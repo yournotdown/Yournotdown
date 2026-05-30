@@ -1,0 +1,42 @@
+{
+  "summary": "Iteration 2: tested ADMIN_EMAILS lockdown + per-business analytics deep-dive. Backend: 40/40 pytest tests pass (added 11 new tests across TestAdminBusinessAnalytics and TestAdminEmailsLockdown). New GET /api/admin/analytics/business/{id}?days=N endpoint returns correct shape, 404 on missing biz, 403 on non-admin, 401 on unauth, and timeline length always equals days for 7/30/90. Generated business_view/website_click/phone_click/directions_click events via /api/analytics/track and confirmed totals + today's timeline row reflect them. Frontend: deep-dive page renders name, image, 4 metric cards, recharts area chart (business-analytics-chart), owner snippet (business-analytics-snippet), and all three range buttons; clicking range-7 hits API with days=7 and gets timeline length 7; admin-analytics-{id} icon in businesses tab + admin-analytics-row-{id} in analytics tab both navigate to /admin/business/{id}. Unauthenticated visit redirects to /admin/login.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Main agent: review the two App.js bugs the testing agent had to patch to unblock testing (see updated_files). The route /admin/business/:id was MISSING (despite review-request claim that it was added), and the file had a stray garbage line 't App;' on line 42 that prevented the frontend from compiling at all. Both fixed in /app/frontend/src/App.js. Please verify the fix matches your intent and consider why the original commit went out broken (likely a bad copy-paste).",
+    "Optional cleanup (already noted iter-1): CategoryDetailPage was supposed to de-dupe business_view in this iteration — quick spot-check shows the tracking call still fires once per business card on every CategoryDetailPage render; verify the de-dupe actually landed (review request claimed it did)."
+  ],
+  "critical_code_review_comments": [
+    "BLOCKER (fixed by testing agent): /app/frontend/src/App.js line 42 had a stray 't App;' token after 'export default App;' — caused babel-loader SyntaxError and the entire frontend was serving the CRA error overlay. Removed.",
+    "BLOCKER (fixed by testing agent): /app/frontend/src/App.js was missing <Route path=\"/admin/business/:id\" element={<AdminBusinessAnalyticsPage />} />. The import was present, the page component exists, but the route was never registered, so navigation fell through to the catch-all HomePage. Route added.",
+    "ADMIN_EMAILS allowlist enforcement in /auth/session is correct: on every login the role is re-derived from the allowlist and demoted to 'user' if email is no longer allowed (server.py lines 333-338). Cannot exercise full flow without a real Emergent session_id but the code path is correct and require_admin still rejects non-admins (verified via 403 tests).",
+    "Per-business analytics endpoint uses ISO timestamp string for the since-filter (since = isoformat()) and groups by $substr of timestamp[0:10] — works because ISO-8601 timestamps are lexicographically sortable, but a real $dateTrunc/$dateFromString would be more robust if timestamps ever get written without a normalized 'Z' suffix.",
+    "Endpoint returns totals as an ALL-TIME aggregate but timeline is days-bounded — this is intentional but the UI labels should make this clear to the operator viewing the page (currently the metric cards do not disambiguate 'total' vs 'in selected range').",
+    "AdminBusinessAnalyticsPage error UI uses data-testid='business-analytics-error' but a 401/403 on /api/admin/analytics/business/{id} causes the page's api interceptor to redirect to /admin/login before the error UI ever renders — that's why the no-auth check found url=/admin/login and no error banner. Behavior is acceptable but worth a comment in the page component."
+  ],
+  "updated_files": [
+    "/app/frontend/src/App.js",
+    "/app/backend/tests/backend_test.py"
+  ],
+  "success_rate": {
+    "backend": "100% (40/40)",
+    "frontend": "100% (all required flows pass after App.js fix)"
+  },
+  "test_credentials": "Same as iter 1: Admin Bearer test_session_admin_1780165861579 / cookie session_token=same. Non-admin Bearer test_session_user_1780165861637. Both still valid in mongo.",
+  "seed_data_creation": "Reused iter-1 seed (9 categories, 30 businesses). Added several analytics events on the first drinks-category business as part of the totals-aggregation test; events are append-only and have no cleanup but do not affect any other test.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "All 40 backend tests in /app/backend/tests/backend_test.py pass. New testids on the deep-dive page: business-analytics-page, business-analytics-name, business-analytics-back, business-analytics-edit, business-analytics-view-public, business-analytics-chart, business-analytics-snippet, business-analytics-range-7/-30/-90, business-analytics-error, business-analytics-loading. On the admin dashboard: admin-analytics-{business_id} (icon button on each business row in businesses tab) and admin-analytics-row-{business_id} (clickable row in analytics tab). The /admin/business/:id route is wired in App.js (was missing on arrival — testing agent added it).",
+  "rca of the issue": "Found two frontend BLOCKER bugs at start of testing: (1) /app/frontend/src/App.js line 42 contained a stray 'export default App;' followed by 't App;' — a clear typo/copy-paste artifact from the main agent's edit. webpack reported 'Module build failed ... SyntaxError: Missing semicolon (42:1)' and the entire SPA served the CRA error overlay. (2) The /admin/business/:id route the main agent claimed to add was actually never added — the AdminBusinessAnalyticsPage import was present but the <Route> registration was missing, so any navigation to /admin/business/<id> fell through to the wildcard route and rendered HomePage. Mitigation: testing agent removed the typo line and added the missing <Route path='/admin/business/:id' element={<AdminBusinessAnalyticsPage />} />. After hot-reload, frontend compiled cleanly and all flows pass. Main agent should review and acknowledge."
+}

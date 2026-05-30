@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import {
   Plus, Pencil, Trash2, Star, ArrowUp, ArrowDown, Upload,
-  LogOut, BarChart3, Store, LayoutGrid, Image as ImageIcon,
+  LogOut, BarChart3, Store, LayoutGrid, Image as ImageIcon, TrendingUp,
 } from "lucide-react";
 import { api, resolveImageUrl } from "../lib/api";
 import { Button } from "@/components/ui/button";
@@ -262,9 +262,10 @@ export default function AdminDashboardPage() {
             onDelete={handleDelete}
             onToggleFeatured={handleToggleFeatured}
             onReorder={handleReorder}
+            onAnalytics={(b) => navigate(`/admin/business/${b.id}`)}
           />
         )}
-        {tab === "analytics" && <AnalyticsPanel analytics={analytics} categories={categories} />}
+        {tab === "analytics" && <AnalyticsPanel analytics={analytics} categories={categories} onOpenBusiness={(bid) => navigate(`/admin/business/${bid}`)} />}
       </div>
 
       {/* Edit / create dialog */}
@@ -424,7 +425,7 @@ function Field({ label, children }) {
   );
 }
 
-function BusinessesPanel({ businesses, categories, onCreate, onEdit, onDelete, onToggleFeatured, onReorder }) {
+function BusinessesPanel({ businesses, categories, onCreate, onEdit, onDelete, onToggleFeatured, onReorder, onAnalytics }) {
   const [filter, setFilter] = useState("all");
   const filtered = filter === "all" ? businesses : businesses.filter((b) => b.category_slug === filter);
 
@@ -511,6 +512,9 @@ function BusinessesPanel({ businesses, categories, onCreate, onEdit, onDelete, o
                 </td>
                 <td className="px-5 py-3">
                   <div className="flex items-center justify-end gap-1">
+                    <IconBtn onClick={() => onAnalytics(b)} testid={`admin-analytics-${b.id}`} label="View analytics">
+                      <TrendingUp className="w-4 h-4" />
+                    </IconBtn>
                     <IconBtn onClick={() => onReorder(idx, -1)} testid={`admin-move-up-${b.id}`} label="Move up">
                       <ArrowUp className="w-4 h-4" />
                     </IconBtn>
@@ -551,7 +555,7 @@ function IconBtn({ children, onClick, testid, label, danger }) {
   );
 }
 
-function AnalyticsPanel({ analytics, categories }) {
+function AnalyticsPanel({ analytics, categories, onOpenBusiness }) {
   if (!analytics) {
     return <div className="text-[#A1A1AA]" data-testid="admin-analytics-loading">Loading analytics…</div>;
   }
@@ -626,7 +630,12 @@ function AnalyticsPanel({ analytics, categories }) {
                 </tr>
               ) : (
                 analytics.by_business.map((row) => (
-                  <tr key={row.business_id} className="border-t border-white/5">
+                  <tr
+                    key={row.business_id}
+                    className="border-t border-white/5 hover:bg-white/[0.03] cursor-pointer"
+                    onClick={() => onOpenBusiness(row.business_id)}
+                    data-testid={`admin-analytics-row-${row.business_id}`}
+                  >
                     <td className="px-5 py-3 font-medium">{row.name}</td>
                     <td className="px-3 py-3 text-[#A1A1AA]">{row.business_view || 0}</td>
                     <td className="px-3 py-3 text-[#A1A1AA]">{row.website_click || 0}</td>

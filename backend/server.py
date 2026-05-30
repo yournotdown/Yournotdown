@@ -330,7 +330,10 @@ async def auth_session(request: Request, response: Response):
     if existing:
         user_id = existing["user_id"]
         update = {"name": name, "picture": picture}
-        if is_admin and existing.get("role") != "admin":
+        # Re-evaluate role on every login so the allowlist is the source of truth.
+        if ADMIN_EMAILS:
+            update["role"] = "admin" if is_admin else "user"
+        elif is_admin and existing.get("role") != "admin":
             update["role"] = "admin"
         await db.users.update_one({"user_id": user_id}, {"$set": update})
     else:
@@ -453,6 +456,69 @@ async def admin_list_categories(user=Depends(require_admin)):
 
 
 # ------------- Admin: analytics -------------
+@api_router.get("/admin/analytics/business/{business_id}")
+async def admin_business_analytics(business_id: str, days: int = 30, user=Depends(require_admin)):
+    biz = await db.businesses.find_one({"id": business_id}, {"_id": 0})
+    if not biz:
+        raise HTTPException(status_code=404, detail="Business not found")
+
+    # Totals per event type (all time)
+    pipeline = [
+        {"$match": {"business_id": business_id}},
+        {"$group": {"_id": "$event_type", "count": {"$sum": 1}}},
+    ]
+    rows = await db.analytics_events.aggregate(pipeline).to_list(100)
+    totals = {r["_id"]: r["count"] for r in rows}
+
+    # Daily timeline for the last N days
+    since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    tl_pipeline = [
+        {"$match": {"business_id": business_id, "timestamp": {"$gte": since}}},
+        {
+            "$group": {
+                "_id": {
+                    "day": {"$substr": ["$timestamp", 0, 10]},
+                    "event_type": "$event_type",
+                },
+                "count": {"$sum": 1},
+            }
+        },
+    ]
+    tl_rows = await db.analytics_events.aggregate(tl_pipeline).to_list(10000)
+
+    # Build {day: {event_type: count}}
+    by_day: dict = {}
+    for r in tl_rows:
+        day = r["_id"]["day"]
+        et = r["_id"]["event_type"]
+        by_day.setdefault(day, {})[et] = r["count"]
+
+    # Fill missing days
+    timeline = []
+    today = datetime.now(timezone.utc).date()
+    for i in range(days - 1, -1, -1):
+        d = (today - timedelta(days=i)).isoformat()
+        row = by_day.get(d, {})
+        timeline.append({
+            "day": d,
+            "business_view": row.get("business_view", 0),
+            "website_click": row.get("website_click", 0),
+            "phone_click": row.get("phone_click", 0),
+            "directions_click": row.get("directions_click", 0),
+        })
+
+    return {
+        "business": biz,
+        "totals": {
+            "business_view": totals.get("business_view", 0),
+            "website_click": totals.get("website_click", 0),
+            "phone_click": totals.get("phone_click", 0),
+            "directions_click": totals.get("directions_click", 0),
+        },
+        "timeline": timeline,
+    }
+
+
 @api_router.get("/admin/analytics/summary")
 async def admin_analytics_summary(user=Depends(require_admin)):
     pipeline = [

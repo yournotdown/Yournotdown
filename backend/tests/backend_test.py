@@ -199,6 +199,119 @@ class TestAdminMisc:
         assert data["by_event_type"].get("im_down_click", 0) >= 1
 
 
+# ---------------- Admin: per-business analytics deep-dive ----------------
+class TestAdminBusinessAnalytics:
+    def test_requires_admin(self, user_headers):
+        # Pick any real business id
+        r = requests.get(f"{API}/businesses", params={"category": "food"}, timeout=10)
+        bid = r.json()[0]["id"]
+        r2 = requests.get(f"{API}/admin/analytics/business/{bid}",
+                          headers=user_headers, timeout=10)
+        assert r2.status_code == 403
+
+    def test_requires_auth(self):
+        r = requests.get(f"{API}/businesses", params={"category": "food"}, timeout=10)
+        bid = r.json()[0]["id"]
+        r2 = requests.get(f"{API}/admin/analytics/business/{bid}", timeout=10)
+        assert r2.status_code == 401
+
+    def test_404_when_business_missing(self, admin_headers):
+        r = requests.get(f"{API}/admin/analytics/business/nonexistent-xyz",
+                         headers=admin_headers, timeout=10)
+        assert r.status_code == 404
+
+    def test_default_days_is_30(self, admin_headers):
+        r = requests.get(f"{API}/businesses", params={"category": "food"}, timeout=10)
+        bid = r.json()[0]["id"]
+        r2 = requests.get(f"{API}/admin/analytics/business/{bid}",
+                         headers=admin_headers, timeout=10)
+        assert r2.status_code == 200
+        data = r2.json()
+        # Shape
+        assert "business" in data and data["business"]["id"] == bid
+        assert "totals" in data
+        for k in ("business_view", "website_click", "phone_click", "directions_click"):
+            assert k in data["totals"]
+        # timeline length
+        assert isinstance(data["timeline"], list)
+        assert len(data["timeline"]) == 30
+        # Each row has all 4 metrics + day
+        for row in data["timeline"]:
+            for k in ("day", "business_view", "website_click", "phone_click", "directions_click"):
+                assert k in row
+
+    @pytest.mark.parametrize("days", [7, 30, 90])
+    def test_range_selector(self, admin_headers, days):
+        r = requests.get(f"{API}/businesses", params={"category": "food"}, timeout=10)
+        bid = r.json()[0]["id"]
+        r2 = requests.get(f"{API}/admin/analytics/business/{bid}",
+                         headers=admin_headers, params={"days": days}, timeout=10)
+        assert r2.status_code == 200
+        assert len(r2.json()["timeline"]) == days
+
+    def test_events_aggregate_into_totals_and_today_row(self, admin_headers):
+        # Pick a distinct business (use drinks category to avoid interference with other tests)
+        r = requests.get(f"{API}/businesses", params={"category": "drinks"}, timeout=10)
+        items = r.json()
+        assert items, "Need at least one drinks business"
+        bid = items[0]["id"]
+
+        # Snapshot current totals
+        before = requests.get(f"{API}/admin/analytics/business/{bid}",
+                              headers=admin_headers, timeout=10).json()["totals"]
+
+        # Generate events
+        events = [
+            {"event_type": "business_view", "business_id": bid},
+            {"event_type": "business_view", "business_id": bid},
+            {"event_type": "website_click", "business_id": bid},
+            {"event_type": "phone_click", "business_id": bid},
+            {"event_type": "directions_click", "business_id": bid},
+        ]
+        for e in events:
+            rr = requests.post(f"{API}/analytics/track", json=e, timeout=10)
+            assert rr.status_code == 200
+
+        # Re-fetch and verify deltas
+        after = requests.get(f"{API}/admin/analytics/business/{bid}",
+                             headers=admin_headers, timeout=10).json()
+        totals = after["totals"]
+        assert totals["business_view"] - before["business_view"] >= 2
+        assert totals["website_click"] - before["website_click"] >= 1
+        assert totals["phone_click"] - before["phone_click"] >= 1
+        assert totals["directions_click"] - before["directions_click"] >= 1
+
+        # Today's row should reflect the events (last entry in timeline)
+        today_row = after["timeline"][-1]
+        assert today_row["business_view"] >= 2
+        assert today_row["website_click"] >= 1
+        assert today_row["phone_click"] >= 1
+        assert today_row["directions_click"] >= 1
+
+
+# ---------------- ADMIN_EMAILS allowlist enforcement ----------------
+class TestAdminEmailsLockdown:
+    def test_non_admin_still_forbidden_on_new_endpoint(self, user_headers):
+        """The new analytics deep-dive endpoint enforces require_admin."""
+        r = requests.get(f"{API}/businesses", params={"category": "food"}, timeout=10)
+        bid = r.json()[0]["id"]
+        r2 = requests.get(f"{API}/admin/analytics/business/{bid}",
+                          headers=user_headers, timeout=10)
+        assert r2.status_code == 403
+
+    def test_existing_admin_token_still_works(self, admin_headers):
+        """Iteration-1 injected admin token (role=admin in mongo) is unaffected by ADMIN_EMAILS."""
+        r = requests.get(f"{API}/auth/me", headers=admin_headers, timeout=10)
+        assert r.status_code == 200
+        assert r.json().get("role") == "admin"
+
+    def test_session_endpoint_rejects_fake_session_id(self):
+        """Cannot bypass allowlist by sending a fake session_id."""
+        r = requests.post(f"{API}/auth/session",
+                          json={"session_id": "fake_not_real_xyz_123"}, timeout=15)
+        assert r.status_code == 401
+
+
 # ---------------- Admin: upload ----------------
 # 1x1 transparent PNG
 PNG_B64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="

@@ -5,6 +5,7 @@ import CategoriesPage from "./pages/CategoriesPage";
 import CategoryDetailPage from "./pages/CategoryDetailPage";
 import AdminLoginPage from "./pages/AdminLoginPage";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
+import AdminBusinessAnalyticsPage from "./pages/AdminBusinessAnalyticsPage";
 import AuthCallback from "./pages/AuthCallback";
 import "@/index.css";
 
@@ -21,6 +22,7 @@ function AppRouter() {
       <Route path="/c/:slug" element={<CategoryDetailPage />} />
       <Route path="/admin/login" element={<AdminLoginPage />} />
       <Route path="/admin" element={<AdminDashboardPage />} />
+      <Route path="/admin/business/:id" element={<AdminBusinessAnalyticsPage />} />
       <Route path="*" element={<HomePage />} />
     </Routes>
   );

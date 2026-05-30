@@ -20,7 +20,14 @@ export default function CategoryDetailPage() {
         const cat = cats.find((c) => c.slug === slug);
         setCategory(cat || { slug, name: slug, emoji: "✨" });
         setBusinesses(biz);
-        biz.forEach((b) => trackEvent("business_view", { business_id: b.id, category_slug: slug }));
+        // One view event per business per page-load (not per render)
+        const seen = new Set();
+        biz.forEach((b) => {
+          if (!seen.has(b.id)) {
+            seen.add(b.id);
+            trackEvent("business_view", { business_id: b.id, category_slug: slug });
+          }
+        });
         setLoading(false);
       })
       .catch(() => setLoading(false));
