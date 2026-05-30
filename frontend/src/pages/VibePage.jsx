@@ -15,7 +15,7 @@ export default function VibePage() {
 
   const handleSelect = (vibe) => {
     trackEvent("vibe_click", { vibe: vibe.slug });
-    navigate(`/categories?vibe=${vibe.slug}`);
+    navigate(`/tonight?vibe=${vibe.slug}`);
   };
 
   return (

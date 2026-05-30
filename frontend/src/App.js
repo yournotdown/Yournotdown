@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { Toaster } from "sonner";
 import HomePage from "./pages/HomePage";
 import VibePage from "./pages/VibePage";
+import TonightPage from "./pages/TonightPage";
 import CategoriesPage from "./pages/CategoriesPage";
 import CategoryDetailPage from "./pages/CategoryDetailPage";
 import AdminLoginPage from "./pages/AdminLoginPage";
@@ -20,6 +21,7 @@ function AppRouter() {
     <Routes>
       <Route path="/" element={<HomePage />} />
       <Route path="/vibe" element={<VibePage />} />
+      <Route path="/tonight" element={<TonightPage />} />
       <Route path="/categories" element={<CategoriesPage />} />
       <Route path="/c/:slug" element={<CategoryDetailPage />} />
       <Route path="/admin/login" element={<AdminLoginPage />} />

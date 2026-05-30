@@ -52,19 +52,43 @@ class Category(BaseModel):
     order: int = 0
 
 
+SLOT_LABELS = [
+    {"slot": "dinner", "label": "Dinner", "emoji": "🍽️", "number": 1},
+    {"slot": "drinks", "label": "Drinks", "emoji": "🍸", "number": 2},
+    {"slot": "entertainment", "label": "Entertainment", "emoji": "🎵", "number": 3},
+    {"slot": "late-night", "label": "Late Night", "emoji": "🌃", "number": 4},
+]
+
+# Sponsor tier weights for weighted-random selection
+SPONSOR_WEIGHTS = {"none": 1, "silver": 5, "gold": 10, "platinum": 20}
+VALID_TIERS = set(SPONSOR_WEIGHTS.keys())
+
+# Default slot assignment by category for backfill
+SLOTS_BY_CATEGORY = {
+    "date-night": ["dinner"],
+    "drinks": ["drinks"],
+    "live-music": ["entertainment"],
+    "night-out": ["late-night"],
+    "family-fun": [],
+    "surprise-me": ["entertainment", "late-night"],
+}
+
+
 class Business(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
     description: str = ""
     image_url: str = ""
-    image_path: Optional[str] = None  # storage path if uploaded
+    image_path: Optional[str] = None
     website: str = ""
     phone: str = ""
     address: str = ""
     category_slug: str
     city_slug: str = "nashville"
-    featured: bool = False
+    featured: bool = False  # legacy — kept for backward-compat; sponsor_tier is canonical
+    sponsor_tier: str = "none"  # one of: none, silver, gold, platinum
+    slots: List[str] = Field(default_factory=list)
     order: int = 0
     created_at: str = Field(default_factory=now_iso)
 
@@ -80,6 +104,8 @@ class BusinessCreate(BaseModel):
     category_slug: str
     city_slug: str = "nashville"
     featured: bool = False
+    sponsor_tier: str = "none"
+    slots: List[str] = Field(default_factory=list)
     order: int = 0
 
 
@@ -94,6 +120,8 @@ class BusinessUpdate(BaseModel):
     category_slug: Optional[str] = None
     city_slug: Optional[str] = None
     featured: Optional[bool] = None
+    sponsor_tier: Optional[str] = None
+    slots: Optional[List[str]] = None
     order: Optional[int] = None
 
 
@@ -111,6 +139,8 @@ class AnalyticsEvent(BaseModel):
     business_id: Optional[str] = None
     category_slug: Optional[str] = None
     city_slug: Optional[str] = None
+    vibe: Optional[str] = None
+    itinerary_id: Optional[str] = None
 
 
 class LeadCreate(BaseModel):
@@ -160,6 +190,7 @@ async def startup():
     biz_count = await db.businesses.count_documents({})
     if biz_count == 0:
         for i, b in enumerate(BUSINESSES):
+            cat = b["category_slug"]
             doc = {
                 "id": str(uuid.uuid4()),
                 "name": b["name"],
@@ -169,14 +200,31 @@ async def startup():
                 "website": b.get("website", ""),
                 "phone": b.get("phone", ""),
                 "address": b.get("address", ""),
-                "category_slug": b["category_slug"],
+                "category_slug": cat,
                 "city_slug": "nashville",
                 "featured": b.get("featured", False),
+                "sponsor_tier": "gold" if b.get("featured") else "none",
+                "slots": list(SLOTS_BY_CATEGORY.get(cat, [])),
                 "order": i,
                 "created_at": now_iso(),
             }
             await db.businesses.insert_one(doc)
         logger.info(f"Seeded {len(BUSINESSES)} businesses")
+
+    # --- Business field backfill (idempotent) ---
+    # Backfill `sponsor_tier` from legacy `featured` flag
+    await db.businesses.update_many(
+        {"sponsor_tier": {"$exists": False}, "featured": True},
+        {"$set": {"sponsor_tier": "gold"}},
+    )
+    await db.businesses.update_many(
+        {"sponsor_tier": {"$exists": False}},
+        {"$set": {"sponsor_tier": "none"}},
+    )
+    # Backfill `slots` from category default
+    async for biz in db.businesses.find({"slots": {"$exists": False}}, {"_id": 0, "id": 1, "category_slug": 1}):
+        default_slots = list(SLOTS_BY_CATEGORY.get(biz.get("category_slug", ""), []))
+        await db.businesses.update_one({"id": biz["id"]}, {"$set": {"slots": default_slots}})
 
 
 @app.on_event("shutdown")
@@ -219,6 +267,108 @@ async def require_admin(user=Depends(get_current_user)):
     if user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     return user
+
+
+# ------------- Itinerary engine -------------
+import random
+
+
+class ItineraryRequest(BaseModel):
+    vibe: Optional[str] = None
+    city: str = "nashville"
+    exclude_ids: List[str] = Field(default_factory=list)
+
+
+def _weighted_pick(candidates: list, exclude_ids: set) -> Optional[dict]:
+    """Pick one business using sponsor-tier weighted random selection.
+
+    If everything is excluded, relax the exclusion filter."""
+    pool = [b for b in candidates if b["id"] not in exclude_ids]
+    if not pool:
+        pool = candidates  # fall back to full candidate set
+    if not pool:
+        return None
+    weights = [SPONSOR_WEIGHTS.get(b.get("sponsor_tier", "none"), 1) for b in pool]
+    return random.choices(pool, weights=weights, k=1)[0]
+
+
+@api_router.post("/itinerary/generate")
+async def generate_itinerary(req: ItineraryRequest, request: Request):
+    """Build a 4-step 'Tonight's Move' itinerary from the catalog."""
+    # Load all candidate businesses for this city
+    all_biz = await db.businesses.find(
+        {"city_slug": req.city, "slots": {"$ne": []}},
+        {"_id": 0},
+    ).to_list(2000)
+
+    by_slot: dict = {}
+    for b in all_biz:
+        for slot in b.get("slots", []):
+            by_slot.setdefault(slot, []).append(b)
+
+    exclude = set(req.exclude_ids)
+    chosen_ids: set = set()
+    steps = []
+    for label in SLOT_LABELS:
+        candidates = by_slot.get(label["slot"], [])
+        # Exclude businesses already picked in THIS itinerary plus prior excludes
+        pick = _weighted_pick(candidates, exclude | chosen_ids)
+        if pick:
+            chosen_ids.add(pick["id"])
+            steps.append({
+                "slot": label["slot"],
+                "number": label["number"],
+                "label": label["label"],
+                "emoji": label["emoji"],
+                "business": pick,
+            })
+
+    itin_id = str(uuid.uuid4())
+    itinerary = {
+        "id": itin_id,
+        "vibe": req.vibe,
+        "city": req.city,
+        "steps": steps,
+        "generated_at": now_iso(),
+    }
+
+    # Persist the itinerary for analytics + record events
+    await db.itineraries.insert_one({
+        **itinerary,
+        "ip": request.client.host if request.client else None,
+    })
+
+    # Track one analytic event per business appearance
+    appearance_docs = []
+    for step in steps:
+        b = step["business"]
+        appearance_docs.append({
+            "id": str(uuid.uuid4()),
+            "event_type": "business_appearance",
+            "business_id": b["id"],
+            "sponsor_tier": b.get("sponsor_tier", "none"),
+            "city_slug": req.city,
+            "vibe": req.vibe,
+            "itinerary_id": itin_id,
+            "ip": request.client.host if request.client else None,
+            "user_agent": request.headers.get("user-agent"),
+            "timestamp": now_iso(),
+        })
+    if appearance_docs:
+        await db.analytics_events.insert_many(appearance_docs)
+    # And one event for the itinerary generation itself
+    await db.analytics_events.insert_one({
+        "id": str(uuid.uuid4()),
+        "event_type": "itinerary_generated",
+        "city_slug": req.city,
+        "vibe": req.vibe,
+        "itinerary_id": itin_id,
+        "ip": request.client.host if request.client else None,
+        "user_agent": request.headers.get("user-agent"),
+        "timestamp": now_iso(),
+    })
+
+    return itinerary
 
 
 # ------------- Public endpoints -------------
@@ -297,10 +447,19 @@ async def track_event(event: AnalyticsEvent, request: Request):
         "business_id": event.business_id,
         "category_slug": event.category_slug,
         "city_slug": event.city_slug,
+        "vibe": event.vibe,
+        "itinerary_id": event.itinerary_id,
         "ip": request.client.host if request.client else None,
         "user_agent": request.headers.get("user-agent"),
         "timestamp": now_iso(),
     }
+    # Stamp sponsor tier on click events for easy reporting
+    if event.business_id and event.event_type in {
+        "business_click", "website_click", "phone_click", "directions_click",
+    }:
+        biz = await db.businesses.find_one({"id": event.business_id}, {"_id": 0, "sponsor_tier": 1})
+        if biz:
+            doc["sponsor_tier"] = biz.get("sponsor_tier", "none")
     await db.analytics_events.insert_one(doc)
     return {"ok": True}
 
@@ -408,7 +567,11 @@ async def admin_list_businesses(user=Depends(require_admin)):
 
 @api_router.post("/admin/businesses")
 async def admin_create_business(body: BusinessCreate, user=Depends(require_admin)):
+    if body.sponsor_tier not in VALID_TIERS:
+        raise HTTPException(status_code=400, detail=f"Invalid sponsor_tier; must be one of {sorted(VALID_TIERS)}")
     biz = Business(**body.model_dump())
+    # Auto-sync legacy `featured` from sponsor_tier
+    biz.featured = biz.sponsor_tier != "none"
     await db.businesses.insert_one(biz.model_dump())
     return biz.model_dump()
 
@@ -416,6 +579,10 @@ async def admin_create_business(body: BusinessCreate, user=Depends(require_admin
 @api_router.patch("/admin/businesses/{business_id}")
 async def admin_update_business(business_id: str, body: BusinessUpdate, user=Depends(require_admin)):
     update = {k: v for k, v in body.model_dump().items() if v is not None}
+    if "sponsor_tier" in update and update["sponsor_tier"] not in VALID_TIERS:
+        raise HTTPException(status_code=400, detail=f"Invalid sponsor_tier; must be one of {sorted(VALID_TIERS)}")
+    if "sponsor_tier" in update:
+        update["featured"] = update["sponsor_tier"] != "none"
     if not update:
         return await db.businesses.find_one({"id": business_id}, {"_id": 0})
     res = await db.businesses.update_one({"id": business_id}, {"$set": update})
@@ -518,6 +685,7 @@ async def admin_business_analytics(business_id: str, days: int = 30, user=Depend
         row = by_day.get(d, {})
         timeline.append({
             "day": d,
+            "business_appearance": row.get("business_appearance", 0),
             "business_view": row.get("business_view", 0),
             "website_click": row.get("website_click", 0),
             "phone_click": row.get("phone_click", 0),
@@ -527,6 +695,7 @@ async def admin_business_analytics(business_id: str, days: int = 30, user=Depend
     return {
         "business": biz,
         "totals": {
+            "business_appearance": totals.get("business_appearance", 0),
             "business_view": totals.get("business_view", 0),
             "website_click": totals.get("website_click", 0),
             "phone_click": totals.get("phone_click", 0),
@@ -564,15 +733,44 @@ async def admin_analytics_summary(user=Depends(require_admin)):
         et = r["_id"]["event_type"]
         by_biz.setdefault(bid, {})[et] = r["count"]
 
-    # attach business names
+    # attach business names + sponsor tier
     biz_ids = list(by_biz.keys())
-    businesses = await db.businesses.find({"id": {"$in": biz_ids}}, {"_id": 0, "id": 1, "name": 1}).to_list(1000)
+    businesses = await db.businesses.find(
+        {"id": {"$in": biz_ids}}, {"_id": 0, "id": 1, "name": 1, "sponsor_tier": 1}
+    ).to_list(1000)
     name_map = {b["id"]: b["name"] for b in businesses}
+    tier_map = {b["id"]: b.get("sponsor_tier", "none") for b in businesses}
     business_breakdown = [
-        {"business_id": bid, "name": name_map.get(bid, "(deleted)"), **counts}
+        {
+            "business_id": bid,
+            "name": name_map.get(bid, "(deleted)"),
+            "sponsor_tier": tier_map.get(bid, "none"),
+            **counts,
+        }
         for bid, counts in by_biz.items()
     ]
-    business_breakdown.sort(key=lambda x: -(x.get("business_view", 0)))
+    business_breakdown.sort(
+        key=lambda x: -(x.get("business_appearance", 0) + x.get("business_view", 0))
+    )
+
+    # Sponsor performance: aggregate appearances + clicks by tier
+    sponsor_pipeline = [
+        {"$match": {"sponsor_tier": {"$ne": None}}},
+        {"$group": {
+            "_id": {"tier": "$sponsor_tier", "event_type": "$event_type"},
+            "count": {"$sum": 1},
+        }},
+    ]
+    sp_rows = await db.analytics_events.aggregate(sponsor_pipeline).to_list(1000)
+    by_tier: dict = {}
+    for r in sp_rows:
+        tier = r["_id"]["tier"] or "none"
+        et = r["_id"]["event_type"]
+        by_tier.setdefault(tier, {})[et] = r["count"]
+    sponsor_performance = []
+    for tier in ["platinum", "gold", "silver", "none"]:
+        if tier in by_tier:
+            sponsor_performance.append({"tier": tier, **by_tier[tier]})
 
     total_events = await db.analytics_events.count_documents({})
 
@@ -581,6 +779,7 @@ async def admin_analytics_summary(user=Depends(require_admin)):
         "by_event_type": summary,
         "by_category": [{"category_slug": r["_id"], "count": r["count"]} for r in cat_rows],
         "by_business": business_breakdown,
+        "sponsor_performance": sponsor_performance,
     }
 
 

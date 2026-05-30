@@ -10,7 +10,7 @@ import {
 import { api, resolveImageUrl } from "../lib/api";
 
 const METRICS = [
-  { key: "business_view", label: "Impressions", icon: Eye, color: "#A1A1AA" },
+  { key: "business_appearance", label: "Appearances", icon: Eye, color: "#FFD166" },
   { key: "website_click", label: "Website clicks", icon: Globe, color: "#FF2A5F" },
   { key: "phone_click", label: "Phone calls", icon: Phone, color: "#22D3EE" },
   { key: "directions_click", label: "Directions", icon: Navigation, color: "#A78BFA" },
@@ -56,10 +56,10 @@ export default function AdminBusinessAnalyticsPage() {
   const b = data.business;
   const totals = data.totals;
   const ctr =
-    totals.business_view > 0
+    totals.business_appearance > 0
       ? (
           ((totals.website_click + totals.phone_click + totals.directions_click) /
-            totals.business_view) *
+            totals.business_appearance) *
           100
         ).toFixed(1)
       : "0.0";
@@ -249,7 +249,7 @@ export default function AdminBusinessAnalyticsPage() {
             data-testid="business-analytics-snippet"
           >
 {`${b.name} — last ${days} days on You're Not Down
-${totals.business_view.toLocaleString()} impressions
+${totals.business_appearance.toLocaleString()} appearances in itineraries
 ${totals.website_click.toLocaleString()} website clicks
 ${totals.phone_click.toLocaleString()} phone calls
 ${totals.directions_click.toLocaleString()} direction requests`}

@@ -28,6 +28,8 @@ const empty = {
   category_slug: "drinks",
   city_slug: "nashville",
   featured: false,
+  sponsor_tier: "none",
+  slots: [],
   order: 0,
 };
 
@@ -381,16 +383,60 @@ export default function AdminDashboardPage() {
               />
             </Field>
 
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={form.featured}
-                onChange={(e) => setForm({ ...form, featured: e.target.checked })}
-                className="w-5 h-5 accent-[#FF2A5F]"
-                data-testid="business-form-featured"
-              />
-              <span className="text-sm font-medium">Feature this business</span>
-            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label="Sponsor tier">
+                <Select
+                  value={form.sponsor_tier || "none"}
+                  onValueChange={(v) => setForm({ ...form, sponsor_tier: v, featured: v !== "none" })}
+                >
+                  <SelectTrigger className="bg-[#1A1A1A] border-white/10 text-white" data-testid="business-form-sponsor-tier">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#121212] border-white/10 text-white">
+                    <SelectItem value="none" className="focus:bg-white/10 focus:text-white">None · weight 1</SelectItem>
+                    <SelectItem value="silver" className="focus:bg-white/10 focus:text-white">Silver · weight 5</SelectItem>
+                    <SelectItem value="gold" className="focus:bg-white/10 focus:text-white">Gold · weight 10</SelectItem>
+                    <SelectItem value="platinum" className="focus:bg-white/10 focus:text-white">Platinum · weight 20</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Itinerary slots">
+                <div className="grid grid-cols-2 gap-2" data-testid="business-form-slots">
+                  {[
+                    { slug: "dinner", label: "🍽️ Dinner" },
+                    { slug: "drinks", label: "🍸 Drinks" },
+                    { slug: "entertainment", label: "🎵 Entertainment" },
+                    { slug: "late-night", label: "🌃 Late Night" },
+                  ].map((s) => {
+                    const checked = (form.slots || []).includes(s.slug);
+                    return (
+                      <label
+                        key={s.slug}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-xl border cursor-pointer transition-colors text-sm ${
+                          checked
+                            ? "bg-[#FF2A5F]/10 border-[#FF2A5F]/40 text-white"
+                            : "bg-[#1A1A1A] border-white/10 text-[#A1A1AA] hover:text-white"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => {
+                            const cur = new Set(form.slots || []);
+                            if (e.target.checked) cur.add(s.slug);
+                            else cur.delete(s.slug);
+                            setForm({ ...form, slots: Array.from(cur) });
+                          }}
+                          className="w-4 h-4 accent-[#FF2A5F]"
+                          data-testid={`business-form-slot-${s.slug}`}
+                        />
+                        <span>{s.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </Field>
+            </div>
           </div>
           <DialogFooter>
             <Button
@@ -467,8 +513,8 @@ function BusinessesPanel({ businesses, categories, onCreate, onEdit, onDelete, o
             <tr className="text-left text-xs uppercase tracking-wide text-[#A1A1AA]">
               <th className="px-5 py-4 w-16"></th>
               <th className="px-2 py-4">Name</th>
-              <th className="px-5 py-4 hidden md:table-cell">Category</th>
-              <th className="px-5 py-4 hidden sm:table-cell">Featured</th>
+              <th className="px-5 py-4 hidden md:table-cell">Slots</th>
+              <th className="px-5 py-4 hidden sm:table-cell">Sponsor</th>
               <th className="px-5 py-4 text-right">Actions</th>
             </tr>
           </thead>
@@ -497,18 +543,11 @@ function BusinessesPanel({ businesses, categories, onCreate, onEdit, onDelete, o
                   <div className="font-bold text-white">{b.name}</div>
                   <div className="text-xs text-[#A1A1AA] line-clamp-1 max-w-md">{b.description}</div>
                 </td>
-                <td className="px-5 py-3 hidden md:table-cell text-sm text-[#A1A1AA]">{b.category_slug}</td>
+                <td className="px-5 py-3 hidden md:table-cell text-xs text-[#A1A1AA]">
+                  {(b.slots && b.slots.length > 0) ? b.slots.join(", ") : <span className="text-white/30">—</span>}
+                </td>
                 <td className="px-5 py-3 hidden sm:table-cell">
-                  <button
-                    onClick={() => onToggleFeatured(b)}
-                    className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${
-                      b.featured ? "bg-[#FF2A5F]/20 text-[#FF2A5F]" : "bg-white/5 text-white/40 hover:text-white"
-                    }`}
-                    data-testid={`admin-feature-toggle-${b.id}`}
-                    aria-label="Toggle featured"
-                  >
-                    <Star className={`w-4 h-4 ${b.featured ? "fill-current" : ""}`} />
-                  </button>
+                  <SponsorBadge tier={b.sponsor_tier || "none"} testid={`admin-sponsor-badge-${b.id}`} />
                 </td>
                 <td className="px-5 py-3">
                   <div className="flex items-center justify-end gap-1">
@@ -555,6 +594,25 @@ function IconBtn({ children, onClick, testid, label, danger }) {
   );
 }
 
+const TIER_STYLES = {
+  platinum: { bg: "bg-white/15", text: "text-white", label: "PLATINUM" },
+  gold: { bg: "bg-yellow-500/15", text: "text-yellow-400", label: "GOLD" },
+  silver: { bg: "bg-zinc-400/15", text: "text-zinc-300", label: "SILVER" },
+  none: { bg: "bg-white/5", text: "text-white/40", label: "—" },
+};
+
+function SponsorBadge({ tier, testid }) {
+  const s = TIER_STYLES[tier] || TIER_STYLES.none;
+  return (
+    <span
+      className={`inline-flex px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider ${s.bg} ${s.text}`}
+      data-testid={testid}
+    >
+      {s.label}
+    </span>
+  );
+}
+
 function AnalyticsPanel({ analytics, categories, onOpenBusiness }) {
   if (!analytics) {
     return <div className="text-[#A1A1AA]" data-testid="admin-analytics-loading">Loading analytics…</div>;
@@ -563,13 +621,16 @@ function AnalyticsPanel({ analytics, categories, onOpenBusiness }) {
   const cards = [
     { label: "Homepage visits", value: ev.homepage_visit || 0, icon: LayoutGrid },
     { label: "I'm Down clicks", value: ev.im_down_click || 0, icon: Star },
-    { label: "Category clicks", value: ev.category_click || 0, icon: BarChart3 },
-    { label: "Business views", value: ev.business_view || 0, icon: Store },
+    { label: "Vibe selections", value: ev.vibe_click || 0, icon: BarChart3 },
+    { label: "Itinerary views", value: ev.itinerary_view || 0, icon: TrendingUp },
+    { label: "Another Night clicks", value: ev.another_night_click || 0, icon: BarChart3 },
+    { label: "Business appearances", value: ev.business_appearance || 0, icon: Store },
+    { label: "Website clicks", value: ev.website_click || 0, icon: ImageIcon },
     { label: "Phone clicks", value: ev.phone_click || 0, icon: ImageIcon },
     { label: "Directions clicks", value: ev.directions_click || 0, icon: ImageIcon },
-    { label: "Website clicks", value: ev.website_click || 0, icon: ImageIcon },
   ];
   const catName = (slug) => categories.find((c) => c.slug === slug)?.name || slug;
+  const sponsorPerf = analytics.sponsor_performance || [];
 
   return (
     <div className="space-y-10" data-testid="admin-analytics">
@@ -609,13 +670,52 @@ function AnalyticsPanel({ analytics, categories, onOpenBusiness }) {
       </div>
 
       <div>
+        <h3 className="font-display text-xl font-bold mb-4">Sponsor performance</h3>
+        <div className="bg-[#121212] border border-white/10 rounded-2xl overflow-x-auto" data-testid="admin-sponsor-performance">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs uppercase tracking-wide text-[#A1A1AA]">
+                <th className="px-5 py-4">Tier</th>
+                <th className="px-3 py-4">Appearances</th>
+                <th className="px-3 py-4">Website</th>
+                <th className="px-3 py-4">Phone</th>
+                <th className="px-3 py-4">Directions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sponsorPerf.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-5 py-8 text-center text-[#A1A1AA]">
+                    No sponsor activity yet.
+                  </td>
+                </tr>
+              ) : (
+                sponsorPerf.map((row) => (
+                  <tr key={row.tier} className="border-t border-white/5">
+                    <td className="px-5 py-3">
+                      <SponsorBadge tier={row.tier} testid={`sponsor-row-tier-${row.tier}`} />
+                    </td>
+                    <td className="px-3 py-3 text-[#A1A1AA]">{row.business_appearance || 0}</td>
+                    <td className="px-3 py-3 text-[#A1A1AA]">{row.website_click || 0}</td>
+                    <td className="px-3 py-3 text-[#A1A1AA]">{row.phone_click || 0}</td>
+                    <td className="px-3 py-3 text-[#A1A1AA]">{row.directions_click || 0}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div>
         <h3 className="font-display text-xl font-bold mb-4">By business</h3>
         <div className="bg-[#121212] border border-white/10 rounded-2xl overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-xs uppercase tracking-wide text-[#A1A1AA]">
                 <th className="px-5 py-4">Business</th>
-                <th className="px-3 py-4">Views</th>
+                <th className="px-3 py-4">Tier</th>
+                <th className="px-3 py-4">Appearances</th>
                 <th className="px-3 py-4">Website</th>
                 <th className="px-3 py-4">Phone</th>
                 <th className="px-3 py-4">Directions</th>
@@ -624,7 +724,7 @@ function AnalyticsPanel({ analytics, categories, onOpenBusiness }) {
             <tbody>
               {analytics.by_business.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-5 py-8 text-center text-[#A1A1AA]">
+                  <td colSpan={6} className="px-5 py-8 text-center text-[#A1A1AA]">
                     No business events yet.
                   </td>
                 </tr>
@@ -637,7 +737,8 @@ function AnalyticsPanel({ analytics, categories, onOpenBusiness }) {
                     data-testid={`admin-analytics-row-${row.business_id}`}
                   >
                     <td className="px-5 py-3 font-medium">{row.name}</td>
-                    <td className="px-3 py-3 text-[#A1A1AA]">{row.business_view || 0}</td>
+                    <td className="px-3 py-3"><SponsorBadge tier={row.sponsor_tier || "none"} /></td>
+                    <td className="px-3 py-3 text-[#A1A1AA]">{row.business_appearance || 0}</td>
                     <td className="px-3 py-3 text-[#A1A1AA]">{row.website_click || 0}</td>
                     <td className="px-3 py-3 text-[#A1A1AA]">{row.phone_click || 0}</td>
                     <td className="px-3 py-3 text-[#A1A1AA]">{row.directions_click || 0}</td>
