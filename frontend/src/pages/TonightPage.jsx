@@ -7,10 +7,10 @@ import {
 import { api, trackEvent, resolveImageUrl } from "../lib/api";
 
 const VIBE_LABELS = {
-  "just-vibing": { emoji: "😇", label: "Just Vibing" },
-  "down": { emoji: "😏", label: "Down" },
-  "very-down": { emoji: "🔥", label: "Very Down" },
-  "send-it": { emoji: "🚀", label: "Send It" },
+  "just-vibing": { emoji: "😇", label: "Take It Easy" },
+  "down": { emoji: "😏", label: "Let's See Where This Goes" },
+  "very-down": { emoji: "🔥", label: "Let's Make It Count" },
+  "send-it": { emoji: "🚀", label: "No Regrets" },
 };
 
 export default function TonightPage() {
