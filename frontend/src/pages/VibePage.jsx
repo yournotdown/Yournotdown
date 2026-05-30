@@ -135,7 +135,7 @@ export default function VibePage() {
         <div className="marquee-track flex whitespace-nowrap py-3 sm:py-4">
           {Array.from({ length: 12 }).map((_, i) => (
             <span
-              key={i}
+              key={`marquee-${i}`}
               className="font-flyer text-sm sm:text-base px-6 tracking-[0.18em] text-white/70"
             >
               {MARQUEE}

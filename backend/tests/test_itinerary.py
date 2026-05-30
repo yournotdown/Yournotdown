@@ -1,12 +1,7 @@
 """Itinerary engine + sponsor tier tests for the major pivot."""
-import os
 import pytest
 import requests
-
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://whatsyoudown.preview.emergentagent.com").rstrip("/")
-API = f"{BASE_URL}/api"
-
-ADMIN_TOKEN = "test_session_admin_1780165861579"
+from test_config import BASE_URL, API, ADMIN_TOKEN  # noqa: F401
 
 
 @pytest.fixture(scope="session")
@@ -77,7 +72,7 @@ class TestItineraryGenerate:
     def test_itinerary_persisted_with_same_id(self, admin_headers):
         r = requests.post(f"{API}/itinerary/generate",
                           json={"vibe": "send-it", "city": "nashville"}, timeout=15)
-        itin_id = r.json()["id"]
+        assert r.json()["id"]  # itinerary id is returned
         # Verify via analytics: itinerary_generated event with this itinerary_id exists
         # (no direct itinerary fetch endpoint exists; use mongo via analytics surface)
         # Use admin analytics summary to confirm by_event_type has itinerary_generated count > 0
@@ -177,14 +172,14 @@ class TestAdminSponsorTier:
         }, timeout=10)
         assert cr.status_code == 200
         bid = cr.json()["id"]
-        assert cr.json()["featured"] is False
+        assert not cr.json()["featured"]
         try:
             r = requests.patch(f"{API}/admin/businesses/{bid}", headers=admin_headers,
                                json={"sponsor_tier": "platinum"}, timeout=10)
             assert r.status_code == 200
             data = r.json()
             assert data["sponsor_tier"] == "platinum"
-            assert data["featured"] is True
+            assert data["featured"]
         finally:
             requests.delete(f"{API}/admin/businesses/{bid}", headers=admin_headers, timeout=10)
 
@@ -194,14 +189,14 @@ class TestAdminSponsorTier:
             "sponsor_tier": "gold", "slots": ["drinks"],
         }, timeout=10)
         bid = cr.json()["id"]
-        assert cr.json()["featured"] is True
+        assert cr.json()["featured"]
         try:
             r = requests.patch(f"{API}/admin/businesses/{bid}", headers=admin_headers,
                                json={"sponsor_tier": "none"}, timeout=10)
             assert r.status_code == 200
             data = r.json()
             assert data["sponsor_tier"] == "none"
-            assert data["featured"] is False
+            assert not data["featured"]
         finally:
             requests.delete(f"{API}/admin/businesses/{bid}", headers=admin_headers, timeout=10)
 

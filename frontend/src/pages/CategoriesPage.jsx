@@ -56,7 +56,7 @@ export default function CategoriesPage() {
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-10">
           {loading
             ? Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="aspect-square rounded-3xl bg-[#121218] animate-pulse" />
+                <div key={`skel-${i}`} className="aspect-square rounded-3xl bg-[#121218] animate-pulse" />
               ))
             : categories.map((cat, i) => (
                 <motion.button

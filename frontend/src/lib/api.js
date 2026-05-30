@@ -10,9 +10,18 @@ export const api = axios.create({
 
 export const trackEvent = (event_type, extra = {}) => {
   try {
-    api.post("/analytics/track", { event_type, ...extra }).catch(() => {});
+    api
+      .post("/analytics/track", { event_type, ...extra })
+      .catch((err) => {
+        // Analytics must never break UX — log for observability only.
+        if (typeof window !== "undefined" && window.console) {
+          console.warn("[analytics] track failed:", event_type, err?.message);
+        }
+      });
   } catch (e) {
-    /* ignore */
+    if (typeof window !== "undefined" && window.console) {
+      console.warn("[analytics] track threw:", event_type, e?.message);
+    }
   }
 };
 

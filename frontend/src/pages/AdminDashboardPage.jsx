@@ -187,7 +187,8 @@ export default function AdminDashboardPage() {
     try {
       await api.post("/auth/logout");
     } catch (e) {
-      /* ignore */
+      // Logout is best-effort; still navigate home even if the server call fails.
+      console.warn("[auth] logout failed:", e?.message);
     }
     navigate("/");
   };

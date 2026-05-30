@@ -141,7 +141,7 @@ export default function TonightPage() {
         ) : loading && !itinerary ? (
           <div className="space-y-0" data-testid="tonight-loading">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="border-t border-white/10 py-10">
+              <div key={`tonight-skel-${i}`} className="border-t border-white/10 py-10">
                 <div className="h-12 w-24 bg-white/5 animate-pulse" />
                 <div className="mt-4 h-56 w-full bg-white/5 animate-pulse" />
               </div>
@@ -218,7 +218,7 @@ export default function TonightPage() {
         <div className="marquee-track flex whitespace-nowrap py-3 sm:py-4">
           {Array.from({ length: 16 }).map((_, i) => (
             <span
-              key={i}
+              key={`marquee-${i}`}
               className="font-flyer text-sm sm:text-base px-6 tracking-[0.18em] text-white/70"
             >
               {MARQUEE}

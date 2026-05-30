@@ -4,12 +4,7 @@ import io
 import base64
 import pytest
 import requests
-
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://whatsyoudown.preview.emergentagent.com").rstrip("/")
-API = f"{BASE_URL}/api"
-
-ADMIN_TOKEN = "test_session_admin_1780165861579"
-USER_TOKEN = "test_session_user_1780165861637"
+from test_config import BASE_URL, API, ADMIN_TOKEN, USER_TOKEN  # noqa: F401
 
 EXPECTED_CATEGORIES = {"drinks", "date-night", "live-music", "night-out", "family-fun", "surprise-me"}
 EXPECTED_CATEGORY_ORDER = ["drinks", "date-night", "live-music", "night-out", "family-fun", "surprise-me"]
@@ -51,7 +46,7 @@ class TestCities:
         assert isinstance(data, list) and len(data) >= 1
         nashville = next((c for c in data if c["slug"] == "nashville"), None)
         assert nashville is not None
-        assert nashville["default"] is True
+        assert nashville["default"]
 
     def test_default_city(self):
         r = requests.get(f"{API}/cities/default", timeout=10)
@@ -143,7 +138,7 @@ class TestVibeAnalytics:
         r = requests.post(f"{API}/analytics/track",
                           json={"event_type": "vibe_click"}, timeout=10)
         assert r.status_code == 200
-        assert r.json().get("ok") is True
+        assert r.json().get("ok")
 
 
 # ---------------- Businesses ----------------
@@ -188,7 +183,7 @@ class TestAnalytics:
     def test_track_events(self, evt):
         r = requests.post(f"{API}/analytics/track", json=evt, timeout=10)
         assert r.status_code == 200
-        assert r.json().get("ok") is True
+        assert r.json().get("ok")
 
     def test_business_view_event(self):
         r = requests.get(f"{API}/businesses", params={"category": "date-night"}, timeout=10)
@@ -244,7 +239,7 @@ class TestAdminBusinesses:
         r = requests.patch(f"{API}/admin/businesses/{bid}", headers=admin_headers,
                            json={"featured": True, "name": "TEST_Biz_Updated"}, timeout=10)
         assert r.status_code == 200
-        assert r.json()["featured"] is True
+        assert r.json()["featured"]
         assert r.json()["name"] == "TEST_Biz_Updated"
 
     def test_reorder(self, admin_headers):

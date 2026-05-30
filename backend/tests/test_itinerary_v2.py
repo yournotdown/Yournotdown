@@ -1,12 +1,7 @@
 """V2 recommendation engine tests: tag-based mood weighting + /api/admin/tags."""
-import os
 import pytest
 import requests
-
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://whatsyoudown.preview.emergentagent.com").rstrip("/")
-API = f"{BASE_URL}/api"
-ADMIN_TOKEN = "test_session_admin_1780165861579"
-USER_TOKEN = "test_session_user_1780165861637"
+from test_config import BASE_URL, API, ADMIN_TOKEN, USER_TOKEN  # noqa: F401
 
 
 @pytest.fixture(scope="session")
