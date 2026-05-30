@@ -90,35 +90,36 @@ export default function TonightPage() {
           transition={{ duration: 0.5 }}
           className="mb-2"
         >
-          <div className="flex items-center gap-3 text-[#A1A1AA] text-xs uppercase tracking-[0.2em] font-bold">
-            <Sparkles className="w-3.5 h-3.5 text-[#FF2A5F]" />
-            Your night, planned
+          <div className="flex items-center gap-3 text-[#A1A1AA] text-[10px] uppercase tracking-[0.32em] font-bold">
+            <Sparkles className="w-3 h-3 text-[#A855F7]" />
+            Curated for tonight
           </div>
           <h1
-            className="font-display font-black text-white text-5xl sm:text-6xl md:text-7xl tracking-tight leading-[0.92] mt-3"
+            className="font-display font-black text-white text-5xl sm:text-6xl md:text-7xl tracking-tight leading-[0.92] mt-4"
             data-testid="tonight-headline"
           >
             TONIGHT'S<br />
-            <span className="text-[#FF2A5F]">MOVE</span>
+            <span className="bg-gradient-to-b from-[#A855F7] to-[#7C3AED] bg-clip-text text-transparent">
+              MOVE
+            </span>
           </h1>
-          <p className="mt-4 text-[#A1A1AA] text-base">
-            You're feeling{" "}
-            <span className="text-white font-bold">
+          <div className="mt-5 flex items-center gap-2 text-[#A1A1AA] text-sm">
+            <span className="h-px w-8 bg-white/15" />
+            <span className="text-white/70">
               {vibeMeta.emoji} {vibeMeta.label}
             </span>
-            . We got you.
-          </p>
+          </div>
         </motion.div>
 
         {error ? (
           <div
-            className="mt-12 p-6 rounded-3xl bg-[#121212] border border-white/10 text-[#A1A1AA]"
+            className="mt-12 p-6 rounded-3xl bg-[#121218] border border-white/10 text-[#A1A1AA]"
             data-testid="tonight-error"
           >
             {error}
             <button
               onClick={() => generate([])}
-              className="mt-4 block text-[#FF2A5F] font-bold hover:underline"
+              className="mt-4 block text-[#7C3AED] font-bold hover:underline"
             >
               Try again →
             </button>
@@ -126,7 +127,7 @@ export default function TonightPage() {
         ) : loading && !itinerary ? (
           <div className="mt-10 space-y-6" data-testid="tonight-loading">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-64 rounded-[32px] bg-[#121212] animate-pulse" />
+              <div key={i} className="h-64 rounded-[32px] bg-[#121218] animate-pulse" />
             ))}
           </div>
         ) : (
@@ -140,7 +141,7 @@ export default function TonightPage() {
               className="mt-10 space-y-8"
             >
               {itinerary?.steps?.length === 0 ? (
-                <div className="p-6 rounded-3xl bg-[#121212] border border-white/10 text-[#A1A1AA]" data-testid="tonight-empty">
+                <div className="p-6 rounded-3xl bg-[#121218] border border-white/10 text-[#A1A1AA]" data-testid="tonight-empty">
                   Catalog's a little thin. Try a different vibe or check back soon.
                 </div>
               ) : (
@@ -170,9 +171,9 @@ export default function TonightPage() {
             <motion.button
               onClick={handleAnother}
               disabled={regenerating}
-              whileTap={{ scale: 0.96 }}
+              whileTap={{ scale: 0.97 }}
               whileHover={{ scale: 1.02 }}
-              className="w-full max-w-sm py-5 px-6 bg-[#FF2A5F] hover:bg-[#E01E50] disabled:opacity-60 text-white font-bold rounded-full glow-pink flex items-center justify-center gap-3 transition-colors"
+              className="w-full max-w-sm py-5 px-6 btn-glass-violet glow-violet-soft disabled:opacity-60 text-white font-bold rounded-full flex items-center justify-center gap-3 transition-all"
               data-testid="tonight-another-button"
             >
               {regenerating ? (
@@ -180,10 +181,10 @@ export default function TonightPage() {
               ) : (
                 <Dice5 className="w-5 h-5" />
               )}
-              <span className="tracking-wide">GIVE ME ANOTHER NIGHT</span>
+              <span className="tracking-[0.18em]">GIVE ME ANOTHER NIGHT</span>
             </motion.button>
-            <p className="mt-3 text-xs text-white/40">
-              Every night is different.
+            <p className="mt-4 text-[10px] uppercase tracking-[0.32em] text-white/30">
+              Every night is different
             </p>
           </motion.div>
         )}
@@ -204,28 +205,31 @@ function StepCard({ step, idx, itinerary, onAction, directionsUrl }) {
       className="relative"
       data-testid={`tonight-step-${step.slot}`}
     >
-      {/* Step number ribbon */}
-      <div className="flex items-center gap-3 mb-4">
-        <div className="w-10 h-10 rounded-full bg-[#FF2A5F] flex items-center justify-center font-display font-black text-white text-lg shrink-0">
-          {step.number}
+      {/* Concierge step header */}
+      <div className="flex items-baseline gap-4 mb-5">
+        <div
+          className="font-display font-black text-[#7C3AED]/80 text-5xl sm:text-6xl leading-none tabular-nums"
+          aria-hidden
+        >
+          {String(step.number).padStart(2, "0")}
         </div>
         <div className="flex-1">
-          <div className="text-xs uppercase tracking-[0.2em] font-bold text-[#A1A1AA]">
-            Step {step.number}
+          <div className="text-[10px] uppercase tracking-[0.32em] font-bold text-[#A1A1AA]">
+            Step {step.number} of 4
           </div>
-          <div className="font-display font-bold text-white text-2xl flex items-center gap-2">
+          <div className="font-display font-bold text-white text-2xl sm:text-3xl flex items-center gap-2 mt-1">
             <span>{step.label}</span>
-            <span aria-hidden>{step.emoji}</span>
+            <span aria-hidden className="text-base opacity-70">{step.emoji}</span>
           </div>
         </div>
       </div>
 
       {/* Business card */}
       <div
-        className="bg-[#121212] rounded-[32px] overflow-hidden border border-white/10 shadow-2xl group"
+        className="bg-[#121218] rounded-[32px] overflow-hidden border border-white/10 shadow-2xl group"
         data-testid={`tonight-business-card-${b.id}`}
       >
-        <div className="relative w-full h-64 sm:h-72 bg-[#1A1A1A] overflow-hidden">
+        <div className="relative w-full h-64 sm:h-72 bg-[#1A1A22] overflow-hidden">
           {resolveImageUrl(b) && (
             <img
               src={resolveImageUrl(b)}
@@ -236,16 +240,16 @@ function StepCard({ step, idx, itinerary, onAction, directionsUrl }) {
           )}
           {sponsored && (
             <div
-              className="absolute top-4 left-4 px-3 py-1.5 bg-white/10 backdrop-blur text-white text-[10px] uppercase tracking-[0.2em] font-bold rounded-full"
+              className="absolute top-4 left-4 px-2.5 py-1 bg-black/50 backdrop-blur border border-[#A855F7]/30 text-[#A855F7] text-[9px] uppercase tracking-[0.32em] font-bold rounded-full"
               data-testid={`tonight-sponsored-badge-${b.id}`}
             >
               Sponsored
             </div>
           )}
         </div>
-        <div className="p-6">
+        <div className="p-6 sm:p-7">
           <h3
-            className="font-display text-2xl sm:text-3xl font-bold text-white"
+            className="font-display text-2xl sm:text-3xl font-bold text-white tracking-tight"
             data-testid={`tonight-business-name-${b.id}`}
           >
             {b.name}
@@ -253,12 +257,12 @@ function StepCard({ step, idx, itinerary, onAction, directionsUrl }) {
           <p className="mt-2 text-[#A1A1AA] text-sm leading-relaxed line-clamp-3">
             {b.description}
           </p>
-          <div className="grid grid-cols-3 gap-3 mt-6">
+          <div className="grid grid-cols-3 gap-2.5 mt-6">
             {b.phone ? (
               <a
                 href={`tel:${b.phone}`}
                 onClick={() => onAction("phone_click", b, itinerary)}
-                className="py-4 rounded-full bg-white/5 hover:bg-white/10 text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-colors active:scale-95"
+                className="py-3.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/5 text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-colors active:scale-95"
                 data-testid={`tonight-call-${b.id}`}
               >
                 <Phone className="w-4 h-4" />
@@ -271,7 +275,7 @@ function StepCard({ step, idx, itinerary, onAction, directionsUrl }) {
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => onAction("directions_click", b, itinerary)}
-                className="py-4 rounded-full bg-white/5 hover:bg-white/10 text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-colors active:scale-95"
+                className="py-3.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/5 text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-colors active:scale-95"
                 data-testid={`tonight-directions-${b.id}`}
               >
                 <Navigation className="w-4 h-4" />
@@ -284,7 +288,7 @@ function StepCard({ step, idx, itinerary, onAction, directionsUrl }) {
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => onAction("website_click", b, itinerary)}
-                className="py-4 rounded-full bg-[#FF2A5F] hover:bg-[#E01E50] text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-colors active:scale-95 glow-pink"
+                className="py-3.5 rounded-full btn-glass-violet text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-colors active:scale-95 glow-violet-soft"
                 data-testid={`tonight-website-${b.id}`}
               >
                 <Globe className="w-4 h-4" />

@@ -29,7 +29,7 @@ export default function CategoriesPage() {
 
   return (
     <div className="min-h-screen px-6 py-10 bg-[#050505] relative overflow-hidden" data-testid="categories-page">
-      <div className="pointer-events-none absolute -top-40 right-0 w-[500px] h-[500px] rounded-full bg-[#FF2A5F]/15 blur-[140px]" />
+      <div className="pointer-events-none absolute -top-40 right-0 w-[500px] h-[500px] rounded-full bg-[#7C3AED]/15 blur-[140px]" />
 
       <div className="max-w-2xl mx-auto relative z-10">
         <button
@@ -56,7 +56,7 @@ export default function CategoriesPage() {
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-10">
           {loading
             ? Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="aspect-square rounded-3xl bg-[#121212] animate-pulse" />
+                <div key={i} className="aspect-square rounded-3xl bg-[#121218] animate-pulse" />
               ))
             : categories.map((cat, i) => (
                 <motion.button
@@ -66,8 +66,8 @@ export default function CategoriesPage() {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   transition={{ delay: i * 0.05, duration: 0.4 }}
                   whileTap={{ scale: 0.95 }}
-                  whileHover={{ y: -4, backgroundColor: "#1A1A1A" }}
-                  className="flex flex-col items-center justify-center aspect-square p-4 bg-[#121212] border border-white/5 hover:border-white/15 rounded-3xl transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#FF2A5F]"
+                  whileHover={{ y: -4, backgroundColor: "#1A1A22" }}
+                  className="flex flex-col items-center justify-center aspect-square p-4 bg-[#121218] border border-white/5 hover:border-white/15 rounded-3xl transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#7C3AED]"
                   data-testid={`category-btn-${cat.slug}`}
                 >
                   <span className="text-5xl sm:text-6xl mb-3 select-none" aria-hidden>

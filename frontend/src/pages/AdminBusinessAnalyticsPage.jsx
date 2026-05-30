@@ -11,7 +11,7 @@ import { api, resolveImageUrl } from "../lib/api";
 
 const METRICS = [
   { key: "business_appearance", label: "Appearances", icon: Eye, color: "#FFD166" },
-  { key: "website_click", label: "Website clicks", icon: Globe, color: "#FF2A5F" },
+  { key: "website_click", label: "Website clicks", icon: Globe, color: "#7C3AED" },
   { key: "phone_click", label: "Phone calls", icon: Phone, color: "#22D3EE" },
   { key: "directions_click", label: "Directions", icon: Navigation, color: "#A78BFA" },
 ];
@@ -82,15 +82,15 @@ export default function AdminBusinessAnalyticsPage() {
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-[#121212] border border-white/10 rounded-3xl overflow-hidden mb-10"
+          className="bg-[#121218] border border-white/10 rounded-3xl overflow-hidden mb-10"
         >
           <div className="flex flex-col md:flex-row">
-            <div className="w-full md:w-72 h-56 md:h-auto bg-[#1A1A1A] relative shrink-0">
+            <div className="w-full md:w-72 h-56 md:h-auto bg-[#1A1A22] relative shrink-0">
               {resolveImageUrl(b) ? (
                 <img src={resolveImageUrl(b)} alt={b.name} className="w-full h-full object-cover" />
               ) : null}
               {b.featured && (
-                <div className="absolute top-4 left-4 px-3 py-1.5 bg-[#FF2A5F] text-white text-xs font-bold rounded-full flex items-center gap-1.5">
+                <div className="absolute top-4 left-4 px-3 py-1.5 bg-[#7C3AED] text-white text-xs font-bold rounded-full flex items-center gap-1.5">
                   <Flame className="w-3 h-3" />
                   FEATURED
                 </div>
@@ -139,14 +139,14 @@ export default function AdminBusinessAnalyticsPage() {
               impression)
             </p>
           </div>
-          <div className="flex bg-[#121212] border border-white/10 rounded-full p-1">
+          <div className="flex bg-[#121218] border border-white/10 rounded-full p-1">
             {[7, 30, 90].map((d) => (
               <button
                 key={d}
                 onClick={() => setDays(d)}
                 className={`px-4 py-1.5 text-xs font-bold rounded-full transition-colors ${
                   days === d
-                    ? "bg-[#FF2A5F] text-white"
+                    ? "bg-[#7C3AED] text-white"
                     : "text-[#A1A1AA] hover:text-white"
                 }`}
                 data-testid={`business-analytics-range-${d}`}
@@ -166,7 +166,7 @@ export default function AdminBusinessAnalyticsPage() {
                 key={m.key}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-[#121212] border border-white/10 rounded-2xl p-5"
+                className="bg-[#121218] border border-white/10 rounded-2xl p-5"
                 data-testid={`business-metric-${m.key}`}
               >
                 <div className="flex items-center justify-between">
@@ -184,7 +184,7 @@ export default function AdminBusinessAnalyticsPage() {
         </div>
 
         {/* Timeline chart */}
-        <div className="bg-[#121212] border border-white/10 rounded-3xl p-5 sm:p-8">
+        <div className="bg-[#121218] border border-white/10 rounded-3xl p-5 sm:p-8">
           <h3 className="font-display text-xl font-bold mb-6">Last {days} days</h3>
           <div className="w-full h-80" data-testid="business-analytics-chart">
             <ResponsiveContainer width="100%" height="100%">
@@ -214,7 +214,7 @@ export default function AdminBusinessAnalyticsPage() {
                 />
                 <Tooltip
                   contentStyle={{
-                    background: "#1A1A1A",
+                    background: "#1A1A22",
                     border: "1px solid rgba(255,255,255,0.1)",
                     borderRadius: 12,
                     color: "#fff",
@@ -239,7 +239,7 @@ export default function AdminBusinessAnalyticsPage() {
         </div>
 
         {/* Owner-friendly summary */}
-        <div className="mt-10 bg-[#121212] border border-white/10 rounded-3xl p-6 sm:p-8">
+        <div className="mt-10 bg-[#121218] border border-white/10 rounded-3xl p-6 sm:p-8">
           <h3 className="font-display text-xl font-bold mb-4">Owner-ready summary</h3>
           <p className="text-sm text-[#A1A1AA] leading-relaxed">
             Copy/paste this when talking to <span className="text-white">{b.name}</span>:

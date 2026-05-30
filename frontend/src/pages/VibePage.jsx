@@ -20,7 +20,7 @@ export default function VibePage() {
 
   return (
     <div className="min-h-screen px-6 py-10 bg-[#050505] relative overflow-hidden" data-testid="vibe-page">
-      <div className="pointer-events-none absolute -top-40 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full bg-[#FF2A5F]/15 blur-[160px]" />
+      <div className="pointer-events-none absolute -top-40 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full bg-[#7C3AED]/15 blur-[160px]" />
 
       <div className="max-w-2xl mx-auto relative z-10">
         <button
@@ -54,7 +54,7 @@ export default function VibePage() {
               transition={{ delay: i * 0.06, duration: 0.4 }}
               whileTap={{ scale: 0.95 }}
               whileHover={{ y: -4 }}
-              className="flex flex-col items-center justify-center aspect-square p-4 bg-[#121212] border border-white/5 hover:border-white/15 hover:bg-[#1A1A1A] rounded-3xl transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#FF2A5F]"
+              className="flex flex-col items-center justify-center aspect-square p-4 bg-[#121218] border border-white/5 hover:border-white/15 hover:bg-[#1A1A22] rounded-3xl transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#7C3AED]"
               data-testid={`vibe-btn-${v.slug}`}
             >
               <span className="text-6xl sm:text-7xl mb-3 select-none" aria-hidden>

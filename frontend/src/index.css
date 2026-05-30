@@ -28,32 +28,32 @@ body {
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 
 ::selection {
-    background: #FF2A5F;
+    background: #7C3AED;
     color: #fff;
 }
 
-/* shadcn HSL tokens (dark) */
+/* shadcn HSL tokens (dark, violet accent) */
 @layer base {
     :root {
         --background: 0 0% 2%;
         --foreground: 0 0% 100%;
-        --card: 0 0% 7%;
+        --card: 240 13% 8%;
         --card-foreground: 0 0% 100%;
-        --popover: 0 0% 7%;
+        --popover: 240 13% 8%;
         --popover-foreground: 0 0% 100%;
-        --primary: 343 100% 58%;
+        --primary: 263 81% 58%;
         --primary-foreground: 0 0% 100%;
-        --secondary: 0 0% 12%;
+        --secondary: 240 6% 10%;
         --secondary-foreground: 0 0% 100%;
-        --muted: 0 0% 12%;
+        --muted: 240 6% 10%;
         --muted-foreground: 240 5% 65%;
-        --accent: 0 0% 12%;
+        --accent: 240 6% 10%;
         --accent-foreground: 0 0% 100%;
         --destructive: 0 84% 60%;
         --destructive-foreground: 0 0% 100%;
-        --border: 0 0% 14%;
-        --input: 0 0% 14%;
-        --ring: 343 100% 58%;
+        --border: 240 6% 14%;
+        --input: 240 6% 14%;
+        --ring: 263 81% 58%;
         --radius: 0.75rem;
     }
 }
@@ -63,9 +63,56 @@ body {
     body { @apply bg-background text-foreground; }
 }
 
-/* Glow utility */
-.glow-pink {
-    box-shadow: 0 0 40px rgba(255, 42, 95, 0.45), 0 8px 24px rgba(255, 42, 95, 0.25);
+/* Premium violet glow — restrained, not neon */
+.glow-violet {
+    box-shadow:
+        0 0 32px rgba(124, 58, 237, 0.35),
+        0 0 64px rgba(124, 58, 237, 0.18),
+        0 8px 24px rgba(0, 0, 0, 0.45),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.glow-violet-soft {
+    box-shadow:
+        0 0 24px rgba(124, 58, 237, 0.18),
+        0 4px 16px rgba(0, 0, 0, 0.35);
+}
+
+/* Glass-like CTA: subtle violet wash, frosted edge */
+.btn-glass-violet {
+    background:
+        linear-gradient(180deg, rgba(168, 85, 247, 0.22) 0%, rgba(124, 58, 237, 0.85) 100%);
+    border: 1px solid rgba(168, 85, 247, 0.45);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+.btn-glass-violet:hover {
+    background:
+        linear-gradient(180deg, rgba(168, 85, 247, 0.32) 0%, rgba(124, 58, 237, 1) 100%);
+    border-color: rgba(168, 85, 247, 0.65);
+}
+
+/* Soft pulsing aura behind the hero CTA */
+@keyframes pulse-violet {
+    0%, 100% {
+        box-shadow:
+            0 0 28px rgba(124, 58, 237, 0.28),
+            0 0 56px rgba(124, 58, 237, 0.12),
+            0 8px 24px rgba(0, 0, 0, 0.45),
+            inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    }
+    50% {
+        box-shadow:
+            0 0 44px rgba(124, 58, 237, 0.55),
+            0 0 96px rgba(168, 85, 247, 0.22),
+            0 8px 24px rgba(0, 0, 0, 0.45),
+            inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    }
+}
+
+.animate-pulse-violet {
+    animation: pulse-violet 3.4s ease-in-out infinite;
 }
 
 .grain {

@@ -201,7 +201,7 @@ export default function AdminDashboardPage() {
       {/* Header */}
       <div className="border-b border-white/10 px-6 py-4 flex items-center justify-between sticky top-0 bg-[#050505]/95 backdrop-blur z-30">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-[#FF2A5F] flex items-center justify-center text-white font-black">
+          <div className="w-9 h-9 rounded-full bg-[#7C3AED] flex items-center justify-center text-white font-black">
             Y
           </div>
           <div>
@@ -241,7 +241,7 @@ export default function AdminDashboardPage() {
               onClick={() => setTab(t.id)}
               className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors ${
                 tab === t.id
-                  ? "border-[#FF2A5F] text-white"
+                  ? "border-[#7C3AED] text-white"
                   : "border-transparent text-[#A1A1AA] hover:text-white"
               }`}
               data-testid={`admin-tab-${t.id}`}
@@ -272,7 +272,7 @@ export default function AdminDashboardPage() {
 
       {/* Edit / create dialog */}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="bg-[#121212] border-white/10 text-white max-w-2xl max-h-[90vh] overflow-y-auto" data-testid="business-dialog">
+        <DialogContent className="bg-[#121218] border-white/10 text-white max-w-2xl max-h-[90vh] overflow-y-auto" data-testid="business-dialog">
           <DialogHeader>
             <DialogTitle className="font-display text-2xl">
               {editing ? "Edit business" : "New business"}
@@ -283,7 +283,7 @@ export default function AdminDashboardPage() {
               <Input
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className="bg-[#1A1A1A] border-white/10 text-white"
+                className="bg-[#1A1A22] border-white/10 text-white"
                 data-testid="business-form-name"
               />
             </Field>
@@ -292,7 +292,7 @@ export default function AdminDashboardPage() {
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
                 rows={3}
-                className="bg-[#1A1A1A] border-white/10 text-white"
+                className="bg-[#1A1A22] border-white/10 text-white"
                 data-testid="business-form-description"
               />
             </Field>
@@ -301,10 +301,10 @@ export default function AdminDashboardPage() {
                 value={form.category_slug}
                 onValueChange={(v) => setForm({ ...form, category_slug: v })}
               >
-                <SelectTrigger className="bg-[#1A1A1A] border-white/10 text-white" data-testid="business-form-category">
+                <SelectTrigger className="bg-[#1A1A22] border-white/10 text-white" data-testid="business-form-category">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent className="bg-[#121212] border-white/10 text-white">
+                <SelectContent className="bg-[#121218] border-white/10 text-white">
                   {categories.map((c) => (
                     <SelectItem key={c.slug} value={c.slug} className="focus:bg-white/10 focus:text-white">
                       {c.emoji} {c.name}
@@ -317,7 +317,7 @@ export default function AdminDashboardPage() {
             <Field label="Image">
               <div className="space-y-3">
                 {(form.image_path || form.image_url) && (
-                  <div className="w-full h-40 rounded-2xl overflow-hidden bg-[#1A1A1A]">
+                  <div className="w-full h-40 rounded-2xl overflow-hidden bg-[#1A1A22]">
                     <img
                       src={resolveImageUrl(form)}
                       alt="preview"
@@ -331,7 +331,7 @@ export default function AdminDashboardPage() {
                     variant="outline"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={uploading}
-                    className="border-white/10 bg-[#1A1A1A] hover:bg-[#222] text-white"
+                    className="border-white/10 bg-[#1A1A22] hover:bg-[#222] text-white"
                     data-testid="business-form-upload-button"
                   >
                     <Upload className="w-4 h-4 mr-2" />
@@ -350,7 +350,7 @@ export default function AdminDashboardPage() {
                   placeholder="...or paste an image URL"
                   value={form.image_url}
                   onChange={(e) => setForm({ ...form, image_url: e.target.value, image_path: null })}
-                  className="bg-[#1A1A1A] border-white/10 text-white"
+                  className="bg-[#1A1A22] border-white/10 text-white"
                   data-testid="business-form-image-url"
                 />
               </div>
@@ -361,7 +361,7 @@ export default function AdminDashboardPage() {
                 <Input
                   value={form.website}
                   onChange={(e) => setForm({ ...form, website: e.target.value })}
-                  className="bg-[#1A1A1A] border-white/10 text-white"
+                  className="bg-[#1A1A22] border-white/10 text-white"
                   data-testid="business-form-website"
                 />
               </Field>
@@ -369,7 +369,7 @@ export default function AdminDashboardPage() {
                 <Input
                   value={form.phone}
                   onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                  className="bg-[#1A1A1A] border-white/10 text-white"
+                  className="bg-[#1A1A22] border-white/10 text-white"
                   data-testid="business-form-phone"
                 />
               </Field>
@@ -378,7 +378,7 @@ export default function AdminDashboardPage() {
               <Input
                 value={form.address}
                 onChange={(e) => setForm({ ...form, address: e.target.value })}
-                className="bg-[#1A1A1A] border-white/10 text-white"
+                className="bg-[#1A1A22] border-white/10 text-white"
                 data-testid="business-form-address"
               />
             </Field>
@@ -389,10 +389,10 @@ export default function AdminDashboardPage() {
                   value={form.sponsor_tier || "none"}
                   onValueChange={(v) => setForm({ ...form, sponsor_tier: v, featured: v !== "none" })}
                 >
-                  <SelectTrigger className="bg-[#1A1A1A] border-white/10 text-white" data-testid="business-form-sponsor-tier">
+                  <SelectTrigger className="bg-[#1A1A22] border-white/10 text-white" data-testid="business-form-sponsor-tier">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-[#121212] border-white/10 text-white">
+                  <SelectContent className="bg-[#121218] border-white/10 text-white">
                     <SelectItem value="none" className="focus:bg-white/10 focus:text-white">None · weight 1</SelectItem>
                     <SelectItem value="silver" className="focus:bg-white/10 focus:text-white">Silver · weight 5</SelectItem>
                     <SelectItem value="gold" className="focus:bg-white/10 focus:text-white">Gold · weight 10</SelectItem>
@@ -414,8 +414,8 @@ export default function AdminDashboardPage() {
                         key={s.slug}
                         className={`flex items-center gap-2 px-3 py-2 rounded-xl border cursor-pointer transition-colors text-sm ${
                           checked
-                            ? "bg-[#FF2A5F]/10 border-[#FF2A5F]/40 text-white"
-                            : "bg-[#1A1A1A] border-white/10 text-[#A1A1AA] hover:text-white"
+                            ? "bg-[#7C3AED]/10 border-[#7C3AED]/40 text-white"
+                            : "bg-[#1A1A22] border-white/10 text-[#A1A1AA] hover:text-white"
                         }`}
                       >
                         <input
@@ -427,7 +427,7 @@ export default function AdminDashboardPage() {
                             else cur.delete(s.slug);
                             setForm({ ...form, slots: Array.from(cur) });
                           }}
-                          className="w-4 h-4 accent-[#FF2A5F]"
+                          className="w-4 h-4 accent-[#7C3AED]"
                           data-testid={`business-form-slot-${s.slug}`}
                         />
                         <span>{s.label}</span>
@@ -450,7 +450,7 @@ export default function AdminDashboardPage() {
             <Button
               onClick={handleSave}
               disabled={saving}
-              className="bg-[#FF2A5F] hover:bg-[#E01E50] text-white"
+              className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white"
               data-testid="business-form-save"
             >
               {saving ? "Saving…" : editing ? "Save changes" : "Create"}
@@ -484,10 +484,10 @@ function BusinessesPanel({ businesses, categories, onCreate, onEdit, onDelete, o
         </div>
         <div className="flex items-center gap-3">
           <Select value={filter} onValueChange={setFilter}>
-            <SelectTrigger className="w-44 bg-[#121212] border-white/10 text-white" data-testid="admin-filter-category">
+            <SelectTrigger className="w-44 bg-[#121218] border-white/10 text-white" data-testid="admin-filter-category">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent className="bg-[#121212] border-white/10 text-white">
+            <SelectContent className="bg-[#121218] border-white/10 text-white">
               <SelectItem value="all" className="focus:bg-white/10 focus:text-white">All categories</SelectItem>
               {categories.map((c) => (
                 <SelectItem key={c.slug} value={c.slug} className="focus:bg-white/10 focus:text-white">
@@ -498,7 +498,7 @@ function BusinessesPanel({ businesses, categories, onCreate, onEdit, onDelete, o
           </Select>
           <Button
             onClick={onCreate}
-            className="bg-[#FF2A5F] hover:bg-[#E01E50] text-white rounded-full"
+            className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded-full"
             data-testid="admin-create-business-button"
           >
             <Plus className="w-4 h-4 mr-2" />
@@ -507,7 +507,7 @@ function BusinessesPanel({ businesses, categories, onCreate, onEdit, onDelete, o
         </div>
       </div>
 
-      <div className="bg-[#121212] rounded-3xl border border-white/10 overflow-hidden">
+      <div className="bg-[#121218] rounded-3xl border border-white/10 overflow-hidden">
         <table className="w-full">
           <thead>
             <tr className="text-left text-xs uppercase tracking-wide text-[#A1A1AA]">
@@ -529,7 +529,7 @@ function BusinessesPanel({ businesses, categories, onCreate, onEdit, onDelete, o
             {filtered.map((b, idx) => (
               <tr key={b.id} className="border-t border-white/5 hover:bg-white/[0.02]" data-testid={`admin-business-row-${b.id}`}>
                 <td className="px-5 py-3">
-                  <div className="w-12 h-12 rounded-xl overflow-hidden bg-[#1A1A1A]">
+                  <div className="w-12 h-12 rounded-xl overflow-hidden bg-[#1A1A22]">
                     {resolveImageUrl(b) ? (
                       <img src={resolveImageUrl(b)} alt="" className="w-full h-full object-cover" />
                     ) : (
@@ -645,7 +645,7 @@ function AnalyticsPanel({ analytics, categories, onOpenBusiness }) {
             key={c.label}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-[#121212] border border-white/10 rounded-2xl p-5"
+            className="bg-[#121218] border border-white/10 rounded-2xl p-5"
           >
             <div className="text-xs uppercase tracking-wide text-[#A1A1AA] font-bold">{c.label}</div>
             <div className="font-display text-3xl font-black mt-2">{c.value.toLocaleString()}</div>
@@ -655,7 +655,7 @@ function AnalyticsPanel({ analytics, categories, onOpenBusiness }) {
 
       <div>
         <h3 className="font-display text-xl font-bold mb-4">By category</h3>
-        <div className="bg-[#121212] border border-white/10 rounded-2xl divide-y divide-white/5">
+        <div className="bg-[#121218] border border-white/10 rounded-2xl divide-y divide-white/5">
           {analytics.by_category.length === 0 ? (
             <div className="p-5 text-sm text-[#A1A1AA]">No category clicks yet.</div>
           ) : (
@@ -671,7 +671,7 @@ function AnalyticsPanel({ analytics, categories, onOpenBusiness }) {
 
       <div>
         <h3 className="font-display text-xl font-bold mb-4">Sponsor performance</h3>
-        <div className="bg-[#121212] border border-white/10 rounded-2xl overflow-x-auto" data-testid="admin-sponsor-performance">
+        <div className="bg-[#121218] border border-white/10 rounded-2xl overflow-x-auto" data-testid="admin-sponsor-performance">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-xs uppercase tracking-wide text-[#A1A1AA]">
@@ -709,7 +709,7 @@ function AnalyticsPanel({ analytics, categories, onOpenBusiness }) {
 
       <div>
         <h3 className="font-display text-xl font-bold mb-4">By business</h3>
-        <div className="bg-[#121212] border border-white/10 rounded-2xl overflow-x-auto">
+        <div className="bg-[#121218] border border-white/10 rounded-2xl overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-xs uppercase tracking-wide text-[#A1A1AA]">

@@ -74,7 +74,7 @@ export default function CategoryDetailPage() {
         {loading ? (
           <div className="space-y-8">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-[420px] rounded-[32px] bg-[#121212] animate-pulse" />
+              <div key={i} className="h-[420px] rounded-[32px] bg-[#121218] animate-pulse" />
             ))}
           </div>
         ) : businesses.length === 0 ? (
@@ -89,10 +89,10 @@ export default function CategoryDetailPage() {
                 initial={{ opacity: 0, y: 24 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.06, duration: 0.45 }}
-                className="bg-[#121212] rounded-[32px] overflow-hidden border border-white/10 shadow-2xl group"
+                className="bg-[#121218] rounded-[32px] overflow-hidden border border-white/10 shadow-2xl group"
                 data-testid={`business-card-${b.id}`}
               >
-                <div className="relative w-full h-72 bg-[#1A1A1A] overflow-hidden">
+                <div className="relative w-full h-72 bg-[#1A1A22] overflow-hidden">
                   {resolveImageUrl(b) && (
                     <img
                       src={resolveImageUrl(b)}
@@ -102,7 +102,7 @@ export default function CategoryDetailPage() {
                     />
                   )}
                   {b.featured && (
-                    <div className="absolute top-4 left-4 px-3 py-1.5 bg-[#FF2A5F] text-white text-xs font-bold rounded-full flex items-center gap-1.5" data-testid={`featured-badge-${b.id}`}>
+                    <div className="absolute top-4 left-4 px-3 py-1.5 bg-[#7C3AED] text-white text-xs font-bold rounded-full flex items-center gap-1.5" data-testid={`featured-badge-${b.id}`}>
                       <Flame className="w-3 h-3" />
                       FEATURED
                     </div>
@@ -146,7 +146,7 @@ export default function CategoryDetailPage() {
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={() => handleAction("website_click", b)}
-                        className="py-4 rounded-full bg-[#FF2A5F] hover:bg-[#E01E50] text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-colors active:scale-95 glow-pink"
+                        className="py-4 rounded-full bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-colors active:scale-95 glow-violet"
                         data-testid={`business-website-${b.id}`}
                       >
                         <Globe className="w-4 h-4" />
