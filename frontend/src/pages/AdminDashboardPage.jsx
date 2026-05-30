@@ -30,6 +30,7 @@ const empty = {
   featured: false,
   sponsor_tier: "none",
   slots: [],
+  tags: [],
   order: 0,
 };
 
@@ -42,6 +43,7 @@ export default function AdminDashboardPage() {
 
   const [businesses, setBusinesses] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [allTags, setAllTags] = useState([]);
   const [analytics, setAnalytics] = useState(null);
   const [editing, setEditing] = useState(null); // business object or null
   const [open, setOpen] = useState(false);
@@ -71,13 +73,15 @@ export default function AdminDashboardPage() {
 
   const loadAll = useCallback(async () => {
     try {
-      const [biz, cats, analytics] = await Promise.all([
+      const [biz, cats, tagsRes, analytics] = await Promise.all([
         api.get("/admin/businesses").then((r) => r.data),
         api.get("/admin/categories").then((r) => r.data),
+        api.get("/admin/tags").then((r) => r.data),
         api.get("/admin/analytics/summary").then((r) => r.data),
       ]);
       setBusinesses(biz);
       setCategories(cats);
+      setAllTags(tagsRes.tags || []);
       setAnalytics(analytics);
     } catch (e) {
       toast.error("Failed to load admin data");
@@ -437,6 +441,38 @@ export default function AdminDashboardPage() {
                 </div>
               </Field>
             </div>
+
+            <Field label="Recommendation tags">
+              <div className="flex flex-wrap gap-1.5" data-testid="business-form-tags">
+                {allTags.map((t) => {
+                  const checked = (form.tags || []).includes(t);
+                  return (
+                    <button
+                      type="button"
+                      key={t}
+                      onClick={() => {
+                        const cur = new Set(form.tags || []);
+                        if (checked) cur.delete(t);
+                        else cur.add(t);
+                        setForm({ ...form, tags: Array.from(cur) });
+                      }}
+                      className={`px-2.5 py-1 rounded-full text-[11px] uppercase tracking-wider font-bold border transition-colors ${
+                        checked
+                          ? "bg-[#C6FF00]/15 border-[#C6FF00]/50 text-[#C6FF00]"
+                          : "bg-[#1A1A22] border-white/10 text-[#A1A1AA] hover:text-white hover:border-white/30"
+                      }`}
+                      data-testid={`business-form-tag-${t}`}
+                    >
+                      {t}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[10px] text-white/40 mt-2">
+                Tags drive the mood-aware recommendation engine. Pick everything that genuinely
+                applies — be honest, not aspirational.
+              </p>
+            </Field>
           </div>
           <DialogFooter>
             <Button

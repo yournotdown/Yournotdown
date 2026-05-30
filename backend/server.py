@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field, ConfigDict
 
 from storage_client import init_storage, put_object, get_object, APP_NAME
 from seed_data import CATEGORIES, CITIES, BUSINESSES, CATEGORY_MIGRATIONS, REMOVED_CATEGORY_SLUGS
+from mood_system import MOOD_WEIGHTS, SPONSOR_MULTIPLIERS, NAME_TO_TAGS, TAGS as VALID_TAGS
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
@@ -86,9 +87,10 @@ class Business(BaseModel):
     address: str = ""
     category_slug: str
     city_slug: str = "nashville"
-    featured: bool = False  # legacy — kept for backward-compat; sponsor_tier is canonical
-    sponsor_tier: str = "none"  # one of: none, silver, gold, platinum
+    featured: bool = False
+    sponsor_tier: str = "none"
     slots: List[str] = Field(default_factory=list)
+    tags: List[str] = Field(default_factory=list)
     order: int = 0
     created_at: str = Field(default_factory=now_iso)
 
@@ -106,6 +108,7 @@ class BusinessCreate(BaseModel):
     featured: bool = False
     sponsor_tier: str = "none"
     slots: List[str] = Field(default_factory=list)
+    tags: List[str] = Field(default_factory=list)
     order: int = 0
 
 
@@ -122,6 +125,7 @@ class BusinessUpdate(BaseModel):
     featured: Optional[bool] = None
     sponsor_tier: Optional[str] = None
     slots: Optional[List[str]] = None
+    tags: Optional[List[str]] = None
     order: Optional[int] = None
 
 
@@ -226,6 +230,21 @@ async def startup():
         default_slots = list(SLOTS_BY_CATEGORY.get(biz.get("category_slug", ""), []))
         await db.businesses.update_one({"id": biz["id"]}, {"$set": {"slots": default_slots}})
 
+    # Backfill `tags` for seeded businesses (idempotent — match by name, only if tags missing/empty)
+    async for biz in db.businesses.find(
+        {"$or": [{"tags": {"$exists": False}}, {"tags": []}]},
+        {"_id": 0, "id": 1, "name": 1},
+    ):
+        tags = NAME_TO_TAGS.get(biz.get("name", ""))
+        if tags:
+            await db.businesses.update_one({"id": biz["id"]}, {"$set": {"tags": tags}})
+        else:
+            # Ensure field exists so the field is queryable later
+            await db.businesses.update_one(
+                {"id": biz["id"], "tags": {"$exists": False}},
+                {"$set": {"tags": []}},
+            )
+
 
 @app.on_event("shutdown")
 async def shutdown():
@@ -279,23 +298,44 @@ class ItineraryRequest(BaseModel):
     exclude_ids: List[str] = Field(default_factory=list)
 
 
-def _weighted_pick(candidates: list, exclude_ids: set) -> Optional[dict]:
-    """Pick one business using sponsor-tier weighted random selection.
+def _relevance_score(business: dict, vibe: Optional[str]) -> float:
+    """Mood-aware relevance score for a single business.
 
-    If everything is excluded, relax the exclusion filter."""
+    Returns max(0.05, 1 + sum_of_tag_weights). The 0.05 floor lets heavily-
+    penalized businesses *technically* appear (so sponsor tiers still matter)
+    but makes them ~100× less likely than a relevant non-sponsor.
+    """
+    if not vibe or vibe not in MOOD_WEIGHTS:
+        return 1.0
+    weights = MOOD_WEIGHTS[vibe]
+    score = 1.0 + sum(weights.get(t, 0) for t in (business.get("tags") or []))
+    return max(0.05, score)
+
+
+def _weighted_pick(
+    candidates: list,
+    exclude_ids: set,
+    vibe: Optional[str],
+) -> Optional[dict]:
+    """Pick one business using mood-relevance × sponsor-tier weighted random.
+
+    If everything is excluded, relax the exclusion filter so the slot still fills."""
     pool = [b for b in candidates if b["id"] not in exclude_ids]
     if not pool:
-        pool = candidates  # fall back to full candidate set
+        pool = candidates
     if not pool:
         return None
-    weights = [SPONSOR_WEIGHTS.get(b.get("sponsor_tier", "none"), 1) for b in pool]
+    weights = []
+    for b in pool:
+        relevance = _relevance_score(b, vibe)
+        sponsor_mult = SPONSOR_MULTIPLIERS.get(b.get("sponsor_tier", "none"), 1)
+        weights.append(relevance * sponsor_mult)
     return random.choices(pool, weights=weights, k=1)[0]
 
 
 @api_router.post("/itinerary/generate")
 async def generate_itinerary(req: ItineraryRequest, request: Request):
-    """Build a 4-step 'Tonight's Move' itinerary from the catalog."""
-    # Load all candidate businesses for this city
+    """Build a 4-step 'Tonight's Move' itinerary tuned to the user's mood."""
     all_biz = await db.businesses.find(
         {"city_slug": req.city, "slots": {"$ne": []}},
         {"_id": 0},
@@ -311,8 +351,7 @@ async def generate_itinerary(req: ItineraryRequest, request: Request):
     steps = []
     for label in SLOT_LABELS:
         candidates = by_slot.get(label["slot"], [])
-        # Exclude businesses already picked in THIS itinerary plus prior excludes
-        pick = _weighted_pick(candidates, exclude | chosen_ids)
+        pick = _weighted_pick(candidates, exclude | chosen_ids, req.vibe)
         if pick:
             chosen_ids.add(pick["id"])
             steps.append({
@@ -321,6 +360,7 @@ async def generate_itinerary(req: ItineraryRequest, request: Request):
                 "label": label["label"],
                 "emoji": label["emoji"],
                 "business": pick,
+                "relevance_score": round(_relevance_score(pick, req.vibe), 2),
             })
 
     itin_id = str(uuid.uuid4())
@@ -332,13 +372,11 @@ async def generate_itinerary(req: ItineraryRequest, request: Request):
         "generated_at": now_iso(),
     }
 
-    # Persist the itinerary for analytics + record events
+    # Persist itinerary + analytics events
     await db.itineraries.insert_one({
         **itinerary,
         "ip": request.client.host if request.client else None,
     })
-
-    # Track one analytic event per business appearance
     appearance_docs = []
     for step in steps:
         b = step["business"]
@@ -356,7 +394,6 @@ async def generate_itinerary(req: ItineraryRequest, request: Request):
         })
     if appearance_docs:
         await db.analytics_events.insert_many(appearance_docs)
-    # And one event for the itinerary generation itself
     await db.analytics_events.insert_one({
         "id": str(uuid.uuid4()),
         "event_type": "itinerary_generated",
@@ -637,6 +674,12 @@ async def admin_upload(file: UploadFile = File(...), user=Depends(require_admin)
 @api_router.get("/admin/categories")
 async def admin_list_categories(user=Depends(require_admin)):
     return await db.categories.find({}, {"_id": 0}).sort("order", 1).to_list(100)
+
+
+@api_router.get("/admin/tags")
+async def admin_list_tags(user=Depends(require_admin)):
+    """Canonical tag vocabulary the recommendation engine knows about."""
+    return {"tags": list(VALID_TAGS)}
 
 
 # ------------- Admin: analytics -------------

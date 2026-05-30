@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="17" time="74.206" timestamp="2026-05-30T21:06:32.362683+00:00" hostname="agent-env-91afa908-0030-4222-89a9-a000380d1fd0"><testcase classname="backend.tests.test_itinerary_v2.TestAdminTagsEndpoint" name="test_requires_auth" time="0.200" /><testcase classname="backend.tests.test_itinerary_v2.TestAdminTagsEndpoint" name="test_requires_admin" time="0.151" /><testcase classname="backend.tests.test_itinerary_v2.TestAdminTagsEndpoint" name="test_returns_canonical_tags" time="0.171" /><testcase classname="backend.tests.test_itinerary_v2.TestTagBackfill" name="test_seeded_businesses_have_expected_tags" time="0.155" /><testcase classname="backend.tests.test_itinerary_v2.TestRelevanceScoreField" name="test_each_step_has_positive_relevance_score" time="0.141" /><testcase classname="backend.tests.test_itinerary_v2.TestMoodBias" name="test_just_vibing_disfavors_nightlife_and_club" time="3.756" /><testcase classname="backend.tests.test_itinerary_v2.TestMoodBias" name="test_send_it_prefers_wildcard_hidden_gem_unique" time="3.545" /><testcase classname="backend.tests.test_itinerary_v2.TestMoodBias" name="test_very_down_prefers_nightlife_popular_concerts" time="3.394" /><testcase classname="backend.tests.test_itinerary_v2.TestMoodBias" name="test_down_prefers_date_night_cocktails_rooftop_live_music" time="3.389" /><testcase classname="backend.tests.test_itinerary_v2.TestSponsorOnTopOfRelevance" name="test_platinum_beats_none_at_same_relevance" time="35.865"><failure message="requests.exceptions.ConnectTimeout: HTTPSConnectionPool(host='whatsyoudown.preview.emergentagent.com', port=443): Max retries exceeded with url: /api/itinerary/generate (Caused by ConnectTimeoutError(&lt;HTTPSConnection(host='whatsyoudown.preview.emergentagent.com', port=443) at 0xfb826e97ea50&gt;, 'Connection to whatsyoudown.preview.emergentagent.com timed out. (connect timeout=15)'))">/root/.venv/lib/python3.11/site-packages/urllib3/connection.py:204: in _new_conn
+    sock = connection.create_connection(
+/root/.venv/lib/python3.11/site-packages/urllib3/util/connection.py:85: in create_connection
+    raise err
+/root/.venv/lib/python3.11/site-packages/urllib3/util/connection.py:73: in create_connection
+    sock.connect(sa)
+E   TimeoutError: timed out
+
+The above exception was the direct cause of the following exception:
+/root/.venv/lib/python3.11/site-packages/urllib3/connectionpool.py:788: in urlopen
+    response = self._make_request(
+/root/.venv/lib/python3.11/site-packages/urllib3/connectionpool.py:488: in _make_request
+    raise new_e
+/root/.venv/lib/python3.11/site-packages/urllib3/connectionpool.py:464: in _make_request
+    self._validate_conn(conn)
+/root/.venv/lib/python3.11/site-packages/urllib3/connectionpool.py:1106: in _validate_conn
+    conn.connect()
+/root/.venv/lib/python3.11/site-packages/urllib3/connection.py:759: in connect
+    self.sock = sock = self._new_conn()
+                       ^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/urllib3/connection.py:213: in _new_conn
+    raise ConnectTimeoutError(
+E   urllib3.exceptions.ConnectTimeoutError: (&lt;HTTPSConnection(host='whatsyoudown.preview.emergentagent.com', port=443) at 0xfb826e97ea50&gt;, 'Connection to whatsyoudown.preview.emergentagent.com timed out. (connect timeout=15)')
+
+The above exception was the direct cause of the following exception:
+/root/.venv/lib/python3.11/site-packages/requests/adapters.py:696: in send
+    resp = conn.urlopen(
+/root/.venv/lib/python3.11/site-packages/urllib3/connectionpool.py:842: in urlopen
+    retries = retries.increment(
+/root/.venv/lib/python3.11/site-packages/urllib3/util/retry.py:543: in increment
+    raise MaxRetryError(_pool, url, reason) from reason  # type: ignore[arg-type]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   urllib3.exceptions.MaxRetryError: HTTPSConnectionPool(host='whatsyoudown.preview.emergentagent.com', port=443): Max retries exceeded with url: /api/itinerary/generate (Caused by ConnectTimeoutError(&lt;HTTPSConnection(host='whatsyoudown.preview.emergentagent.com', port=443) at 0xfb826e97ea50&gt;, 'Connection to whatsyoudown.preview.emergentagent.com timed out. (connect timeout=15)'))
+
+During handling of the above exception, another exception occurred:
+backend/tests/test_itinerary_v2.py:167: in test_platinum_beats_none_at_same_relevance
+    r = requests.post(f"{API}/itinerary/generate",
+/root/.venv/lib/python3.11/site-packages/requests/api.py:134: in post
+    return request("post", url, data=data, json=json, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/api.py:71: in request
+    return session.request(method=method, url=url, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:651: in request
+    resp = self.send(prep, **send_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/sessions.py:784: in send
+    r = adapter.send(request, **kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/adapters.py:717: in send
+    raise ConnectTimeout(e, request=request)
+E   requests.exceptions.ConnectTimeout: HTTPSConnectionPool(host='whatsyoudown.preview.emergentagent.com', port=443): Max retries exceeded with url: /api/itinerary/generate (Caused by ConnectTimeoutError(&lt;HTTPSConnection(host='whatsyoudown.preview.emergentagent.com', port=443) at 0xfb826e97ea50&gt;, 'Connection to whatsyoudown.preview.emergentagent.com timed out. (connect timeout=15)'))</failure></testcase><testcase classname="backend.tests.test_itinerary_v2.TestEdgeCases" name="test_heavily_penalized_business_doesnt_crash_engine" time="18.032" /><testcase classname="backend.tests.test_itinerary_v2.TestEdgeCases" name="test_business_without_tags_doesnt_crash" time="0.338" /><testcase classname="backend.tests.test_itinerary_v2.TestEdgeCases" name="test_slot_order_preserved" time="3.537" /><testcase classname="backend.tests.test_itinerary_v2.TestEdgeCases" name="test_exclude_ids_still_works" time="0.213" /><testcase classname="backend.tests.test_itinerary_v2.TestAdminTagsCRUD" name="test_create_business_with_tags" time="0.321" /><testcase classname="backend.tests.test_itinerary_v2.TestAdminTagsCRUD" name="test_patch_tags_persists" time="0.486" /><testcase classname="backend.tests.test_itinerary_v2.TestAdminTagsCRUD" name="test_patch_tags_empty_list" time="0.318" /></testsuite></testsuites>
