@@ -41,7 +41,13 @@ Build "You're Not Down" — a city-agnostic, mobile-first discovery platform tha
 - ADMIN_EMAILS allowlist (or first-user bootstrap)
 - City-aware architecture (cities collection, multi-city ready)
 
-## Implemented (Iteration 2 — Feb 2026)
+## Implemented (Iteration 3 — Feb 2026) — Brand refactor
+- Removed city from primary UX. Homepage CTA is now just "I'M DOWN" (no Nashville).
+- New 3-step funnel: Home → /vibe ("How down are you?" — 😇 Just Vibing / 😏 Down / 🔥 Very Down / 🚀 Send It) → /categories ("What's the move?") → /c/:slug
+- Category set reduced from 9 to 6 with new branding: Drinks & Conversation 🍸, Date Night ❤️, Live Music 🎵, Night Out 🌃, Family Time 👨‍👩‍👧, Surprise Me 🎲
+- Backend startup migration (idempotent): food→date-night, sports/rooftops/events→night-out; old category docs deleted; no business data lost
+- Vibe slug round-trips through the URL (/categories?vibe=very-down → /c/:slug?vibe=very-down) — decorative for now, but the architecture is ready to filter recommendations by vibe later
+- Brand chrome contains zero city references — only the underlying business content/addresses do
 - ADMIN_EMAILS locked down to blakealansing@gmail.com (allowlist now strictly enforced, no bootstrap)
 - Auth re-evaluates admin role from allowlist on every login (demotes if removed)
 - New endpoint GET /api/admin/analytics/business/{id}?days=N returning totals + daily timeline
