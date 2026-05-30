@@ -41,6 +41,14 @@ Build "You're Not Down" — a city-agnostic, mobile-first discovery platform tha
 - ADMIN_EMAILS allowlist (or first-user bootstrap)
 - City-aware architecture (cities collection, multi-city ready)
 
+## Implemented (Iteration 2 — Feb 2026)
+- ADMIN_EMAILS locked down to blakealansing@gmail.com (allowlist now strictly enforced, no bootstrap)
+- Auth re-evaluates admin role from allowlist on every login (demotes if removed)
+- New endpoint GET /api/admin/analytics/business/{id}?days=N returning totals + daily timeline
+- New page /admin/business/:id — per-business deep-dive with 4 metric cards (Impressions, Website clicks, Phone calls, Directions), 7d/30d/90d range selector, recharts area chart, owner-ready copy/paste snippet
+- "View analytics" icon on each business row + clickable rows in analytics summary
+- De-duplicated business_view tracking on category detail page
+
 ## Backlog (P1/P2)
 - P1: Lead capture per business (form on card)
 - P1: Per-business analytics page (412 views / 87 website / 31 calls / 54 directions style)

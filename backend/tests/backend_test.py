@@ -11,7 +11,17 @@ API = f"{BASE_URL}/api"
 ADMIN_TOKEN = "test_session_admin_1780165861579"
 USER_TOKEN = "test_session_user_1780165861637"
 
-EXPECTED_CATEGORIES = {"food", "drinks", "live-music", "date-night", "family-fun", "sports", "rooftops", "events", "surprise-me"}
+EXPECTED_CATEGORIES = {"drinks", "date-night", "live-music", "night-out", "family-fun", "surprise-me"}
+EXPECTED_CATEGORY_ORDER = ["drinks", "date-night", "live-music", "night-out", "family-fun", "surprise-me"]
+EXPECTED_CATEGORY_META = {
+    "drinks": ("Drinks & Conversation", "🍸"),
+    "date-night": ("Date Night", "❤️"),
+    "live-music": ("Live Music", "🎵"),
+    "night-out": ("Night Out", "🌃"),
+    "family-fun": ("Family Time", "👨\u200d👩\u200d👧"),
+    "surprise-me": ("Surprise Me", "🎲"),
+}
+REMOVED_CATEGORIES = ["food", "sports", "rooftops", "events"]
 
 
 @pytest.fixture(scope="session")
@@ -60,11 +70,86 @@ class TestCategories:
         for c in cats:
             assert c.get("emoji"), f"Missing emoji for {c['slug']}"
 
+    def test_categories_ordered_and_named(self):
+        r = requests.get(f"{API}/categories", timeout=10)
+        cats = r.json()
+        assert len(cats) == 6
+        actual_order = [c["slug"] for c in cats]
+        assert actual_order == EXPECTED_CATEGORY_ORDER
+        for c in cats:
+            expected_name, expected_emoji = EXPECTED_CATEGORY_META[c["slug"]]
+            assert c["name"] == expected_name, f"{c['slug']} name {c['name']!r} != {expected_name!r}"
+            assert c["emoji"] == expected_emoji, f"{c['slug']} emoji {c['emoji']!r} != {expected_emoji!r}"
+
+    def test_removed_categories_absent(self):
+        r = requests.get(f"{API}/categories", timeout=10)
+        slugs = {c["slug"] for c in r.json()}
+        for s in REMOVED_CATEGORIES:
+            assert s not in slugs, f"Removed category {s} still present"
+
+
+# ---------------- Migration ----------------
+class TestCategoryMigration:
+    def test_date_night_has_migrated_food(self):
+        r = requests.get(f"{API}/businesses", params={"category": "date-night"}, timeout=10)
+        assert r.status_code == 200
+        items = r.json()
+        names = {b["name"] for b in items}
+        # Migrated from food + original date-night
+        expected = {"Hattie B's Hot Chicken", "Husk Nashville", "The Pharmacy Burger", "Rolf and Daughters",
+                    "Catbird Seat", "Rooftop at Bobby", "Henrietta Red"}
+        missing = expected - names
+        assert not missing, f"date-night missing migrated businesses: {missing}"
+        assert len(items) >= 6
+
+    def test_night_out_has_migrated_sports_rooftops_events(self):
+        r = requests.get(f"{API}/businesses", params={"category": "night-out"}, timeout=10)
+        assert r.status_code == 200
+        items = r.json()
+        names = {b["name"] for b in items}
+        expected = {"Nissan Stadium", "Bridgestone Arena", "Geodis Park",
+                    "L.A. Jackson", "White Limozeen", "UP Rooftop Lounge",
+                    "CMA Fest", "Tomato Art Fest", "Live On The Green"}
+        missing = expected - names
+        assert not missing, f"night-out missing migrated businesses: {missing}"
+        assert len(items) >= 7
+
+    @pytest.mark.parametrize("slug", REMOVED_CATEGORIES)
+    def test_removed_categories_return_empty(self, slug):
+        r = requests.get(f"{API}/businesses", params={"category": slug}, timeout=10)
+        assert r.status_code == 200
+        assert r.json() == [], f"{slug} should return empty list"
+
+    def test_all_businesses_preserved(self):
+        # Total seeded: 30. None should have been deleted by migration.
+        r = requests.get(f"{API}/businesses", params={"limit": 1000}, timeout=10)
+        assert r.status_code == 200
+        items = r.json()
+        # Some TEST_ may exist from prior runs; assert at least 30 original ones still there
+        non_test = [b for b in items if not b["name"].startswith("TEST_")]
+        assert len(non_test) >= 30, f"Expected >=30 preserved businesses, got {len(non_test)}"
+
+    def test_migration_idempotent_slugs_present(self):
+        # After repeated startups, exactly 6 categories should remain, no dupes
+        r = requests.get(f"{API}/categories", timeout=10)
+        cats = r.json()
+        slugs = [c["slug"] for c in cats]
+        assert len(slugs) == len(set(slugs)) == 6
+
+
+# ---------------- Vibe analytics ----------------
+class TestVibeAnalytics:
+    def test_vibe_click_tracked(self):
+        r = requests.post(f"{API}/analytics/track",
+                          json={"event_type": "vibe_click"}, timeout=10)
+        assert r.status_code == 200
+        assert r.json().get("ok") is True
+
 
 # ---------------- Businesses ----------------
 class TestBusinesses:
-    def test_food_category(self):
-        r = requests.get(f"{API}/businesses", params={"category": "food"}, timeout=10)
+    def test_date_night_category(self):
+        r = requests.get(f"{API}/businesses", params={"category": "date-night"}, timeout=10)
         assert r.status_code == 200
         items = r.json()
         assert len(items) >= 1
@@ -79,7 +164,7 @@ class TestBusinesses:
         assert len(items) <= 8
 
     def test_get_single_business(self):
-        r = requests.get(f"{API}/businesses", params={"category": "food"}, timeout=10)
+        r = requests.get(f"{API}/businesses", params={"category": "date-night"}, timeout=10)
         bid = r.json()[0]["id"]
         r2 = requests.get(f"{API}/businesses/{bid}", timeout=10)
         assert r2.status_code == 200
@@ -95,7 +180,7 @@ class TestAnalytics:
     @pytest.mark.parametrize("evt", [
         {"event_type": "homepage_visit"},
         {"event_type": "im_down_click"},
-        {"event_type": "category_click", "category_slug": "food"},
+        {"event_type": "category_click", "category_slug": "date-night"},
         {"event_type": "phone_click"},
         {"event_type": "directions_click"},
         {"event_type": "website_click"},
@@ -106,7 +191,7 @@ class TestAnalytics:
         assert r.json().get("ok") is True
 
     def test_business_view_event(self):
-        r = requests.get(f"{API}/businesses", params={"category": "food"}, timeout=10)
+        r = requests.get(f"{API}/businesses", params={"category": "date-night"}, timeout=10)
         bid = r.json()[0]["id"]
         r2 = requests.post(f"{API}/analytics/track", json={"event_type": "business_view", "business_id": bid}, timeout=10)
         assert r2.status_code == 200
@@ -142,7 +227,7 @@ class TestAdminBusinesses:
         assert isinstance(r.json(), list)
 
     def test_create_business(self, admin_headers):
-        payload = {"name": "TEST_Biz", "description": "test", "category_slug": "food", "city_slug": "nashville"}
+        payload = {"name": "TEST_Biz", "description": "test", "category_slug": "date-night", "city_slug": "nashville"}
         r = requests.post(f"{API}/admin/businesses", headers=admin_headers, json=payload, timeout=10)
         assert r.status_code == 200
         data = r.json()
@@ -182,7 +267,7 @@ class TestAdminMisc:
     def test_admin_categories(self, admin_headers):
         r = requests.get(f"{API}/admin/categories", headers=admin_headers, timeout=10)
         assert r.status_code == 200
-        assert len(r.json()) == 9
+        assert len(r.json()) == 6
 
     def test_admin_categories_forbidden(self, user_headers):
         r = requests.get(f"{API}/admin/categories", headers=user_headers, timeout=10)
@@ -203,14 +288,14 @@ class TestAdminMisc:
 class TestAdminBusinessAnalytics:
     def test_requires_admin(self, user_headers):
         # Pick any real business id
-        r = requests.get(f"{API}/businesses", params={"category": "food"}, timeout=10)
+        r = requests.get(f"{API}/businesses", params={"category": "date-night"}, timeout=10)
         bid = r.json()[0]["id"]
         r2 = requests.get(f"{API}/admin/analytics/business/{bid}",
                           headers=user_headers, timeout=10)
         assert r2.status_code == 403
 
     def test_requires_auth(self):
-        r = requests.get(f"{API}/businesses", params={"category": "food"}, timeout=10)
+        r = requests.get(f"{API}/businesses", params={"category": "date-night"}, timeout=10)
         bid = r.json()[0]["id"]
         r2 = requests.get(f"{API}/admin/analytics/business/{bid}", timeout=10)
         assert r2.status_code == 401
@@ -221,7 +306,7 @@ class TestAdminBusinessAnalytics:
         assert r.status_code == 404
 
     def test_default_days_is_30(self, admin_headers):
-        r = requests.get(f"{API}/businesses", params={"category": "food"}, timeout=10)
+        r = requests.get(f"{API}/businesses", params={"category": "date-night"}, timeout=10)
         bid = r.json()[0]["id"]
         r2 = requests.get(f"{API}/admin/analytics/business/{bid}",
                          headers=admin_headers, timeout=10)
@@ -242,7 +327,7 @@ class TestAdminBusinessAnalytics:
 
     @pytest.mark.parametrize("days", [7, 30, 90])
     def test_range_selector(self, admin_headers, days):
-        r = requests.get(f"{API}/businesses", params={"category": "food"}, timeout=10)
+        r = requests.get(f"{API}/businesses", params={"category": "date-night"}, timeout=10)
         bid = r.json()[0]["id"]
         r2 = requests.get(f"{API}/admin/analytics/business/{bid}",
                          headers=admin_headers, params={"days": days}, timeout=10)
@@ -293,7 +378,7 @@ class TestAdminBusinessAnalytics:
 class TestAdminEmailsLockdown:
     def test_non_admin_still_forbidden_on_new_endpoint(self, user_headers):
         """The new analytics deep-dive endpoint enforces require_admin."""
-        r = requests.get(f"{API}/businesses", params={"category": "food"}, timeout=10)
+        r = requests.get(f"{API}/businesses", params={"category": "date-night"}, timeout=10)
         bid = r.json()[0]["id"]
         r2 = requests.get(f"{API}/admin/analytics/business/{bid}",
                           headers=user_headers, timeout=10)

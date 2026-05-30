@@ -15,7 +15,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, ConfigDict
 
 from storage_client import init_storage, put_object, get_object, APP_NAME
-from seed_data import CATEGORIES, CITIES, BUSINESSES
+from seed_data import CATEGORIES, CITIES, BUSINESSES, CATEGORY_MIGRATIONS, REMOVED_CATEGORY_SLUGS
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
@@ -136,9 +136,26 @@ async def startup():
     # Seed cities
     for c in CITIES:
         await db.cities.update_one({"slug": c["slug"]}, {"$setOnInsert": c}, upsert=True)
-    # Seed categories
+
+    # --- Category migration (idempotent) ---
+    # 1. Migrate businesses out of removed categories
+    for old_slug, new_slug in CATEGORY_MIGRATIONS.items():
+        await db.businesses.update_many(
+            {"category_slug": old_slug},
+            {"$set": {"category_slug": new_slug}},
+        )
+    # 2. Delete removed categories
+    if REMOVED_CATEGORY_SLUGS:
+        await db.categories.delete_many({"slug": {"$in": REMOVED_CATEGORY_SLUGS}})
+
+    # 3. Upsert the canonical category set (always overwrite name/emoji/order to keep branding fresh)
     for cat in CATEGORIES:
-        await db.categories.update_one({"slug": cat["slug"]}, {"$setOnInsert": cat}, upsert=True)
+        await db.categories.update_one(
+            {"slug": cat["slug"]},
+            {"$set": cat},
+            upsert=True,
+        )
+
     # Seed businesses if empty
     biz_count = await db.businesses.count_documents({})
     if biz_count == 0:

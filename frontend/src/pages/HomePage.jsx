@@ -1,29 +1,23 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
-import { api, trackEvent } from "../lib/api";
+import { trackEvent } from "../lib/api";
 
 export default function HomePage() {
   const navigate = useNavigate();
-  const [city, setCity] = useState({ name: "Nashville", slug: "nashville" });
 
   useEffect(() => {
     trackEvent("homepage_visit");
-    api
-      .get("/cities/default")
-      .then((r) => setCity(r.data))
-      .catch(() => {});
   }, []);
 
   const handleClick = () => {
-    trackEvent("im_down_click", { city_slug: city.slug });
-    navigate("/categories");
+    trackEvent("im_down_click");
+    navigate("/vibe");
   };
 
   return (
     <div className="relative min-h-screen flex flex-col items-center justify-center px-6 overflow-hidden bg-[#050505]" data-testid="homepage">
-      {/* Background glow */}
       <div className="pointer-events-none absolute inset-0 grain opacity-50" />
       <div className="pointer-events-none absolute -top-40 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full bg-[#FF2A5F]/20 blur-[160px]" />
       <div className="pointer-events-none absolute bottom-0 right-0 w-[400px] h-[400px] rounded-full bg-[#FF2A5F]/10 blur-[140px]" />
@@ -65,7 +59,7 @@ export default function HomePage() {
           whileHover={{ scale: 1.03 }}
           data-testid="homepage-im-down-button"
         >
-          <span className="tracking-wide">I'M DOWN {city.name.toUpperCase()}</span>
+          <span className="tracking-wide">I'M DOWN</span>
           <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
         </motion.button>
       </motion.div>

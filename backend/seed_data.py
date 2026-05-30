@@ -1,16 +1,23 @@
 """Seed data for "You're Not Down" — Nashville businesses."""
 
 CATEGORIES = [
-    {"slug": "food", "name": "Food", "emoji": "🍔", "order": 1},
-    {"slug": "drinks", "name": "Drinks", "emoji": "🍸", "order": 2},
-    {"slug": "live-music", "name": "Live Music", "emoji": "🎸", "order": 3},
-    {"slug": "date-night", "name": "Date Night", "emoji": "❤️", "order": 4},
-    {"slug": "family-fun", "name": "Family Fun", "emoji": "👨‍👩‍👧", "order": 5},
-    {"slug": "sports", "name": "Sports", "emoji": "🏟️", "order": 6},
-    {"slug": "rooftops", "name": "Rooftops", "emoji": "🌆", "order": 7},
-    {"slug": "events", "name": "Events", "emoji": "🎉", "order": 8},
-    {"slug": "surprise-me", "name": "Surprise Me", "emoji": "🎲", "order": 9},
+    {"slug": "drinks", "name": "Drinks & Conversation", "emoji": "🍸", "order": 1},
+    {"slug": "date-night", "name": "Date Night", "emoji": "❤️", "order": 2},
+    {"slug": "live-music", "name": "Live Music", "emoji": "🎵", "order": 3},
+    {"slug": "night-out", "name": "Night Out", "emoji": "🌃", "order": 4},
+    {"slug": "family-fun", "name": "Family Time", "emoji": "👨‍👩‍👧", "order": 5},
+    {"slug": "surprise-me", "name": "Surprise Me", "emoji": "🎲", "order": 6},
 ]
+
+# One-time migration map: old category slug -> new category slug
+CATEGORY_MIGRATIONS = {
+    "food": "date-night",
+    "sports": "night-out",
+    "rooftops": "night-out",
+    "events": "night-out",
+}
+
+REMOVED_CATEGORY_SLUGS = list(CATEGORY_MIGRATIONS.keys())
 
 CITIES = [
     {"slug": "nashville", "name": "Nashville", "default": True},

@@ -25,7 +25,7 @@ const empty = {
   website: "",
   phone: "",
   address: "",
-  category_slug: "food",
+  category_slug: "drinks",
   city_slug: "nashville",
   featured: false,
   order: 0,
@@ -88,7 +88,7 @@ export default function AdminDashboardPage() {
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ ...empty, category_slug: categories[0]?.slug || "food", order: businesses.length });
+    setForm({ ...empty, category_slug: categories[0]?.slug || "drinks", order: businesses.length });
     setOpen(true);
   };
 

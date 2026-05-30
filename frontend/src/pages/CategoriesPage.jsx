@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
 import { api, trackEvent } from "../lib/api";
 
 export default function CategoriesPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const vibe = searchParams.get("vibe");
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -21,7 +23,8 @@ export default function CategoriesPage() {
 
   const handleCategory = (slug) => {
     trackEvent("category_click", { category_slug: slug });
-    navigate(`/c/${slug}`);
+    const qs = vibe ? `?vibe=${vibe}` : "";
+    navigate(`/c/${slug}${qs}`);
   };
 
   return (
@@ -30,7 +33,7 @@ export default function CategoriesPage() {
 
       <div className="max-w-2xl mx-auto relative z-10">
         <button
-          onClick={() => navigate("/")}
+          onClick={() => navigate(-1)}
           className="flex items-center gap-2 text-white/60 hover:text-white text-sm mb-10 transition-colors"
           data-testid="categories-back-button"
         >
@@ -45,14 +48,14 @@ export default function CategoriesPage() {
           transition={{ duration: 0.5 }}
           data-testid="categories-headline"
         >
-          What are you<br />down for?
+          What's<br />the move?
         </motion.h1>
 
         <p className="mt-3 text-[#A1A1AA] text-base">Pick a vibe. We've got you.</p>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-10">
           {loading
-            ? Array.from({ length: 9 }).map((_, i) => (
+            ? Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className="aspect-square rounded-3xl bg-[#121212] animate-pulse" />
               ))
             : categories.map((cat, i) => (

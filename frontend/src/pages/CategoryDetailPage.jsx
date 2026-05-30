@@ -46,12 +46,12 @@ export default function CategoryDetailPage() {
     <div className="min-h-screen bg-[#050505] pb-24" data-testid="category-detail-page">
       <div className="max-w-2xl mx-auto px-6 pt-10">
         <button
-          onClick={() => navigate("/categories")}
+          onClick={() => navigate(-1)}
           className="flex items-center gap-2 text-white/60 hover:text-white text-sm mb-8 transition-colors"
           data-testid="category-detail-back"
         >
           <ArrowLeft className="w-4 h-4" />
-          Categories
+          Back
         </button>
 
         <motion.div
@@ -67,7 +67,7 @@ export default function CategoryDetailPage() {
             {category?.name}
           </h1>
           <p className="mt-3 text-[#A1A1AA] text-base">
-            {businesses.length} {businesses.length === 1 ? "spot" : "spots"} in Nashville.
+            {businesses.length} {businesses.length === 1 ? "spot" : "spots"} for you.
           </p>
         </motion.div>
 
