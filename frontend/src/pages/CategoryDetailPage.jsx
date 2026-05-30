@@ -102,7 +102,7 @@ export default function CategoryDetailPage() {
                     />
                   )}
                   {b.featured && (
-                    <div className="absolute top-4 left-4 px-3 py-1.5 bg-[#7C3AED] text-white text-xs font-bold rounded-full flex items-center gap-1.5" data-testid={`featured-badge-${b.id}`}>
+                    <div className="absolute top-4 left-4 px-3 py-1.5 bg-[#C6FF00] text-white text-xs font-bold rounded-full flex items-center gap-1.5" data-testid={`featured-badge-${b.id}`}>
                       <Flame className="w-3 h-3" />
                       FEATURED
                     </div>
@@ -146,7 +146,7 @@ export default function CategoryDetailPage() {
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={() => handleAction("website_click", b)}
-                        className="py-4 rounded-full bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-colors active:scale-95 glow-violet"
+                        className="py-4 rounded-full bg-[#C6FF00] hover:bg-[#A8E000] text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-colors active:scale-95 glow-lime"
                         data-testid={`business-website-${b.id}`}
                       >
                         <Globe className="w-4 h-4" />

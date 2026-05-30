@@ -123,7 +123,7 @@ body {
     body { @apply bg-background text-foreground; }
 }
 
-/* Premium violet glow — restrained, not neon */
+/* Premium violet glow — restrained, not neon (admin only) */
 .glow-violet {
     box-shadow:
         0 0 32px rgba(124, 58, 237, 0.35),
@@ -135,6 +135,20 @@ body {
 .glow-violet-soft {
     box-shadow:
         0 0 24px rgba(124, 58, 237, 0.18),
+        0 4px 16px rgba(0, 0, 0, 0.35);
+}
+
+/* Acid lime glow — user-facing brand */
+.glow-lime {
+    box-shadow:
+        0 0 32px rgba(198, 255, 0, 0.45),
+        0 0 64px rgba(198, 255, 0, 0.22),
+        0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.glow-lime-soft {
+    box-shadow:
+        0 0 18px rgba(198, 255, 0, 0.25),
         0 4px 16px rgba(0, 0, 0, 0.35);
 }
 
