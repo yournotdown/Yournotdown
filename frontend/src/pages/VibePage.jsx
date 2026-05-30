@@ -28,13 +28,12 @@ export default function VibePage() {
       className="relative min-h-screen bg-black text-white overflow-hidden"
       data-testid="vibe-page"
     >
-      {/* Atmospherics — match homepage exactly */}
+      {/* Atmospherics — same as homepage */}
       <div className="pointer-events-none absolute inset-0 film-grain opacity-70" />
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,_transparent_55%,_#000_100%)]" />
       <div className="pointer-events-none absolute inset-0 strobe-dim bg-black" />
       <div className="pointer-events-none absolute inset-x-0 h-px bg-white/40 scanline-anim" />
 
-      {/* Crash flash on select */}
       <AnimatePresence>
         {crashing && (
           <motion.div
@@ -63,20 +62,20 @@ export default function VibePage() {
         ← Back
       </button>
 
-      {/* Content */}
+      {/* Content — playful, emoji-first */}
       <motion.div
-        className="relative z-10 min-h-screen flex flex-col justify-center pt-28 pb-28 px-6 sm:px-10"
+        className="relative z-10 min-h-screen flex flex-col justify-center pt-24 pb-28 px-5 sm:px-10 max-w-5xl mx-auto w-full"
         animate={crashing ? { scale: 0.96, opacity: 0 } : { scale: 1, opacity: 1 }}
         transition={{ duration: 0.32 }}
       >
         <motion.h1
           className="font-flyer text-white uppercase"
           style={{
-            fontSize: "clamp(2.2rem, 7vw, 6rem)",
+            fontSize: "clamp(2rem, 6vw, 4.5rem)",
             transform: "rotate(-1.5deg)",
             transformOrigin: "left",
           }}
-          initial={{ opacity: 0, x: -20 }}
+          initial={{ opacity: 0, x: -16 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.55 }}
           data-testid="vibe-headline"
@@ -84,47 +83,48 @@ export default function VibePage() {
           How down<br />are you<span className="lime-dot">?</span>
         </motion.h1>
 
-        <div className="mt-10 sm:mt-14 border-t border-white/10">
+        <div className="mt-8 sm:mt-12 grid grid-cols-2 gap-3 sm:gap-5">
           {VIBES.map((v, i) => (
             <motion.button
               key={v.slug}
               onClick={() => handleSelect(v)}
-              initial={{ opacity: 0, x: -16 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.08 + i * 0.06, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-              className="group relative w-full flex items-center justify-between gap-4 sm:gap-6 py-6 sm:py-7 border-b border-white/10 transition-colors hover:bg-white/[0.025] focus:outline-none cursor-pointer"
+              initial={{ opacity: 0, y: 16, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ delay: 0.1 + i * 0.07, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+              whileTap={{ scale: 0.95 }}
+              whileHover={{ y: -6 }}
+              className="group relative aspect-square sm:aspect-[5/4] bg-[#0A0A0A] border border-white/10 hover:border-[#C6FF00]/60 hover:bg-[#0C0F08] flex flex-col items-center justify-center px-3 py-5 cursor-pointer transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C6FF00]/60 overflow-hidden"
               data-testid={`vibe-btn-${v.slug}`}
             >
-              {/* Hover lime sweep on left */}
+              {/* Hover lime aura behind emoji */}
               <span
                 aria-hidden
-                className="absolute left-0 top-0 bottom-0 w-0 group-hover:w-1 bg-[#C6FF00] transition-all duration-300"
+                className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 rounded-full bg-[#C6FF00]/0 group-hover:bg-[#C6FF00]/12 blur-3xl transition-colors duration-500"
               />
-              <div className="flex items-baseline gap-3 sm:gap-6 min-w-0 text-left">
-                <span className="font-flyer text-white/30 text-[11px] uppercase tracking-[0.3em] tabular-nums shrink-0">
-                  {String(i + 1).padStart(2, "0")}
-                </span>
-                <span
-                  className="font-flyer uppercase text-white group-hover:text-[#C6FF00] transition-colors leading-[0.88]"
-                  style={{ fontSize: "clamp(1.6rem, 5.2vw, 4.2rem)" }}
-                >
-                  {v.label}
-                </span>
-              </div>
-              <div className="flex items-center gap-3 sm:gap-5 shrink-0">
-                <span
-                  className="text-2xl sm:text-4xl select-none transition-transform group-hover:translate-x-1 group-hover:-translate-y-0.5"
-                  aria-hidden
-                >
-                  {v.emoji}
-                </span>
-                <span
-                  className="font-flyer text-2xl sm:text-4xl text-white/25 group-hover:text-[#C6FF00] transition-colors leading-none"
-                  aria-hidden
-                >
-                  →
-                </span>
-              </div>
+              {/* Tiny index */}
+              <span className="absolute top-3 left-3 font-flyer text-[10px] uppercase tracking-[0.3em] text-white/30 tabular-nums">
+                {String(i + 1).padStart(2, "0")}
+              </span>
+
+              {/* GIANT EMOJI — the hero */}
+              <motion.span
+                className="relative select-none leading-none drop-shadow-[0_8px_24px_rgba(198,255,0,0.18)]"
+                aria-hidden
+                style={{ fontSize: "clamp(5rem, 18vw, 10rem)" }}
+                animate={{ y: [0, -5, 0], rotate: [0, i % 2 === 0 ? 2 : -2, 0] }}
+                transition={{
+                  duration: 4 + i * 0.5,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
+              >
+                {v.emoji}
+              </motion.span>
+
+              {/* Small caption */}
+              <span className="relative mt-2 sm:mt-3 font-flyer text-[11px] sm:text-sm uppercase tracking-[0.18em] text-white group-hover:text-[#C6FF00] transition-colors text-center leading-tight">
+                {v.label}
+              </span>
             </motion.button>
           ))}
         </div>
