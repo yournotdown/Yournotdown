@@ -39,7 +39,7 @@ GOOGLE_PLACES_API_URL = "https://places.googleapis.com/v1"
 CITY_SLUG = "nashville"
 TARGET_ZIP_CODES = [
     "37201", "37203", "37204", "37205", "37206", "37207",
-    "37208", "37209", "37210", "37211", "37212",
+    "37208", "37209", "37210", "37211", "37212", "37219",
 ]
 ZIP_QUERIES = [
     "best restaurants in {zip_code} Nashville",
@@ -54,6 +54,18 @@ ZIP_QUERIES = [
     "hidden gem restaurants in {zip_code} Nashville",
 ]
 DOWNTOWN_QUERIES = ["honky tonks in downtown Nashville"]
+TARGETED_DISCOVERY_QUERIES = [
+    "omakase Nashville",
+    "sushi Nashville",
+    "japanese bakery Nashville",
+    "bakery cafe Nashville",
+    "Wedgewood Houston restaurants Nashville",
+    "Germantown restaurants Nashville",
+    "Neuhoff restaurants Nashville",
+    "Nashville Yards restaurants Nashville",
+    "chef driven restaurants Nashville",
+    "new restaurants Nashville",
+]
 
 MIN_RATING = 4.2
 PREFERRED_RATING_COUNT = 100
@@ -70,6 +82,12 @@ CURATOR_ALLOWLIST_DISPLAY_NAMES = {
     "streetcar taps garden": "Streetcar Taps & Garden",
     "two hands": "Two Hands",
     "the henry": "The Henry",
+    "sushi row": "Sushi Row",
+    "charmers": "Charmers",
+    "kase x noko": "Kase x Noko",
+    "babychan": "Babychan",
+    "fonda fina": "Fonda Fina",
+    "ocean prime": "Ocean Prime",
 }
 CURATOR_ALLOWLIST = set(CURATOR_ALLOWLIST_DISPLAY_NAMES)
 BROADWAY_OVERRIDE_DISPLAY_NAMES = {
@@ -554,7 +572,7 @@ def report_template(dry_run: bool = True) -> dict:
         "mode": "dry-run" if dry_run else "apply",
         "city_slug": CITY_SLUG,
         "zip_codes": list(TARGET_ZIP_CODES),
-        "queries_planned": len(TARGET_ZIP_CODES) * len(ZIP_QUERIES) + len(DOWNTOWN_QUERIES) + len(BROADWAY_QUERIES),
+        "queries_planned": len(TARGETED_DISCOVERY_QUERIES) + len(TARGET_ZIP_CODES) * len(ZIP_QUERIES) + len(DOWNTOWN_QUERIES) + len(BROADWAY_QUERIES),
         "minimum_brand_fit_score": MIN_BRAND_FIT_SCORE,
         "curator_allowlist": sorted(CURATOR_ALLOWLIST),
         "curator_allowlist_results": [],
@@ -670,6 +688,7 @@ class StandardLibrarySession:
 
 def planned_queries(zip_codes: Iterable[str]) -> list[str]:
     return [
+        *TARGETED_DISCOVERY_QUERIES,
         *(template.format(zip_code=zip_code) for zip_code in zip_codes for template in ZIP_QUERIES),
         *DOWNTOWN_QUERIES,
         *BROADWAY_QUERIES,
@@ -762,6 +781,7 @@ def run_import(client: GooglePlacesClient, existing: Iterable[dict] = (), collec
                 "rating": document["google_rating"],
                 "userRatingCount": document["google_user_rating_count"],
                 "slots": document["slots"],
+                "import_queries": document["import_queries"],
             }
         if broadway_name:
             broadway_override_results[broadway_name] = {
@@ -859,6 +879,7 @@ def rejection_summary(place: dict, reason: str, source_queries: Iterable[str]) -
         "userRatingCount": int(place.get("userRatingCount") or 0),
         "address": place.get("formattedAddress", ""),
         "rejection_reason": reason,
+        "import_queries": sorted(set(source_queries)),
     }
 
 

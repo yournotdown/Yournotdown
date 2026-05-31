@@ -14,6 +14,7 @@ from google_places_importer import (  # noqa: E402
     dedupe_documents,
     is_broadway_override,
     is_curator_allowlisted,
+    planned_queries,
     report_template,
     run_import,
     should_import_place,
@@ -35,8 +36,31 @@ def place(**overrides):
 
 
 class TestFiltering(unittest.TestCase):
+    def test_targeted_discovery_queries_lead_query_plan(self):
+        self.assertEqual(
+            planned_queries(["37201"])[:10],
+            [
+                "omakase Nashville",
+                "sushi Nashville",
+                "japanese bakery Nashville",
+                "bakery cafe Nashville",
+                "Wedgewood Houston restaurants Nashville",
+                "Germantown restaurants Nashville",
+                "Neuhoff restaurants Nashville",
+                "Nashville Yards restaurants Nashville",
+                "chef driven restaurants Nashville",
+                "new restaurants Nashville",
+            ],
+        )
+
     def test_accepts_high_quality_place(self):
         self.assertEqual(should_import_place(place()), (True, "accepted"))
+
+    def test_accepts_nashville_37219(self):
+        self.assertEqual(
+            should_import_place(place(formattedAddress="201 4th Ave N, Nashville, TN 37219")),
+            (True, "accepted"),
+        )
 
     def test_rejects_low_rating(self):
         self.assertEqual(
@@ -95,6 +119,20 @@ class TestFiltering(unittest.TestCase):
                 place(displayName={"text": "Streetcar Taps & Garden - Germantown"})
             )
         )
+
+    def test_expanded_curator_allowlist_bypasses_low_review_count(self):
+        for name in [
+            "Sushi Row",
+            "Charmers",
+            "Kase x Noko",
+            "Babychan",
+            "Fonda Fina",
+            "Ocean Prime",
+        ]:
+            with self.subTest(name=name):
+                row = place(displayName={"text": name}, userRatingCount=12)
+                self.assertTrue(is_curator_allowlisted(row))
+                self.assertEqual(should_import_place(row), (True, "accepted"))
 
     def test_curator_allowlist_does_not_bypass_rating_floor_or_safety_filters(self):
         self.assertEqual(
