@@ -19,6 +19,28 @@ CATEGORY_MIGRATIONS = {
 
 REMOVED_CATEGORY_SLUGS = list(CATEGORY_MIGRATIONS.keys())
 
+# Default itinerary slot assignment by canonical category.
+SLOTS_BY_CATEGORY = {
+    "date-night": ["dinner"],
+    "drinks": ["drinks"],
+    "live-music": ["entertainment"],
+    "night-out": ["late-night"],
+    "family-fun": ["entertainment"],
+    "surprise-me": ["entertainment", "late-night"],
+}
+
+
+def canonical_category_slug(category_slug):
+    """Return the canonical category slug for legacy and current data."""
+    return CATEGORY_MIGRATIONS.get(category_slug, category_slug)
+
+
+def default_slots_for_category(category_slug):
+    """Return a fresh default slot list after canonicalizing the category."""
+    canonical_slug = canonical_category_slug(category_slug)
+    return list(SLOTS_BY_CATEGORY.get(canonical_slug, []))
+
+
 CITIES = [
     {"slug": "nashville", "name": "Nashville", "default": True},
 ]

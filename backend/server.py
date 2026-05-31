@@ -15,7 +15,15 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, ConfigDict
 
 from storage_client import init_storage, put_object, get_object, APP_NAME
-from seed_data import CATEGORIES, CITIES, BUSINESSES, CATEGORY_MIGRATIONS, REMOVED_CATEGORY_SLUGS
+from seed_data import (
+    CATEGORIES,
+    CITIES,
+    BUSINESSES,
+    CATEGORY_MIGRATIONS,
+    REMOVED_CATEGORY_SLUGS,
+    canonical_category_slug,
+    default_slots_for_category,
+)
 from mood_system import MOOD_WEIGHTS, SPONSOR_MULTIPLIERS, NAME_TO_TAGS, TAGS as VALID_TAGS
 
 ROOT_DIR = Path(__file__).parent
@@ -63,17 +71,6 @@ SLOT_LABELS = [
 # Sponsor tier weights for weighted-random selection
 SPONSOR_WEIGHTS = {"none": 1, "silver": 5, "gold": 10, "platinum": 20}
 VALID_TIERS = set(SPONSOR_WEIGHTS.keys())
-
-# Default slot assignment by category for backfill
-SLOTS_BY_CATEGORY = {
-    "date-night": ["dinner"],
-    "drinks": ["drinks"],
-    "live-music": ["entertainment"],
-    "night-out": ["late-night"],
-    "family-fun": [],
-    "surprise-me": ["entertainment", "late-night"],
-}
-
 
 class Business(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -194,7 +191,7 @@ async def startup():
     biz_count = await db.businesses.count_documents({})
     if biz_count == 0:
         for i, b in enumerate(BUSINESSES):
-            cat = b["category_slug"]
+            cat = canonical_category_slug(b["category_slug"])
             doc = {
                 "id": str(uuid.uuid4()),
                 "name": b["name"],
@@ -208,7 +205,7 @@ async def startup():
                 "city_slug": "nashville",
                 "featured": b.get("featured", False),
                 "sponsor_tier": "gold" if b.get("featured") else "none",
-                "slots": list(SLOTS_BY_CATEGORY.get(cat, [])),
+                "slots": default_slots_for_category(cat),
                 "order": i,
                 "created_at": now_iso(),
             }
@@ -225,10 +222,15 @@ async def startup():
         {"sponsor_tier": {"$exists": False}},
         {"$set": {"sponsor_tier": "none"}},
     )
-    # Backfill `slots` from category default
-    async for biz in db.businesses.find({"slots": {"$exists": False}}, {"_id": 0, "id": 1, "category_slug": 1}):
-        default_slots = list(SLOTS_BY_CATEGORY.get(biz.get("category_slug", ""), []))
-        await db.businesses.update_one({"id": biz["id"]}, {"$set": {"slots": default_slots}})
+    # Backfill missing or empty `slots` from the canonical category default.
+    # This repairs rows created before legacy category seeds were canonicalized.
+    async for biz in db.businesses.find(
+        {"$or": [{"slots": {"$exists": False}}, {"slots": []}]},
+        {"_id": 0, "id": 1, "category_slug": 1},
+    ):
+        default_slots = default_slots_for_category(biz.get("category_slug", ""))
+        if default_slots:
+            await db.businesses.update_one({"id": biz["id"]}, {"$set": {"slots": default_slots}})
 
     # Backfill `tags` for seeded businesses (idempotent — match by name, only if tags missing/empty)
     async for biz in db.businesses.find(
