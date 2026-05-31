@@ -71,6 +71,7 @@ SLOT_LABELS = [
 # Sponsor tier weights for weighted-random selection
 SPONSOR_WEIGHTS = {"none": 1, "silver": 5, "gold": 10, "platinum": 20}
 VALID_TIERS = set(SPONSOR_WEIGHTS.keys())
+VALID_IMPORT_STATUSES = {"pending", "approved", "rejected"}
 
 class Business(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -88,6 +89,19 @@ class Business(BaseModel):
     sponsor_tier: str = "none"
     slots: List[str] = Field(default_factory=list)
     tags: List[str] = Field(default_factory=list)
+    brand_fit_score: Optional[int] = None
+    import_override_reason: Optional[str] = None
+    google_place_id: Optional[str] = None
+    normalized_name_address: Optional[str] = None
+    google_rating: Optional[float] = None
+    google_user_rating_count: Optional[int] = None
+    google_maps_url: str = ""
+    google_photo_names: List[str] = Field(default_factory=list)
+    google_types: List[str] = Field(default_factory=list)
+    imported_status: str = "approved"
+    import_source: Optional[str] = None
+    imported_at: Optional[str] = None
+    import_queries: List[str] = Field(default_factory=list)
     order: int = 0
     created_at: str = Field(default_factory=now_iso)
 
@@ -106,6 +120,19 @@ class BusinessCreate(BaseModel):
     sponsor_tier: str = "none"
     slots: List[str] = Field(default_factory=list)
     tags: List[str] = Field(default_factory=list)
+    brand_fit_score: Optional[int] = None
+    import_override_reason: Optional[str] = None
+    google_place_id: Optional[str] = None
+    normalized_name_address: Optional[str] = None
+    google_rating: Optional[float] = None
+    google_user_rating_count: Optional[int] = None
+    google_maps_url: str = ""
+    google_photo_names: List[str] = Field(default_factory=list)
+    google_types: List[str] = Field(default_factory=list)
+    imported_status: str = "approved"
+    import_source: Optional[str] = None
+    imported_at: Optional[str] = None
+    import_queries: List[str] = Field(default_factory=list)
     order: int = 0
 
 
@@ -123,6 +150,19 @@ class BusinessUpdate(BaseModel):
     sponsor_tier: Optional[str] = None
     slots: Optional[List[str]] = None
     tags: Optional[List[str]] = None
+    brand_fit_score: Optional[int] = None
+    import_override_reason: Optional[str] = None
+    google_place_id: Optional[str] = None
+    normalized_name_address: Optional[str] = None
+    google_rating: Optional[float] = None
+    google_user_rating_count: Optional[int] = None
+    google_maps_url: Optional[str] = None
+    google_photo_names: Optional[List[str]] = None
+    google_types: Optional[List[str]] = None
+    imported_status: Optional[str] = None
+    import_source: Optional[str] = None
+    imported_at: Optional[str] = None
+    import_queries: Optional[List[str]] = None
     order: Optional[int] = None
 
 
@@ -133,6 +173,11 @@ class ReorderItem(BaseModel):
 
 class ReorderPayload(BaseModel):
     items: List[ReorderItem]
+
+
+class BulkImportReviewPayload(BaseModel):
+    ids: List[str]
+    imported_status: str
 
 
 class AnalyticsEvent(BaseModel):
@@ -157,6 +202,9 @@ api_router = APIRouter(prefix="/api")
 
 @app.on_event("startup")
 async def startup():
+    await db.businesses.create_index("google_place_id", unique=True, sparse=True)
+    await db.businesses.create_index("normalized_name_address", unique=True, sparse=True)
+
     # Object storage
     try:
         init_storage()
@@ -206,6 +254,7 @@ async def startup():
                 "featured": b.get("featured", False),
                 "sponsor_tier": "gold" if b.get("featured") else "none",
                 "slots": default_slots_for_category(cat),
+                "imported_status": "approved",
                 "order": i,
                 "created_at": now_iso(),
             }
@@ -221,6 +270,11 @@ async def startup():
     await db.businesses.update_many(
         {"sponsor_tier": {"$exists": False}},
         {"$set": {"sponsor_tier": "none"}},
+    )
+    # Existing catalog rows predate imports and remain publicly approved.
+    await db.businesses.update_many(
+        {"imported_status": {"$exists": False}},
+        {"$set": {"imported_status": "approved"}},
     )
     # Backfill missing or empty `slots` from the canonical category default.
     # This repairs rows created before legacy category seeds were canonicalized.
@@ -339,7 +393,7 @@ def _weighted_pick(
 async def generate_itinerary(req: ItineraryRequest, request: Request):
     """Build a 4-step 'Tonight's Move' itinerary tuned to the user's mood."""
     all_biz = await db.businesses.find(
-        {"city_slug": req.city, "slots": {"$ne": []}},
+        {"city_slug": req.city, "slots": {"$ne": []}, "imported_status": "approved"},
         {"_id": 0},
     ).to_list(2000)
 
@@ -445,7 +499,7 @@ async def list_businesses(
     featured: Optional[bool] = None,
     limit: int = 200,
 ):
-    q = {"city_slug": city}
+    q = {"city_slug": city, "imported_status": "approved"}
     if category and category != "surprise-me":
         q["category_slug"] = category
     if featured is not None:
@@ -461,7 +515,7 @@ async def list_businesses(
 
 @api_router.get("/businesses/{business_id}")
 async def get_business(business_id: str):
-    b = await db.businesses.find_one({"id": business_id}, {"_id": 0})
+    b = await db.businesses.find_one({"id": business_id, "imported_status": "approved"}, {"_id": 0})
     if not b:
         raise HTTPException(status_code=404, detail="Not found")
     return b
@@ -599,8 +653,11 @@ async def logout(response: Response, session_token: Optional[str] = Cookie(None)
 
 # ------------- Admin: businesses -------------
 @api_router.get("/admin/businesses")
-async def admin_list_businesses(user=Depends(require_admin)):
-    items = await db.businesses.find({}, {"_id": 0}).sort([("order", 1)]).to_list(1000)
+async def admin_list_businesses(imported_status: Optional[str] = None, user=Depends(require_admin)):
+    if imported_status and imported_status not in VALID_IMPORT_STATUSES:
+        raise HTTPException(status_code=400, detail="Invalid imported_status")
+    query = {"imported_status": imported_status} if imported_status else {}
+    items = await db.businesses.find(query, {"_id": 0}).sort([("order", 1)]).to_list(5000)
     return items
 
 
@@ -608,6 +665,8 @@ async def admin_list_businesses(user=Depends(require_admin)):
 async def admin_create_business(body: BusinessCreate, user=Depends(require_admin)):
     if body.sponsor_tier not in VALID_TIERS:
         raise HTTPException(status_code=400, detail=f"Invalid sponsor_tier; must be one of {sorted(VALID_TIERS)}")
+    if body.imported_status not in VALID_IMPORT_STATUSES:
+        raise HTTPException(status_code=400, detail="Invalid imported_status")
     biz = Business(**body.model_dump())
     # Auto-sync legacy `featured` from sponsor_tier
     biz.featured = biz.sponsor_tier != "none"
@@ -620,6 +679,8 @@ async def admin_update_business(business_id: str, body: BusinessUpdate, user=Dep
     update = {k: v for k, v in body.model_dump().items() if v is not None}
     if "sponsor_tier" in update and update["sponsor_tier"] not in VALID_TIERS:
         raise HTTPException(status_code=400, detail=f"Invalid sponsor_tier; must be one of {sorted(VALID_TIERS)}")
+    if "imported_status" in update and update["imported_status"] not in VALID_IMPORT_STATUSES:
+        raise HTTPException(status_code=400, detail="Invalid imported_status")
     if "sponsor_tier" in update:
         update["featured"] = update["sponsor_tier"] != "none"
     if not update:
@@ -643,6 +704,31 @@ async def admin_reorder(payload: ReorderPayload, user=Depends(require_admin)):
     for it in payload.items:
         await db.businesses.update_one({"id": it.id}, {"$set": {"order": it.order}})
     return {"ok": True, "count": len(payload.items)}
+
+
+@api_router.post("/admin/businesses/import-review")
+async def admin_bulk_import_review(payload: BulkImportReviewPayload, user=Depends(require_admin)):
+    if payload.imported_status not in {"approved", "rejected"}:
+        raise HTTPException(status_code=400, detail="Bulk review status must be approved or rejected")
+    if not payload.ids:
+        return {"ok": True, "count": 0}
+    res = await db.businesses.update_many(
+        {"id": {"$in": payload.ids}},
+        {"$set": {"imported_status": payload.imported_status}},
+    )
+    return {"ok": True, "count": res.modified_count}
+
+
+@api_router.get("/admin/businesses/import-summary")
+async def admin_import_summary(user=Depends(require_admin)):
+    rows = await db.businesses.aggregate([
+        {"$group": {"_id": "$imported_status", "count": {"$sum": 1}}},
+    ]).to_list(10)
+    counts = {row["_id"] or "approved": row["count"] for row in rows}
+    return {
+        status: counts.get(status, 0)
+        for status in ["pending", "approved", "rejected"]
+    }
 
 
 # ------------- Admin: image upload -------------

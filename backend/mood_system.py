@@ -4,7 +4,7 @@
 TAGS = [
     "coffee", "brunch", "casual", "fine_dining", "dessert", "family", "scenic", "quiet",
     "cocktails", "rooftop", "speakeasy", "live_music", "concerts", "sports",
-    "nightlife", "club", "late_night", "entertainment", "date_night",
+    "nightlife", "club", "late_night", "entertainment", "date_night", "honky_tonk",
     "popular", "tourist_favorite", "local_favorite",
     "hidden_gem", "unique", "wildcard",
 ]

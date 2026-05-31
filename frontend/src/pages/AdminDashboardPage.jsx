@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import {
   Plus, Pencil, Trash2, Star, ArrowUp, ArrowDown, Upload,
   LogOut, BarChart3, Store, LayoutGrid, Image as ImageIcon, TrendingUp,
+  ClipboardCheck, CheckCircle, XCircle, ExternalLink,
 } from "lucide-react";
 import { api, resolveImageUrl } from "../lib/api";
 import { Button } from "@/components/ui/button";
@@ -31,6 +32,7 @@ const empty = {
   sponsor_tier: "none",
   slots: [],
   tags: [],
+  imported_status: "approved",
   order: 0,
 };
 
@@ -45,6 +47,8 @@ export default function AdminDashboardPage() {
   const [categories, setCategories] = useState([]);
   const [allTags, setAllTags] = useState([]);
   const [analytics, setAnalytics] = useState(null);
+  const [importSummary, setImportSummary] = useState(null);
+  const [selectedImports, setSelectedImports] = useState([]);
   const [editing, setEditing] = useState(null); // business object or null
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(empty);
@@ -73,16 +77,18 @@ export default function AdminDashboardPage() {
 
   const loadAll = useCallback(async () => {
     try {
-      const [biz, cats, tagsRes, analytics] = await Promise.all([
+      const [biz, cats, tagsRes, analytics, importSummary] = await Promise.all([
         api.get("/admin/businesses").then((r) => r.data),
         api.get("/admin/categories").then((r) => r.data),
         api.get("/admin/tags").then((r) => r.data),
         api.get("/admin/analytics/summary").then((r) => r.data),
+        api.get("/admin/businesses/import-summary").then((r) => r.data),
       ]);
       setBusinesses(biz);
       setCategories(cats);
       setAllTags(tagsRes.tags || []);
       setAnalytics(analytics);
+      setImportSummary(importSummary);
     } catch (e) {
       toast.error("Failed to load admin data");
     }
@@ -193,6 +199,21 @@ export default function AdminDashboardPage() {
     navigate("/");
   };
 
+  const handleBulkImportReview = async (imported_status) => {
+    if (selectedImports.length === 0) return;
+    try {
+      await api.post("/admin/businesses/import-review", {
+        ids: selectedImports,
+        imported_status,
+      });
+      toast.success(`${selectedImports.length} place${selectedImports.length === 1 ? "" : "s"} ${imported_status}`);
+      setSelectedImports([]);
+      await loadAll();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Bulk review failed");
+    }
+  };
+
   if (authChecking) {
     return (
       <div className="min-h-screen bg-[#050505] flex items-center justify-center text-[#A1A1AA]">
@@ -239,6 +260,7 @@ export default function AdminDashboardPage() {
         <div className="flex gap-2 border-b border-white/10">
           {[
             { id: "businesses", label: "Businesses", icon: Store },
+            { id: "imports", label: `Import Review${importSummary?.pending ? ` (${importSummary.pending})` : ""}`, icon: ClipboardCheck },
             { id: "analytics", label: "Analytics", icon: BarChart3 },
           ].map((t) => (
             <button
@@ -273,6 +295,17 @@ export default function AdminDashboardPage() {
           />
         )}
         {tab === "analytics" && <AnalyticsPanel analytics={analytics} categories={categories} onOpenBusiness={(bid) => navigate(`/admin/business/${bid}`)} />}
+        {tab === "imports" && (
+          <ImportReviewPanel
+            businesses={businesses}
+            summary={importSummary}
+            selected={selectedImports}
+            onSelectedChange={setSelectedImports}
+            onApprove={() => handleBulkImportReview("approved")}
+            onReject={() => handleBulkImportReview("rejected")}
+            onEdit={openEdit}
+          />
+        )}
       </div>
 
       {/* Edit / create dialog */}
@@ -379,6 +412,31 @@ export default function AdminDashboardPage() {
                 />
               </Field>
             </div>
+
+            {form.import_source === "google_places" && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field label="Import review status">
+                  <Select
+                    value={form.imported_status || "pending"}
+                    onValueChange={(v) => setForm({ ...form, imported_status: v })}
+                  >
+                    <SelectTrigger className="bg-[#1A1A22] border-white/10 text-white" data-testid="business-form-import-status">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-[#121218] border-white/10 text-white">
+                      <SelectItem value="pending" className="focus:bg-white/10 focus:text-white">Pending review</SelectItem>
+                      <SelectItem value="approved" className="focus:bg-white/10 focus:text-white">Approved</SelectItem>
+                      <SelectItem value="rejected" className="focus:bg-white/10 focus:text-white">Rejected</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label="Google rating">
+                  <div className="text-sm text-white py-3">
+                    {form.google_rating || "—"} · {(form.google_user_rating_count || 0).toLocaleString()} reviews
+                  </div>
+                </Field>
+              </div>
+            )}
             <Field label="Address">
               <Input
                 value={form.address}
@@ -504,6 +562,153 @@ function Field({ label, children }) {
     <div>
       <div className="text-xs font-bold uppercase tracking-wide text-[#A1A1AA] mb-2">{label}</div>
       {children}
+    </div>
+  );
+}
+
+function ImportReviewPanel({ businesses, summary, selected, onSelectedChange, onApprove, onReject, onEdit }) {
+  const [status, setStatus] = useState("pending");
+  const imported = businesses
+    .filter((b) => b.import_source === "google_places" && b.imported_status === status)
+    .sort((a, b) => (b.brand_fit_score || 0) - (a.brand_fit_score || 0));
+  const selectedSet = new Set(selected);
+
+  const toggle = (id) => {
+    onSelectedChange(
+      selectedSet.has(id)
+        ? selected.filter((selectedId) => selectedId !== id)
+        : [...selected, id]
+    );
+  };
+
+  const toggleAll = () => {
+    const ids = imported.map((b) => b.id);
+    const allSelected = ids.length > 0 && ids.every((id) => selectedSet.has(id));
+    onSelectedChange(allSelected ? selected.filter((id) => !ids.includes(id)) : Array.from(new Set([...selected, ...ids])));
+  };
+
+  return (
+    <div data-testid="admin-import-review">
+      <div className="flex items-start justify-between gap-4 flex-wrap mb-6">
+        <div>
+          <h2 className="font-display text-3xl font-bold">Google Places Import Review</h2>
+          <p className="text-sm text-[#A1A1AA] mt-1">
+            Imported places stay private until approved.
+          </p>
+        </div>
+        <div className="flex gap-2 text-xs">
+          {["pending", "approved", "rejected"].map((item) => (
+            <button
+              key={item}
+              onClick={() => {
+                setStatus(item);
+                onSelectedChange([]);
+              }}
+              className={`px-3 py-2 rounded-full border capitalize ${
+                status === item ? "border-[#7C3AED] text-white bg-[#7C3AED]/15" : "border-white/10 text-[#A1A1AA]"
+              }`}
+              data-testid={`admin-import-filter-${item}`}
+            >
+              {item} {summary?.[item] || 0}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex gap-2 mb-4">
+        <Button
+          onClick={onApprove}
+          disabled={selected.length === 0}
+          className="bg-emerald-600 hover:bg-emerald-500 text-white"
+          data-testid="admin-import-approve"
+        >
+          <CheckCircle className="w-4 h-4 mr-2" />
+          Approve selected
+        </Button>
+        <Button
+          onClick={onReject}
+          disabled={selected.length === 0}
+          className="bg-red-700 hover:bg-red-600 text-white"
+          data-testid="admin-import-reject"
+        >
+          <XCircle className="w-4 h-4 mr-2" />
+          Reject selected
+        </Button>
+      </div>
+
+      <div className="bg-[#121218] rounded-3xl border border-white/10 overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-xs uppercase tracking-wide text-[#A1A1AA]">
+              <th className="px-5 py-4">
+                <input type="checkbox" onChange={toggleAll} aria-label="Select all imported places" />
+              </th>
+              <th className="px-3 py-4">Place</th>
+              <th className="px-3 py-4">Fit</th>
+              <th className="px-3 py-4">Google</th>
+              <th className="px-3 py-4 hidden lg:table-cell">Tags</th>
+              <th className="px-3 py-4 hidden md:table-cell">Slots</th>
+              <th className="px-5 py-4 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {imported.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="px-5 py-12 text-center text-[#A1A1AA]">
+                  No {status} Google Places imports.
+                </td>
+              </tr>
+            ) : imported.map((b) => (
+              <tr key={b.id} className="border-t border-white/5" data-testid={`admin-import-row-${b.id}`}>
+                <td className="px-5 py-4">
+                  <input
+                    type="checkbox"
+                    checked={selectedSet.has(b.id)}
+                    onChange={() => toggle(b.id)}
+                    aria-label={`Select ${b.name}`}
+                  />
+                </td>
+                <td className="px-3 py-4">
+                  <div className="font-bold">{b.name}</div>
+                  <div className="text-xs text-[#A1A1AA] mt-1 max-w-sm">{b.address}</div>
+                </td>
+                <td className="px-3 py-4 font-bold text-[#C6FF00]">{b.brand_fit_score || "—"}</td>
+                <td className="px-3 py-4 whitespace-nowrap text-[#A1A1AA]">
+                  <div>{b.google_rating || "—"} · {(b.google_user_rating_count || 0).toLocaleString()}</div>
+                  {b.import_override_reason && (
+                    <div className="text-amber-400 text-[10px] uppercase tracking-wide mt-1">
+                      Curator override
+                    </div>
+                  )}
+                  {b.google_maps_url && (
+                    <a href={b.google_maps_url} target="_blank" rel="noopener noreferrer" className="text-[#C6FF00] inline-flex items-center gap-1 mt-1">
+                      Maps <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+                </td>
+                <td className="px-3 py-4 hidden lg:table-cell text-xs text-[#A1A1AA] max-w-xs">
+                  {(b.tags || []).join(", ")}
+                </td>
+                <td className="px-3 py-4 hidden md:table-cell text-xs text-[#A1A1AA]">
+                  {(b.slots || []).join(", ")}
+                </td>
+                <td className="px-5 py-4 text-right">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onEdit(b)}
+                    className="text-white/70 hover:text-white hover:bg-white/5"
+                    data-testid={`admin-import-edit-${b.id}`}
+                  >
+                    <Pencil className="w-4 h-4 mr-1" />
+                    Edit
+                  </Button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
