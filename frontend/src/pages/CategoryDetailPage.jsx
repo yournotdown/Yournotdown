@@ -3,9 +3,11 @@ import { useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, Phone, Navigation, Globe, Flame } from "lucide-react";
 import { api, trackEvent, resolveImageUrl } from "../lib/api";
+import { activeCitySlug } from "../lib/cities";
 
 export default function CategoryDetailPage() {
-  const { slug } = useParams();
+  const { citySlug: routeCitySlug, slug } = useParams();
+  const citySlug = activeCitySlug(routeCitySlug);
   const navigate = useNavigate();
   const [businesses, setBusinesses] = useState([]);
   const [category, setCategory] = useState(null);
@@ -14,7 +16,7 @@ export default function CategoryDetailPage() {
   useEffect(() => {
     Promise.all([
       api.get("/categories").then((r) => r.data),
-      api.get("/businesses", { params: { category: slug, city: "nashville" } }).then((r) => r.data),
+      api.get("/businesses", { params: { category: slug, city: citySlug } }).then((r) => r.data),
     ])
       .then(([cats, biz]) => {
         const cat = cats.find((c) => c.slug === slug);
@@ -25,13 +27,13 @@ export default function CategoryDetailPage() {
         biz.forEach((b) => {
           if (!seen.has(b.id)) {
             seen.add(b.id);
-            trackEvent("business_view", { business_id: b.id, category_slug: slug });
+            trackEvent("business_view", { business_id: b.id, category_slug: slug, city_slug: citySlug });
           }
         });
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, [slug]);
+  }, [citySlug, slug]);
 
   const directionsUrl = (b) => {
     const q = encodeURIComponent(b.address || b.name);
@@ -39,7 +41,7 @@ export default function CategoryDetailPage() {
   };
 
   const handleAction = (type, b) => {
-    trackEvent(type, { business_id: b.id, category_slug: slug });
+    trackEvent(type, { business_id: b.id, category_slug: slug, city_slug: citySlug });
   };
 
   return (

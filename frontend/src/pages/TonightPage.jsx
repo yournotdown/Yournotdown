@@ -1,8 +1,9 @@
 import { useEffect, useState, useCallback } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Phone, Navigation, Globe, RotateCw } from "lucide-react";
 import { api, trackEvent, resolveImageUrl } from "../lib/api";
+import { activeCitySlug, cityPath } from "../lib/cities";
 
 const VIBE_LABELS = {
   "just-vibing": { emoji: "😇", label: "Take It Easy" },
@@ -22,6 +23,8 @@ const MARQUEE = "WHAT'S NEXT";
 
 export default function TonightPage() {
   const navigate = useNavigate();
+  const { citySlug: routeCitySlug } = useParams();
+  const citySlug = activeCitySlug(routeCitySlug);
   const [searchParams] = useSearchParams();
   const vibe = searchParams.get("vibe") || "down";
   const vibeMeta = VIBE_LABELS[vibe] || { emoji: "✨", label: vibe };
@@ -38,11 +41,11 @@ export default function TonightPage() {
       try {
         const r = await api.post("/itinerary/generate", {
           vibe,
-          city: "nashville",
+          city: citySlug,
           exclude_ids: excludeIds,
         });
         setItinerary(r.data);
-        trackEvent("itinerary_view", { vibe, itinerary_id: r.data.id });
+        trackEvent("itinerary_view", { vibe, itinerary_id: r.data.id, city_slug: citySlug });
         const newIds = r.data.steps.map((s) => s.business.id);
         setSeenIds((prev) => Array.from(new Set([...prev, ...newIds])));
       } catch (e) {
@@ -52,7 +55,7 @@ export default function TonightPage() {
         setRegenerating(false);
       }
     },
-    [vibe]
+    [citySlug, vibe]
   );
 
   useEffect(() => {
@@ -60,11 +63,11 @@ export default function TonightPage() {
     setSeenIds([]);
     generate([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vibe]);
+  }, [citySlug, vibe]);
 
   const handleAnother = () => {
     setRegenerating(true);
-    trackEvent("another_night_click", { vibe });
+    trackEvent("another_night_click", { vibe, city_slug: citySlug });
     generate(seenIds);
   };
 
@@ -74,7 +77,7 @@ export default function TonightPage() {
   };
 
   const handleAction = (type, b) => {
-    trackEvent(type, { business_id: b.id, itinerary_id: itinerary?.id, vibe });
+    trackEvent(type, { business_id: b.id, itinerary_id: itinerary?.id, vibe, city_slug: citySlug });
   };
 
   return (
@@ -97,7 +100,7 @@ export default function TonightPage() {
       </div>
 
       <button
-        onClick={() => navigate("/vibe")}
+        onClick={() => navigate(cityPath(citySlug, "vibe"))}
         className="absolute top-14 left-6 z-10 text-[10px] uppercase tracking-[0.3em] text-white/50 hover:text-[#C6FF00] transition-colors"
         data-testid="tonight-back-button"
       >

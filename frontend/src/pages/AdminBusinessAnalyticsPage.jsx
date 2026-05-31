@@ -117,7 +117,7 @@ export default function AdminBusinessAnalyticsPage() {
                   Edit business
                 </button>
                 <a
-                  href={`/c/${b.category_slug}`}
+                  href={`/${b.city_slug || "nashville"}/c/${b.category_slug}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="px-4 py-2 rounded-full bg-white/5 hover:bg-white/10 text-sm font-bold flex items-center gap-2 transition-colors"

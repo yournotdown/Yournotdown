@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
 import { api, trackEvent } from "../lib/api";
+import { activeCitySlug, cityPath } from "../lib/cities";
 
 export default function CategoriesPage() {
   const navigate = useNavigate();
+  const { citySlug: routeCitySlug } = useParams();
+  const citySlug = activeCitySlug(routeCitySlug);
   const [searchParams] = useSearchParams();
   const vibe = searchParams.get("vibe");
   const [categories, setCategories] = useState([]);
@@ -22,9 +25,9 @@ export default function CategoriesPage() {
   }, []);
 
   const handleCategory = (slug) => {
-    trackEvent("category_click", { category_slug: slug });
+    trackEvent("category_click", { category_slug: slug, city_slug: citySlug });
     const qs = vibe ? `?vibe=${vibe}` : "";
-    navigate(`/c/${slug}${qs}`);
+    navigate(`${cityPath(citySlug, `c/${slug}`)}${qs}`);
   };
 
   return (

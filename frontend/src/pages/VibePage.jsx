@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
+import { useNavigate, useParams } from "react-router-dom";
+import { motion } from "framer-motion";
 import { trackEvent } from "../lib/api";
+import { activeCitySlug, cityPath } from "../lib/cities";
 
 const VIBES = [
   { slug: "just-vibing", emoji: "😇", label: "Take It Easy" },
@@ -14,13 +15,15 @@ const MARQUEE = "PICK YOUR VERSION OF THE NIGHT";
 
 export default function VibePage() {
   const navigate = useNavigate();
+  const { citySlug: routeCitySlug } = useParams();
+  const citySlug = activeCitySlug(routeCitySlug);
   const [crashing, setCrashing] = useState(false);
 
   const handleSelect = (vibe) => {
     if (crashing) return;
-    trackEvent("vibe_click", { vibe: vibe.slug });
+    trackEvent("vibe_click", { vibe: vibe.slug, city_slug: citySlug });
     setCrashing(true);
-    setTimeout(() => navigate(`/tonight?vibe=${vibe.slug}`), 420);
+    setTimeout(() => navigate(`${cityPath(citySlug, "tonight")}?vibe=${vibe.slug}`), 240);
   };
 
   return (
@@ -34,18 +37,6 @@ export default function VibePage() {
       <div className="pointer-events-none absolute inset-0 strobe-dim bg-black" />
       <div className="pointer-events-none absolute inset-x-0 h-px bg-white/40 scanline-anim" />
 
-      <AnimatePresence>
-        {crashing && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: [0, 1, 1, 0] }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.42, times: [0, 0.15, 0.55, 1] }}
-            className="pointer-events-none fixed inset-0 z-50 bg-[#C6FF00]"
-          />
-        )}
-      </AnimatePresence>
-
       {/* Corner marks */}
       <div className="absolute top-5 left-6 z-10 text-[10px] uppercase tracking-[0.3em] text-white/40 select-none">
         YND <span className="lime-dot mx-1.5">/</span> EST. 26
@@ -55,7 +46,7 @@ export default function VibePage() {
       </div>
 
       <button
-        onClick={() => navigate("/")}
+        onClick={() => navigate(cityPath(citySlug))}
         className="absolute top-14 left-6 z-10 text-[10px] uppercase tracking-[0.3em] text-white/50 hover:text-[#C6FF00] transition-colors"
         data-testid="vibe-back-button"
       >
@@ -65,8 +56,8 @@ export default function VibePage() {
       {/* Content — playful, emoji-first */}
       <motion.div
         className="relative z-10 min-h-screen flex flex-col justify-center pt-24 pb-28 px-5 sm:px-10 max-w-5xl mx-auto w-full"
-        animate={crashing ? { scale: 0.96, opacity: 0 } : { scale: 1, opacity: 1 }}
-        transition={{ duration: 0.32 }}
+        animate={crashing ? { scale: 0.98, opacity: 0 } : { scale: 1, opacity: 1 }}
+        transition={{ duration: 0.24 }}
       >
         <motion.h1
           className="font-flyer text-white uppercase"

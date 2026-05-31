@@ -1,23 +1,26 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
+import { useNavigate, useParams } from "react-router-dom";
+import { motion } from "framer-motion";
 import { trackEvent } from "../lib/api";
+import { activeCitySlug, cityDisplayName, cityPath } from "../lib/cities";
 
 const MARQUEE = "NO BORING NIGHTS";
 
 export default function HomePage() {
   const navigate = useNavigate();
+  const { citySlug: routeCitySlug } = useParams();
+  const citySlug = activeCitySlug(routeCitySlug);
   const [crashing, setCrashing] = useState(false);
 
   useEffect(() => {
-    trackEvent("homepage_visit");
-  }, []);
+    trackEvent("homepage_visit", { city_slug: citySlug });
+  }, [citySlug]);
 
   const handleClick = () => {
     if (crashing) return;
-    trackEvent("im_down_click");
+    trackEvent("im_down_click", { city_slug: citySlug });
     setCrashing(true);
-    setTimeout(() => navigate("/vibe"), 420);
+    setTimeout(() => navigate(cityPath(citySlug, "vibe")), 240);
   };
 
   return (
@@ -32,25 +35,12 @@ export default function HomePage() {
       {/* Scanline */}
       <div className="pointer-events-none absolute inset-x-0 h-px bg-white/40 scanline-anim" />
 
-      {/* "Crash" inversion flash on click */}
-      <AnimatePresence>
-        {crashing && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: [0, 1, 1, 0] }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.42, times: [0, 0.15, 0.55, 1] }}
-            className="pointer-events-none fixed inset-0 z-50 bg-[#C6FF00]"
-          />
-        )}
-      </AnimatePresence>
-
       {/* HERO TYPE */}
       <motion.div
         className="relative z-10 min-h-screen flex flex-col justify-center px-6 sm:px-10 pb-24 pt-24"
         initial={{ opacity: 0, y: 14 }}
-        animate={crashing ? { scale: 0.92, opacity: 0 } : { opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: crashing ? 0.32 : 0.7, ease: [0.22, 1, 0.36, 1] }}
+        animate={crashing ? { scale: 0.98, opacity: 0 } : { opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: crashing ? 0.24 : 0.7, ease: [0.22, 1, 0.36, 1] }}
       >
         <motion.h2
           className="font-flyer flicker-neon text-white uppercase select-none"
@@ -86,6 +76,9 @@ export default function HomePage() {
             I'M DOWN
           </span>
           <span className="lime-dot inline-block ml-1 sm:ml-2">.</span>
+          <span className="inline-block ml-2 sm:ml-4 align-middle font-display text-xs sm:text-base md:text-xl tracking-[0.28em] text-white/65">
+            {cityDisplayName(citySlug)}
+          </span>
         </motion.button>
       </motion.div>
 
