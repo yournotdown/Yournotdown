@@ -10,10 +10,13 @@ import requests
 from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, UploadFile, File, Header, Cookie, Depends
 from fastapi.responses import StreamingResponse, Response as FastResponse
 from dotenv import load_dotenv
+from starlette.background import BackgroundTask
+from starlette.concurrency import run_in_threadpool
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, ConfigDict
 
+from google_places_photos import fetch_google_places_photo, google_places_photo_media_url
 from storage_client import init_storage, put_object, get_object, APP_NAME
 from seed_data import (
     CATEGORIES,
@@ -519,6 +522,55 @@ async def get_business(business_id: str):
     if not b:
         raise HTTPException(status_code=404, detail="Not found")
     return b
+
+
+# ------------- Google Places photos (public proxy) -------------
+@api_router.get("/google-places/photo")
+async def google_places_photo(photo_name: Optional[str] = None, business_id: Optional[str] = None):
+    if bool(photo_name) == bool(business_id):
+        raise HTTPException(status_code=400, detail="Provide exactly one of photo_name or business_id")
+    if photo_name:
+        try:
+            google_places_photo_media_url(photo_name)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        business = await db.businesses.find_one(
+            {"google_photo_names": photo_name, "imported_status": "approved"},
+            {"_id": 1},
+        )
+        if not business:
+            raise HTTPException(status_code=404, detail="Google Places photo not found")
+    else:
+        business = await db.businesses.find_one(
+            {"id": business_id, "imported_status": "approved"},
+            {"_id": 0, "google_photo_names": 1},
+        )
+        if not business:
+            raise HTTPException(status_code=404, detail="Business not found")
+        photo_names = business.get("google_photo_names") or []
+        if not photo_names:
+            raise HTTPException(status_code=404, detail="Business has no Google Places photos")
+        photo_name = photo_names[0]
+    upstream = None
+    try:
+        upstream = await run_in_threadpool(fetch_google_places_photo, photo_name)
+        upstream.raise_for_status()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        logger.error("Google Places photo proxy is unavailable: %s", e)
+        raise HTTPException(status_code=503, detail="Google Places photo proxy is unavailable")
+    except requests.RequestException as e:
+        if upstream is not None:
+            upstream.close()
+        logger.warning("Google Places photo request failed: %s", e)
+        raise HTTPException(status_code=502, detail="Google Places photo request failed")
+    return StreamingResponse(
+        upstream.iter_content(chunk_size=64 * 1024),
+        media_type=upstream.headers.get("content-type", "image/jpeg"),
+        headers={"Cache-Control": "public, max-age=86400"},
+        background=BackgroundTask(upstream.close),
+    )
 
 
 # ------------- File serving (public) -------------

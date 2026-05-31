@@ -27,5 +27,9 @@ export const trackEvent = (event_type, extra = {}) => {
 
 export const resolveImageUrl = (b) => {
   if (b?.image_path) return `${API}/files/${b.image_path}`;
-  return b?.image_url || "";
+  if (b?.image_url) return b.image_url;
+  if (b?.google_photo_names?.[0]) {
+    return `${API}/google-places/photo?photo_name=${encodeURIComponent(b.google_photo_names[0])}`;
+  }
+  return "";
 };
