@@ -12,6 +12,7 @@ import AuthCallback from "./pages/AuthCallback";
 import { cityPath, DEFAULT_CITY_SLUG } from "./lib/cities";
 import "@/index.css";
 
+// build marker: force production frontend rebuild
 function NashvilleRedirect({ path = "" }) {
   const location = useLocation();
   return <Navigate to={`${cityPath(DEFAULT_CITY_SLUG, path)}${location.search}`} replace />;
