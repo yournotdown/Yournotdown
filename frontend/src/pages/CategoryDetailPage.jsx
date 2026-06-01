@@ -4,12 +4,14 @@ import { motion } from "framer-motion";
 import { ArrowLeft, Phone, Navigation, Globe, Flame } from "lucide-react";
 import { api, trackEvent, resolveImageUrl } from "../lib/api";
 import { activeCitySlug } from "../lib/cities";
+import EventCard from "../components/EventCard";
 
 export default function CategoryDetailPage() {
   const { citySlug: routeCitySlug, slug } = useParams();
   const citySlug = activeCitySlug(routeCitySlug);
   const navigate = useNavigate();
   const [businesses, setBusinesses] = useState([]);
+  const [events, setEvents] = useState([]);
   const [category, setCategory] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -17,11 +19,13 @@ export default function CategoryDetailPage() {
     Promise.all([
       api.get("/categories").then((r) => r.data),
       api.get("/businesses", { params: { category: slug, city: citySlug } }).then((r) => r.data),
+      api.get("/events/today", { params: { city: citySlug } }).then((r) => r.data).catch(() => []),
     ])
-      .then(([cats, biz]) => {
+      .then(([cats, biz, todayEvents]) => {
         const cat = cats.find((c) => c.slug === slug);
         setCategory(cat || { slug, name: slug, emoji: "✨" });
         setBusinesses(biz);
+        setEvents(todayEvents);
         // One view event per business per page-load (not per render)
         const seen = new Set();
         biz.forEach((b) => {
@@ -79,87 +83,125 @@ export default function CategoryDetailPage() {
               <div key={i} className="h-[420px] rounded-[32px] bg-[#121218] animate-pulse" />
             ))}
           </div>
-        ) : businesses.length === 0 ? (
-          <div className="text-center text-[#A1A1AA] py-20" data-testid="category-empty-state">
-            Nothing here yet. Check back soon.
-          </div>
         ) : (
-          <div className="space-y-8">
-            {businesses.map((b, i) => (
-              <motion.div
-                key={b.id}
-                initial={{ opacity: 0, y: 24 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.06, duration: 0.45 }}
-                className="bg-[#121218] rounded-[32px] overflow-hidden border border-white/10 shadow-2xl group"
-                data-testid={`business-card-${b.id}`}
-              >
-                <div className="relative w-full h-72 bg-[#1A1A22] overflow-hidden">
-                  {resolveImageUrl(b) && (
-                    <img
-                      src={resolveImageUrl(b)}
-                      alt={b.name}
-                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                      loading="lazy"
-                    />
-                  )}
-                  {b.featured && (
-                    <div className="absolute top-4 left-4 px-3 py-1.5 bg-[#C6FF00] text-white text-xs font-bold rounded-full flex items-center gap-1.5" data-testid={`featured-badge-${b.id}`}>
-                      <Flame className="w-3 h-3" />
-                      FEATURED
-                    </div>
-                  )}
+          <>
+            <section className="mb-14" data-testid="tonights-events-section">
+              <div className="mb-5 border-t border-white/10 pt-5">
+                <div className="text-[10px] uppercase tracking-[0.3em] text-[#C6FF00]">
+                  Live calendar
                 </div>
-                <div className="p-6">
-                  <h3 className="font-display text-2xl sm:text-3xl font-bold text-white" data-testid={`business-name-${b.id}`}>
-                    {b.name}
-                  </h3>
-                  <p className="mt-2 text-[#A1A1AA] text-sm leading-relaxed line-clamp-3">
-                    {b.description}
-                  </p>
-                  <div className="grid grid-cols-3 gap-3 mt-6">
-                    {b.phone ? (
-                      <a
-                        href={`tel:${b.phone}`}
-                        onClick={() => handleAction("phone_click", b)}
-                        className="py-4 rounded-full bg-white/5 hover:bg-white/10 text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-colors active:scale-95"
-                        data-testid={`business-call-${b.id}`}
-                      >
-                        <Phone className="w-4 h-4" />
-                        <span className="hidden sm:inline">Call</span>
-                      </a>
-                    ) : <div />}
-                    {b.address || b.name ? (
-                      <a
-                        href={directionsUrl(b)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={() => handleAction("directions_click", b)}
-                        className="py-4 rounded-full bg-white/5 hover:bg-white/10 text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-colors active:scale-95"
-                        data-testid={`business-directions-${b.id}`}
-                      >
-                        <Navigation className="w-4 h-4" />
-                        <span className="hidden sm:inline">Directions</span>
-                      </a>
-                    ) : <div />}
-                    {b.website ? (
-                      <a
-                        href={b.website}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={() => handleAction("website_click", b)}
-                        className="py-4 rounded-full bg-[#C6FF00] hover:bg-[#A8E000] text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-colors active:scale-95 glow-lime"
-                        data-testid={`business-website-${b.id}`}
-                      >
-                        <Globe className="w-4 h-4" />
-                        <span className="hidden sm:inline">Website</span>
-                      </a>
-                    ) : <div />}
-                  </div>
+                <h2 className="mt-2 font-flyer text-3xl uppercase text-white">
+                  Tonight's Events<span className="lime-dot">.</span>
+                </h2>
+              </div>
+
+              {events.length === 0 ? (
+                <p className="border border-white/10 bg-[#121218] px-5 py-6 text-sm text-[#A1A1AA]">
+                  No events listed for tonight.
+                </p>
+              ) : (
+                <div className="space-y-4">
+                  {events.map((event, i) => (
+                    <EventCard key={event.id || event.external_event_id} event={event} index={i} />
+                  ))}
                 </div>
-              </motion.div>
-            ))}
-          </div>
+              )}
+            </section>
+
+            <section data-testid="venue-list-section">
+              <div className="mb-5 border-t border-white/10 pt-5">
+                <div className="text-[10px] uppercase tracking-[0.3em] text-white/40">
+                  Explore the city
+                </div>
+                <h2 className="mt-2 font-flyer text-3xl uppercase text-white">
+                  Venues<span className="lime-dot">.</span>
+                </h2>
+              </div>
+
+              {businesses.length === 0 ? (
+                <div className="text-center text-[#A1A1AA] py-20" data-testid="category-empty-state">
+                  Nothing here yet. Check back soon.
+                </div>
+              ) : (
+                <div className="space-y-8">
+                  {businesses.map((b, i) => (
+                    <motion.div
+                      key={b.id}
+                      initial={{ opacity: 0, y: 24 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.06, duration: 0.45 }}
+                      className="bg-[#121218] rounded-[32px] overflow-hidden border border-white/10 shadow-2xl group"
+                      data-testid={`business-card-${b.id}`}
+                    >
+                      <div className="relative w-full h-72 bg-[#1A1A22] overflow-hidden">
+                        {resolveImageUrl(b) && (
+                          <img
+                            src={resolveImageUrl(b)}
+                            alt={b.name}
+                            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                            loading="lazy"
+                          />
+                        )}
+                        {b.featured && (
+                          <div className="absolute top-4 left-4 px-3 py-1.5 bg-[#C6FF00] text-white text-xs font-bold rounded-full flex items-center gap-1.5" data-testid={`featured-badge-${b.id}`}>
+                            <Flame className="w-3 h-3" />
+                            FEATURED
+                          </div>
+                        )}
+                      </div>
+                      <div className="p-6">
+                        <h3 className="font-display text-2xl sm:text-3xl font-bold text-white" data-testid={`business-name-${b.id}`}>
+                          {b.name}
+                        </h3>
+                        <p className="mt-2 text-[#A1A1AA] text-sm leading-relaxed line-clamp-3">
+                          {b.description}
+                        </p>
+                        <div className="grid grid-cols-3 gap-3 mt-6">
+                          {b.phone ? (
+                            <a
+                              href={`tel:${b.phone}`}
+                              onClick={() => handleAction("phone_click", b)}
+                              className="py-4 rounded-full bg-white/5 hover:bg-white/10 text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-colors active:scale-95"
+                              data-testid={`business-call-${b.id}`}
+                            >
+                              <Phone className="w-4 h-4" />
+                              <span className="hidden sm:inline">Call</span>
+                            </a>
+                          ) : <div />}
+                          {b.address || b.name ? (
+                            <a
+                              href={directionsUrl(b)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={() => handleAction("directions_click", b)}
+                              className="py-4 rounded-full bg-white/5 hover:bg-white/10 text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-colors active:scale-95"
+                              data-testid={`business-directions-${b.id}`}
+                            >
+                              <Navigation className="w-4 h-4" />
+                              <span className="hidden sm:inline">Directions</span>
+                            </a>
+                          ) : <div />}
+                          {b.website ? (
+                            <a
+                              href={b.website}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={() => handleAction("website_click", b)}
+                              className="py-4 rounded-full bg-[#C6FF00] hover:bg-[#A8E000] text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-colors active:scale-95 glow-lime"
+                              data-testid={`business-website-${b.id}`}
+                            >
+                              <Globe className="w-4 h-4" />
+                              <span className="hidden sm:inline">Website</span>
+                            </a>
+                          ) : <div />}
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </section>
+          </>
         )}
       </div>
     </div>
