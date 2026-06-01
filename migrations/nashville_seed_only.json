@@ -1,0 +1,774 @@
+[
+  {
+    "id": "4e645433-8627-43f3-88ad-5d332a0beb7b",
+    "name": "Hattie B's Hot Chicken",
+    "description": "Nashville's iconic hot chicken \u2014 pick your heat, grab a side of mac.",
+    "image_url": "https://images.unsplash.com/photo-1661422586023-681ea60507e2?crop=entropy&cs=srgb&fm=jpg&q=85&w=1200",
+    "image_path": null,
+    "website": "https://hattieb.com",
+    "phone": "+16157426387",
+    "address": "112 19th Ave S, Nashville, TN",
+    "category_slug": "date-night",
+    "city_slug": "nashville",
+    "featured": true,
+    "order": 0,
+    "created_at": "2026-05-30T18:24:33.005299+00:00",
+    "sponsor_tier": "gold",
+    "slots": [
+      "dinner"
+    ],
+    "tags": [
+      "casual",
+      "tourist_favorite",
+      "popular"
+    ],
+    "imported_status": "approved"
+  },
+  {
+    "id": "9ccf3a7b-6bc0-4a63-993c-6f4b5fb81123",
+    "name": "Husk Nashville",
+    "description": "Refined Southern cooking in a restored 19th-century home.",
+    "image_url": "https://images.unsplash.com/photo-1661422586023-681ea60507e2?crop=entropy&cs=srgb&fm=jpg&q=85&w=1200",
+    "image_path": null,
+    "website": "https://husknashville.com",
+    "phone": "+16152567299",
+    "address": "37 Rutledge St, Nashville, TN",
+    "category_slug": "date-night",
+    "city_slug": "nashville",
+    "featured": false,
+    "order": 1,
+    "created_at": "2026-05-30T18:24:33.031146+00:00",
+    "sponsor_tier": "none",
+    "slots": [
+      "dinner"
+    ],
+    "tags": [
+      "fine_dining",
+      "date_night",
+      "local_favorite"
+    ],
+    "imported_status": "approved"
+  },
+  {
+    "id": "5237e987-28c4-488a-aa7a-3420ad3137fd",
+    "name": "The Pharmacy Burger",
+    "description": "Burgers, phosphates and a backyard beer garden.",
+    "image_url": "https://images.unsplash.com/photo-1661422586023-681ea60507e2?crop=entropy&cs=srgb&fm=jpg&q=85&w=1200",
+    "image_path": null,
+    "website": "https://thepharmacynashville.com",
+    "phone": "+16152629899",
+    "address": "731 McFerrin Ave, Nashville, TN",
+    "category_slug": "date-night",
+    "city_slug": "nashville",
+    "featured": false,
+    "order": 2,
+    "created_at": "2026-05-30T18:24:33.031592+00:00",
+    "sponsor_tier": "none",
+    "slots": [
+      "dinner"
+    ],
+    "tags": [
+      "casual",
+      "family",
+      "popular",
+      "local_favorite"
+    ],
+    "imported_status": "approved"
+  },
+  {
+    "id": "5f800b98-735e-446a-bd36-176a21b0d2cb",
+    "name": "Rolf and Daughters",
+    "description": "Wood-fired pastas and natural wine in a Germantown warehouse.",
+    "image_url": "https://images.unsplash.com/photo-1661422586023-681ea60507e2?crop=entropy&cs=srgb&fm=jpg&q=85&w=1200",
+    "image_path": null,
+    "website": "https://rolfanddaughters.com",
+    "phone": "+16157264800",
+    "address": "700 Taylor St, Nashville, TN",
+    "category_slug": "date-night",
+    "city_slug": "nashville",
+    "featured": false,
+    "order": 3,
+    "created_at": "2026-05-30T18:24:33.031846+00:00",
+    "sponsor_tier": "none",
+    "slots": [
+      "dinner"
+    ],
+    "tags": [
+      "fine_dining",
+      "date_night",
+      "hidden_gem"
+    ],
+    "imported_status": "approved"
+  },
+  {
+    "id": "627be484-4e3d-4518-b821-3184dd1953c6",
+    "name": "Attaboy",
+    "description": "Bartender's-choice cocktail den \u2014 no menu, just trust.",
+    "image_url": "https://static.prod-images.emergentagent.com/jobs/b92b0f3b-9cfd-4b9b-83f4-6105a4bdc217/images/c1177e1886d16b846ca25ac0693579cf6c7f3ad7b682268fcfe8e2fb4ed9514d.png",
+    "image_path": null,
+    "website": "https://attaboynashville.com",
+    "phone": "+16158889724",
+    "address": "8 McFerrin Ave, Nashville, TN",
+    "category_slug": "drinks",
+    "city_slug": "nashville",
+    "featured": true,
+    "order": 4,
+    "created_at": "2026-05-30T18:24:33.032050+00:00",
+    "sponsor_tier": "gold",
+    "slots": [
+      "drinks"
+    ],
+    "tags": [
+      "cocktails",
+      "hidden_gem",
+      "date_night",
+      "local_favorite",
+      "speakeasy"
+    ],
+    "imported_status": "approved"
+  },
+  {
+    "id": "aa1c4f55-2b0d-4968-9d3d-1894e8cdf730",
+    "name": "The Patterson House",
+    "description": "Speakeasy classics in a curtained back room.",
+    "image_url": "https://static.prod-images.emergentagent.com/jobs/b92b0f3b-9cfd-4b9b-83f4-6105a4bdc217/images/c1177e1886d16b846ca25ac0693579cf6c7f3ad7b682268fcfe8e2fb4ed9514d.png",
+    "image_path": null,
+    "website": "https://thepattersonnashville.com",
+    "phone": "+16152562222",
+    "address": "1711 Division St, Nashville, TN",
+    "category_slug": "drinks",
+    "city_slug": "nashville",
+    "featured": false,
+    "order": 5,
+    "created_at": "2026-05-30T18:24:33.032270+00:00",
+    "sponsor_tier": "none",
+    "slots": [
+      "drinks"
+    ],
+    "tags": [
+      "cocktails",
+      "date_night",
+      "speakeasy",
+      "hidden_gem"
+    ],
+    "imported_status": "approved"
+  },
+  {
+    "id": "bd895ad7-4347-4ed3-984a-993b26573df6",
+    "name": "Bastion",
+    "description": "Tiny bar, big cocktails, hidden behind the nachos.",
+    "image_url": "https://static.prod-images.emergentagent.com/jobs/b92b0f3b-9cfd-4b9b-83f4-6105a4bdc217/images/c1177e1886d16b846ca25ac0693579cf6c7f3ad7b682268fcfe8e2fb4ed9514d.png",
+    "image_path": null,
+    "website": "https://bastionnashville.com",
+    "phone": "+16156019293",
+    "address": "434 Houston St, Nashville, TN",
+    "category_slug": "drinks",
+    "city_slug": "nashville",
+    "featured": false,
+    "order": 6,
+    "created_at": "2026-05-30T18:24:33.032462+00:00",
+    "sponsor_tier": "none",
+    "slots": [
+      "drinks"
+    ],
+    "tags": [
+      "cocktails",
+      "hidden_gem",
+      "unique",
+      "speakeasy"
+    ],
+    "imported_status": "approved"
+  },
+  {
+    "id": "b66504f8-9d77-477a-bab2-1b5b4895bb78",
+    "name": "Old Glory",
+    "description": "Cathedral-like cocktail lounge in a former boiler room.",
+    "image_url": "https://static.prod-images.emergentagent.com/jobs/b92b0f3b-9cfd-4b9b-83f4-6105a4bdc217/images/c1177e1886d16b846ca25ac0693579cf6c7f3ad7b682268fcfe8e2fb4ed9514d.png",
+    "image_path": null,
+    "website": "https://oldglorynashville.com",
+    "phone": "+16153794200",
+    "address": "1200 Villa Pl, Nashville, TN",
+    "category_slug": "drinks",
+    "city_slug": "nashville",
+    "featured": false,
+    "order": 7,
+    "created_at": "2026-05-30T18:24:33.032650+00:00",
+    "sponsor_tier": "none",
+    "slots": [
+      "drinks"
+    ],
+    "tags": [
+      "cocktails",
+      "unique",
+      "date_night"
+    ],
+    "imported_status": "approved"
+  },
+  {
+    "id": "ae59c8ad-1d26-4ee2-81e6-ca21ea3fd5eb",
+    "name": "The Bluebird Cafe",
+    "description": "Songwriters in the round. The Nashville listening room.",
+    "image_url": "https://static.prod-images.emergentagent.com/jobs/b92b0f3b-9cfd-4b9b-83f4-6105a4bdc217/images/41df6b9a58753125673589ac5cee166fa575f4191a4a3ef3331508da99ced7ee.png",
+    "image_path": null,
+    "website": "https://bluebirdcafe.com",
+    "phone": "+16153831461",
+    "address": "4104 Hillsboro Pike, Nashville, TN",
+    "category_slug": "live-music",
+    "city_slug": "nashville",
+    "featured": true,
+    "order": 8,
+    "created_at": "2026-05-30T18:24:33.032843+00:00",
+    "sponsor_tier": "gold",
+    "slots": [
+      "entertainment"
+    ],
+    "tags": [
+      "live_music",
+      "quiet",
+      "scenic",
+      "local_favorite"
+    ],
+    "imported_status": "approved"
+  },
+  {
+    "id": "5eede132-e4f5-486e-85f3-c47c49cdb7b0",
+    "name": "Exit/In",
+    "description": "Legendary rock club that's hosted everyone from Etta to Etta.",
+    "image_url": "https://static.prod-images.emergentagent.com/jobs/b92b0f3b-9cfd-4b9b-83f4-6105a4bdc217/images/41df6b9a58753125673589ac5cee166fa575f4191a4a3ef3331508da99ced7ee.png",
+    "image_path": null,
+    "website": "https://exitin.com",
+    "phone": "+16153213340",
+    "address": "2208 Elliston Pl, Nashville, TN",
+    "category_slug": "live-music",
+    "city_slug": "nashville",
+    "featured": false,
+    "order": 9,
+    "created_at": "2026-05-30T18:24:33.033018+00:00",
+    "sponsor_tier": "none",
+    "slots": [
+      "entertainment"
+    ],
+    "tags": [
+      "live_music",
+      "nightlife",
+      "concerts"
+    ],
+    "imported_status": "approved"
+  },
+  {
+    "id": "907dfa43-8db6-40a6-9422-645aeb5bdee8",
+    "name": "The Basement East",
+    "description": "Indie shows, late nights, sweaty crowds.",
+    "image_url": "https://static.prod-images.emergentagent.com/jobs/b92b0f3b-9cfd-4b9b-83f4-6105a4bdc217/images/41df6b9a58753125673589ac5cee166fa575f4191a4a3ef3331508da99ced7ee.png",
+    "image_path": null,
+    "website": "https://thebasementeast.com",
+    "phone": "+16158437620",
+    "address": "917 Woodland St, Nashville, TN",
+    "category_slug": "live-music",
+    "city_slug": "nashville",
+    "featured": false,
+    "order": 10,
+    "created_at": "2026-05-30T18:24:33.033195+00:00",
+    "sponsor_tier": "none",
+    "slots": [
+      "entertainment"
+    ],
+    "tags": [
+      "live_music",
+      "nightlife",
+      "concerts",
+      "local_favorite"
+    ],
+    "imported_status": "approved"
+  },
+  {
+    "id": "78a6b273-487c-4c4c-8ada-0c578afe804c",
+    "name": "Ryman Auditorium",
+    "description": "The Mother Church. Pews, stained glass, perfect acoustics.",
+    "image_url": "https://static.prod-images.emergentagent.com/jobs/b92b0f3b-9cfd-4b9b-83f4-6105a4bdc217/images/41df6b9a58753125673589ac5cee166fa575f4191a4a3ef3331508da99ced7ee.png",
+    "image_path": null,
+    "website": "https://ryman.com",
+    "phone": "+16158897464",
+    "address": "116 Rep. John Lewis Way N, Nashville, TN",
+    "category_slug": "live-music",
+    "city_slug": "nashville",
+    "featured": false,
+    "order": 11,
+    "created_at": "2026-05-30T18:24:33.033373+00:00",
+    "sponsor_tier": "none",
+    "slots": [
+      "entertainment"
+    ],
+    "tags": [
+      "live_music",
+      "concerts",
+      "tourist_favorite",
+      "scenic",
+      "popular"
+    ],
+    "imported_status": "approved"
+  },
+  {
+    "id": "dc0e0289-fd67-44da-99ea-f65e4f3c324b",
+    "name": "Catbird Seat",
+    "description": "Chef's counter with a multi-course tasting menu.",
+    "image_url": "https://images.unsplash.com/photo-1559329007-40df8a9345d8?crop=entropy&cs=srgb&fm=jpg&q=85&w=1200",
+    "image_path": null,
+    "website": "https://thecatbirdseatrestaurant.com",
+    "phone": "+16159658511",
+    "address": "1711 Division St, Nashville, TN",
+    "category_slug": "date-night",
+    "city_slug": "nashville",
+    "featured": true,
+    "order": 12,
+    "created_at": "2026-05-30T18:24:33.033543+00:00",
+    "sponsor_tier": "gold",
+    "slots": [
+      "dinner"
+    ],
+    "tags": [
+      "fine_dining",
+      "date_night",
+      "unique",
+      "hidden_gem"
+    ],
+    "imported_status": "approved"
+  },
+  {
+    "id": "c7f9d7a6-01cc-4b78-9730-d4b734144e42",
+    "name": "Rooftop at Bobby",
+    "description": "Vintage bus, skyline views, low-light cocktails.",
+    "image_url": "https://images.unsplash.com/photo-1519214605650-76a613ee3245?crop=entropy&cs=srgb&fm=jpg&q=85&w=1200",
+    "image_path": null,
+    "website": "https://bobbyhotel.com",
+    "phone": "+16152442020",
+    "address": "230 4th Ave N, Nashville, TN",
+    "category_slug": "date-night",
+    "city_slug": "nashville",
+    "featured": false,
+    "order": 13,
+    "created_at": "2026-05-30T18:24:33.033742+00:00",
+    "sponsor_tier": "none",
+    "slots": [
+      "dinner"
+    ],
+    "tags": [
+      "rooftop",
+      "cocktails",
+      "date_night",
+      "scenic"
+    ],
+    "imported_status": "approved"
+  },
+  {
+    "id": "80df44f7-f378-4c47-9896-49640d371aab",
+    "name": "Henrietta Red",
+    "description": "Raw bar, natural wine, soft glowing dining room.",
+    "image_url": "https://images.unsplash.com/photo-1559329007-40df8a9345d8?crop=entropy&cs=srgb&fm=jpg&q=85&w=1200",
+    "image_path": null,
+    "website": "https://henriettared.com",
+    "phone": "+16157255600",
+    "address": "1200 4th Ave N, Nashville, TN",
+    "category_slug": "date-night",
+    "city_slug": "nashville",
+    "featured": false,
+    "order": 14,
+    "created_at": "2026-05-30T18:24:33.033919+00:00",
+    "sponsor_tier": "none",
+    "slots": [
+      "dinner"
+    ],
+    "tags": [
+      "fine_dining",
+      "date_night",
+      "cocktails"
+    ],
+    "imported_status": "approved"
+  },
+  {
+    "id": "18e52d46-32b2-4b23-9b5f-f14ddbd01d23",
+    "name": "Adventure Science Center",
+    "description": "Hands-on exhibits and a planetarium with a panoramic dome.",
+    "image_url": "https://images.unsplash.com/photo-1503454537195-1dcabb73ffb9?crop=entropy&cs=srgb&fm=jpg&q=85&w=1200",
+    "image_path": null,
+    "website": "https://adventuresci.org",
+    "phone": "+16158628881",
+    "address": "800 Fort Negley Blvd, Nashville, TN",
+    "category_slug": "family-fun",
+    "city_slug": "nashville",
+    "featured": false,
+    "order": 15,
+    "created_at": "2026-05-30T18:24:33.034096+00:00",
+    "sponsor_tier": "none",
+    "slots": [
+      "entertainment"
+    ],
+    "tags": [
+      "family",
+      "scenic"
+    ],
+    "imported_status": "approved"
+  },
+  {
+    "id": "7296014a-9dfe-486d-b083-5f578a803849",
+    "name": "Nashville Zoo at Grassmere",
+    "description": "200 acres, jungle gym treehouse, kangaroo kickabout.",
+    "image_url": "https://images.unsplash.com/photo-1503454537195-1dcabb73ffb9?crop=entropy&cs=srgb&fm=jpg&q=85&w=1200",
+    "image_path": null,
+    "website": "https://nashvillezoo.org",
+    "phone": "+16158334224",
+    "address": "3777 Nolensville Pike, Nashville, TN",
+    "category_slug": "family-fun",
+    "city_slug": "nashville",
+    "featured": false,
+    "order": 16,
+    "created_at": "2026-05-30T18:24:33.034288+00:00",
+    "sponsor_tier": "none",
+    "slots": [
+      "entertainment"
+    ],
+    "tags": [
+      "family",
+      "scenic"
+    ],
+    "imported_status": "approved"
+  },
+  {
+    "id": "a66e5d25-c7f6-4460-a36e-2a6e62e231cb",
+    "name": "Cheekwood Estate & Gardens",
+    "description": "Mansion, gardens, seasonal lights and weekend programming.",
+    "image_url": "https://images.unsplash.com/photo-1503454537195-1dcabb73ffb9?crop=entropy&cs=srgb&fm=jpg&q=85&w=1200",
+    "image_path": null,
+    "website": "https://cheekwood.org",
+    "phone": "+16153560092",
+    "address": "1200 Forrest Park Dr, Nashville, TN",
+    "category_slug": "family-fun",
+    "city_slug": "nashville",
+    "featured": false,
+    "order": 17,
+    "created_at": "2026-05-30T18:24:33.034473+00:00",
+    "sponsor_tier": "none",
+    "slots": [
+      "entertainment"
+    ],
+    "tags": [
+      "family",
+      "scenic",
+      "quiet"
+    ],
+    "imported_status": "approved"
+  },
+  {
+    "id": "bfdd8cf1-5da4-4054-a730-7d2b30fde9e4",
+    "name": "Nissan Stadium",
+    "description": "Home of the Tennessee Titans. NFL Sundays, riverside views.",
+    "image_url": "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?crop=entropy&cs=srgb&fm=jpg&q=85&w=1200",
+    "image_path": null,
+    "website": "https://nissanstadium.com",
+    "phone": "+16155658600",
+    "address": "1 Titans Way, Nashville, TN",
+    "category_slug": "night-out",
+    "city_slug": "nashville",
+    "featured": true,
+    "order": 18,
+    "created_at": "2026-05-30T18:24:33.034657+00:00",
+    "sponsor_tier": "gold",
+    "slots": [
+      "late-night"
+    ],
+    "tags": [
+      "sports",
+      "popular",
+      "entertainment",
+      "tourist_favorite"
+    ],
+    "imported_status": "approved"
+  },
+  {
+    "id": "2f5b038b-6fd5-4a28-804c-6ba3a0c27a59",
+    "name": "Bridgestone Arena",
+    "description": "Catch the Predators or a stadium-size headliner downtown.",
+    "image_url": "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?crop=entropy&cs=srgb&fm=jpg&q=85&w=1200",
+    "image_path": null,
+    "website": "https://bridgestonearena.com",
+    "phone": "+16157707800",
+    "address": "501 Broadway, Nashville, TN",
+    "category_slug": "night-out",
+    "city_slug": "nashville",
+    "featured": false,
+    "order": 19,
+    "created_at": "2026-05-30T18:24:33.034841+00:00",
+    "sponsor_tier": "none",
+    "slots": [
+      "late-night"
+    ],
+    "tags": [
+      "sports",
+      "concerts",
+      "popular",
+      "entertainment"
+    ],
+    "imported_status": "approved"
+  },
+  {
+    "id": "80355046-0406-4003-a8a0-cc22f3cc408c",
+    "name": "Geodis Park",
+    "description": "Nashville SC's home \u2014 chants, smoke, southern f\u00fatbol.",
+    "image_url": "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?crop=entropy&cs=srgb&fm=jpg&q=85&w=1200",
+    "image_path": null,
+    "website": "https://geodispark.com",
+    "phone": "+16158228000",
+    "address": "501 Benton Ave, Nashville, TN",
+    "category_slug": "night-out",
+    "city_slug": "nashville",
+    "featured": false,
+    "order": 20,
+    "created_at": "2026-05-30T18:24:33.035014+00:00",
+    "sponsor_tier": "none",
+    "slots": [
+      "late-night"
+    ],
+    "tags": [
+      "sports",
+      "popular",
+      "entertainment"
+    ],
+    "imported_status": "approved"
+  },
+  {
+    "id": "9dbecd28-e50e-40fb-8fa3-955608d82186",
+    "name": "L.A. Jackson",
+    "description": "Glass-walled rooftop above Thompson Hotel. Sunsets and skyline.",
+    "image_url": "https://images.unsplash.com/photo-1519214605650-76a613ee3245?crop=entropy&cs=srgb&fm=jpg&q=85&w=1200",
+    "image_path": null,
+    "website": "https://lajacksonbar.com",
+    "phone": "+16157702008",
+    "address": "401 11th Ave S, Nashville, TN",
+    "category_slug": "night-out",
+    "city_slug": "nashville",
+    "featured": true,
+    "order": 21,
+    "created_at": "2026-05-30T18:24:33.035200+00:00",
+    "sponsor_tier": "gold",
+    "slots": [
+      "late-night"
+    ],
+    "tags": [
+      "rooftop",
+      "cocktails",
+      "scenic",
+      "popular"
+    ],
+    "imported_status": "approved"
+  },
+  {
+    "id": "c4c661d3-1203-42f5-97c2-a4a8f2bb7ed7",
+    "name": "White Limozeen",
+    "description": "Hot pink rooftop wonderland on top of Graduate Hotel.",
+    "image_url": "https://images.unsplash.com/photo-1519214605650-76a613ee3245?crop=entropy&cs=srgb&fm=jpg&q=85&w=1200",
+    "image_path": null,
+    "website": "https://whitelimozeen.com",
+    "phone": "+16157612824",
+    "address": "101 20th Ave N, Nashville, TN",
+    "category_slug": "night-out",
+    "city_slug": "nashville",
+    "featured": false,
+    "order": 22,
+    "created_at": "2026-05-30T18:24:33.035431+00:00",
+    "sponsor_tier": "none",
+    "slots": [
+      "late-night"
+    ],
+    "tags": [
+      "rooftop",
+      "cocktails",
+      "unique",
+      "popular"
+    ],
+    "imported_status": "approved"
+  },
+  {
+    "id": "e809801f-08ab-44b9-a0b4-df92783edb92",
+    "name": "UP Rooftop Lounge",
+    "description": "Killer views across the Gulch, neon-lit and loud.",
+    "image_url": "https://images.unsplash.com/photo-1519214605650-76a613ee3245?crop=entropy&cs=srgb&fm=jpg&q=85&w=1200",
+    "image_path": null,
+    "website": "https://uprooftoplounge.com",
+    "phone": "+16157770171",
+    "address": "901 Division St, Nashville, TN",
+    "category_slug": "night-out",
+    "city_slug": "nashville",
+    "featured": false,
+    "order": 23,
+    "created_at": "2026-05-30T18:24:33.035653+00:00",
+    "sponsor_tier": "none",
+    "slots": [
+      "late-night"
+    ],
+    "tags": [
+      "rooftop",
+      "nightlife",
+      "popular"
+    ],
+    "imported_status": "approved"
+  },
+  {
+    "id": "4cc02317-3300-4d33-9ee9-f87667ba1b1c",
+    "name": "CMA Fest",
+    "description": "Four days of country at every downtown stage. June.",
+    "image_url": "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?crop=entropy&cs=srgb&fm=jpg&q=85&w=1200",
+    "image_path": null,
+    "website": "https://cmafest.com",
+    "phone": "+16152442840",
+    "address": "Downtown Nashville, TN",
+    "category_slug": "night-out",
+    "city_slug": "nashville",
+    "featured": true,
+    "order": 24,
+    "created_at": "2026-05-30T18:24:33.035838+00:00",
+    "sponsor_tier": "gold",
+    "slots": [
+      "late-night"
+    ],
+    "tags": [
+      "concerts",
+      "entertainment",
+      "popular",
+      "tourist_favorite"
+    ],
+    "imported_status": "approved"
+  },
+  {
+    "id": "899db9ab-cc04-4ae1-b134-82cc1ff0d460",
+    "name": "Tomato Art Fest",
+    "description": "East Nashville's weirdest, friendliest block party. August.",
+    "image_url": "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?crop=entropy&cs=srgb&fm=jpg&q=85&w=1200",
+    "image_path": null,
+    "website": "https://tomatoartfest.com",
+    "phone": "+16152627379",
+    "address": "5 Points, East Nashville, TN",
+    "category_slug": "night-out",
+    "city_slug": "nashville",
+    "featured": false,
+    "order": 25,
+    "created_at": "2026-05-30T18:24:33.036014+00:00",
+    "sponsor_tier": "none",
+    "slots": [
+      "late-night"
+    ],
+    "tags": [
+      "entertainment",
+      "unique",
+      "local_favorite",
+      "family"
+    ],
+    "imported_status": "approved"
+  },
+  {
+    "id": "84d0458d-6e4e-4493-bd55-e5163311db64",
+    "name": "Live On The Green",
+    "description": "Free outdoor concert series at Public Square Park.",
+    "image_url": "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?crop=entropy&cs=srgb&fm=jpg&q=85&w=1200",
+    "image_path": null,
+    "website": "https://liveonthegreen.com",
+    "phone": "+16157379828",
+    "address": "Public Sq, Nashville, TN",
+    "category_slug": "night-out",
+    "city_slug": "nashville",
+    "featured": false,
+    "order": 26,
+    "created_at": "2026-05-30T18:24:33.036190+00:00",
+    "sponsor_tier": "none",
+    "slots": [
+      "late-night"
+    ],
+    "tags": [
+      "concerts",
+      "entertainment",
+      "local_favorite",
+      "scenic"
+    ],
+    "imported_status": "approved"
+  },
+  {
+    "id": "a21f9aa8-2dfb-4c1a-a28b-a24e62e97462",
+    "name": "Skull's Rainbow Room",
+    "description": "Burlesque, supper club, jazz \u2014 Printers Alley after dark.",
+    "image_url": "https://static.prod-images.emergentagent.com/jobs/b92b0f3b-9cfd-4b9b-83f4-6105a4bdc217/images/41df6b9a58753125673589ac5cee166fa575f4191a4a3ef3331508da99ced7ee.png",
+    "image_path": null,
+    "website": "https://skullsrainbowroom.com",
+    "phone": "+16157305865",
+    "address": "222 Printers Aly, Nashville, TN",
+    "category_slug": "surprise-me",
+    "city_slug": "nashville",
+    "featured": true,
+    "order": 27,
+    "created_at": "2026-05-30T18:24:33.036363+00:00",
+    "sponsor_tier": "gold",
+    "slots": [
+      "entertainment",
+      "late-night"
+    ],
+    "tags": [
+      "unique",
+      "hidden_gem",
+      "live_music",
+      "late_night"
+    ],
+    "imported_status": "approved"
+  },
+  {
+    "id": "4c486e09-a945-4b92-979b-cd1d2e58005a",
+    "name": "Santa's Pub",
+    "description": "Karaoke in a double-wide trailer. No frills, full heart.",
+    "image_url": "https://static.prod-images.emergentagent.com/jobs/b92b0f3b-9cfd-4b9b-83f4-6105a4bdc217/images/c1177e1886d16b846ca25ac0693579cf6c7f3ad7b682268fcfe8e2fb4ed9514d.png",
+    "image_path": null,
+    "website": "http://santaspub.com",
+    "phone": "+16156497705",
+    "address": "2225 Bransford Ave, Nashville, TN",
+    "category_slug": "surprise-me",
+    "city_slug": "nashville",
+    "featured": false,
+    "order": 28,
+    "created_at": "2026-05-30T18:24:33.036530+00:00",
+    "sponsor_tier": "none",
+    "slots": [
+      "entertainment",
+      "late-night"
+    ],
+    "tags": [
+      "unique",
+      "hidden_gem",
+      "local_favorite",
+      "late_night"
+    ],
+    "imported_status": "approved"
+  },
+  {
+    "id": "d27512da-0170-46e4-9bf2-2d49e62684f4",
+    "name": "Dino's",
+    "description": "Cheeseburger, cold beer, neon sign. Don't overthink it.",
+    "image_url": "https://images.unsplash.com/photo-1661422586023-681ea60507e2?crop=entropy&cs=srgb&fm=jpg&q=85&w=1200",
+    "image_path": null,
+    "website": "https://dinosnashville.com",
+    "phone": "+16152273866",
+    "address": "411 Gallatin Ave, Nashville, TN",
+    "category_slug": "surprise-me",
+    "city_slug": "nashville",
+    "featured": false,
+    "order": 29,
+    "created_at": "2026-05-30T18:24:33.036713+00:00",
+    "sponsor_tier": "none",
+    "slots": [
+      "entertainment",
+      "late-night"
+    ],
+    "tags": [
+      "casual",
+      "local_favorite",
+      "late_night",
+      "hidden_gem"
+    ],
+    "imported_status": "approved"
+  }
+]
