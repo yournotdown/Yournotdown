@@ -17,7 +17,18 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, ConfigDict
 
 from google_places_photos import fetch_google_places_photo, google_places_photo_media_url
-from ticketmaster_events import attach_event_to_step, events_by_business_id, local_today
+from ticketmaster_events import (
+    TicketmasterClient,
+    api_sync_response,
+    attach_event_to_step,
+    date_range_sync_report,
+    event_upsert,
+    events_by_business_id,
+    expiration_cleanup_query,
+    local_today,
+    supported_city_config,
+    validate_apply_confirmation,
+)
 from storage_client import init_storage, put_object, get_object, APP_NAME
 from seed_data import (
     CATEGORIES,
@@ -211,6 +222,13 @@ class CityEvent(BaseModel):
     status: str = ""
     created_at: str = Field(default_factory=now_iso)
     updated_at: str = Field(default_factory=now_iso)
+
+
+class TicketmasterSyncPayload(BaseModel):
+    city: str = "nashville"
+    days: int = Field(default=2, ge=1, le=7)
+    apply: bool = False
+    confirm: str = ""
 
 
 class LeadCreate(BaseModel):
@@ -816,6 +834,52 @@ async def admin_bulk_import_review(payload: BulkImportReviewPayload, user=Depend
         {"$set": {"imported_status": payload.imported_status}},
     )
     return {"ok": True, "count": res.modified_count}
+
+
+@api_router.post("/admin/events/ticketmaster-sync")
+async def admin_ticketmaster_sync(payload: TicketmasterSyncPayload, user=Depends(require_admin)):
+    try:
+        validate_apply_confirmation(payload.apply, payload.confirm)
+        supported_city_config(payload.city)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    businesses = await db.businesses.find(
+        {"city_slug": payload.city, "imported_status": "approved"},
+        {"_id": 0, "id": 1, "name": 1},
+    ).to_list(5000)
+    try:
+        report = await run_in_threadpool(
+            date_range_sync_report,
+            TicketmasterClient(),
+            businesses,
+            payload.city,
+            payload.days,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        logger.warning("Ticketmaster sync failed: %s", type(exc).__name__)
+        raise HTTPException(status_code=502, detail="Ticketmaster sync failed")
+
+    if not payload.apply:
+        return api_sync_response(report)
+
+    upserted = 0
+    modified = 0
+    for document in report["events"]:
+        selector, update = event_upsert(document)
+        result = await db.city_events.update_one(selector, update, upsert=True)
+        upserted += int(result.upserted_id is not None)
+        modified += result.modified_count
+    cleanup_query = expiration_cleanup_query(payload.city)
+    cleanup = await db.city_events.delete_many(cleanup_query)
+    return api_sync_response(report, {
+        "upserted": upserted,
+        "modified": modified,
+        "expired_deleted": cleanup.deleted_count,
+        "expiration_cutoff": cleanup_query["local_date"]["$lt"],
+    })
 
 
 @api_router.get("/admin/businesses/import-summary")

@@ -40,10 +40,15 @@ def now_iso() -> str:
 
 
 def city_timezone(city_slug: str) -> ZoneInfo:
+    config = supported_city_config(city_slug)
+    return ZoneInfo(config["timezone"])
+
+
+def supported_city_config(city_slug: str) -> dict:
     config = CITY_CONFIG.get(city_slug)
     if not config:
         raise ValueError(f"Unsupported city slug: {city_slug}")
-    return ZoneInfo(config["timezone"])
+    return config
 
 
 def local_today(city_slug: str, now: Optional[datetime] = None) -> str:
@@ -183,9 +188,7 @@ class TicketmasterClient:
         self.sleeper = sleeper or time.sleep
 
     def events_for_date(self, city_slug: str, local_date: str) -> list[dict]:
-        config = CITY_CONFIG.get(city_slug)
-        if not config:
-            raise ValueError(f"Unsupported city slug: {city_slug}")
+        config = supported_city_config(city_slug)
         start_date_time, end_date_time = utc_city_day_window(city_slug, local_date)
         query = parse.urlencode({
             "apikey": self.api_key,
@@ -244,32 +247,103 @@ def dry_run_sync(client: TicketmasterClient, businesses: Iterable[dict], city_sl
     }
 
 
+def date_range_sync_report(client: TicketmasterClient, businesses: Iterable[dict], city_slug: str = "nashville",
+                           days: int = 2, start_date: Optional[str] = None) -> dict:
+    if not 1 <= days <= 7:
+        raise ValueError("days must be between 1 and 7")
+    first_date = date.fromisoformat(start_date or local_today(city_slug))
+    business_rows = list(businesses)
+    reports = [
+        dry_run_sync(client, business_rows, city_slug, (first_date + timedelta(days=offset)).isoformat())
+        for offset in range(days)
+    ]
+    fetched = sum(report["fetched"] for report in reports)
+    documents = deduplicate_event_documents(
+        document
+        for report in reports
+        for document in report["events"]
+    )
+    return {
+        "mode": "dry-run",
+        "city_slug": city_slug,
+        "dates": [report["local_date"] for report in reports],
+        "fetched": fetched,
+        "after_dedupe": len(documents),
+        "duplicates_removed": fetched - len(documents),
+        "would_upsert": len(documents),
+        "matched": sum(bool(document["venue_business_id"]) for document in documents),
+        "unmatched": sum(not document["venue_business_id"] for document in documents),
+        "events": documents,
+    }
+
+
+def event_upsert(document: dict) -> tuple[dict, dict]:
+    mutable_fields = {key: value for key, value in document.items() if key not in {"id", "created_at"}}
+    return (
+        {"source": document["source"], "external_event_id": document["external_event_id"]},
+        {
+            "$set": mutable_fields,
+            "$setOnInsert": {"id": document["id"], "created_at": document["created_at"]},
+        },
+    )
+
+
+def expiration_cleanup_query(city_slug: str, now: Optional[datetime] = None) -> dict:
+    return {
+        "source": TICKETMASTER_SOURCE,
+        "city_slug": city_slug,
+        "local_date": {"$lt": local_today(city_slug, now=now)},
+    }
+
+
+def api_sync_response(report: dict, apply_summary: Optional[dict] = None) -> dict:
+    response = {
+        "success": True,
+        "mode": "apply" if apply_summary is not None else "dry-run",
+        "dates": report["dates"],
+        "fetched": report["fetched"],
+        "after_dedupe": report["after_dedupe"],
+        "would_upsert": report["would_upsert"],
+        "duplicates_removed": report["duplicates_removed"],
+        "matched": report["matched"],
+        "unmatched": report["unmatched"],
+        "sample_events": report["events"][:20],
+    }
+    if apply_summary is None:
+        return response
+    return {
+        **response,
+        "upserted": apply_summary["upserted"],
+        "updated": apply_summary["modified"],
+        "removed": apply_summary["expired_deleted"],
+        "expiration_cutoff": apply_summary["expiration_cutoff"],
+    }
+
+
+def validate_apply_confirmation(apply: bool, confirm: Optional[str]) -> None:
+    if apply and confirm != "APPROVE":
+        raise ValueError("Apply requires confirm=APPROVE")
+
+
 def apply_event_sync(collection, report: dict, city_slug: str, now: Optional[datetime] = None) -> dict:
     upserted = 0
     modified = 0
     for document in report["events"]:
-        mutable_fields = {key: value for key, value in document.items() if key not in {"id", "created_at"}}
+        selector, update = event_upsert(document)
         result = collection.update_one(
-            {"source": document["source"], "external_event_id": document["external_event_id"]},
-            {
-                "$set": mutable_fields,
-                "$setOnInsert": {"id": document["id"], "created_at": document["created_at"]},
-            },
+            selector,
+            update,
             upsert=True,
         )
         upserted += int(result.upserted_id is not None)
         modified += result.modified_count
-    cutoff = local_today(city_slug, now=now)
-    cleanup = collection.delete_many({
-        "source": TICKETMASTER_SOURCE,
-        "city_slug": city_slug,
-        "local_date": {"$lt": cutoff},
-    })
+    cleanup_query = expiration_cleanup_query(city_slug, now=now)
+    cleanup = collection.delete_many(cleanup_query)
     return {
         "upserted": upserted,
         "modified": modified,
         "expired_deleted": cleanup.deleted_count,
-        "expiration_cutoff": cutoff,
+        "expiration_cutoff": cleanup_query["local_date"]["$lt"],
     }
 
 

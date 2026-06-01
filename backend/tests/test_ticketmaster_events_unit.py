@@ -15,18 +15,24 @@ sys.path.insert(0, str(BACKEND_DIR))
 
 from ticketmaster_events import (  # noqa: E402
     TicketmasterClient,
+    api_sync_response,
     apply_event_sync,
     attach_event_to_step,
     canonical_venue_name,
+    date_range_sync_report,
     deduplicate_event_documents,
     dry_run_sync,
+    event_upsert,
     event_is_on_local_date,
     events_by_business_id,
+    expiration_cleanup_query,
     match_business_for_venue,
     normalize_venue_name,
     require_apply_approval,
+    supported_city_config,
     ticketmaster_event_document,
     utc_city_day_window,
+    validate_apply_confirmation,
 )
 
 
@@ -92,6 +98,11 @@ class TestMatching(unittest.TestCase):
         )
         self.assertEqual(document["venue_name"], "3rd & Lindsley")
 
+    def test_supported_city_config_rejects_unknown_city(self):
+        self.assertEqual(supported_city_config("nashville")["ticketmaster_city"], "Nashville")
+        with self.assertRaisesRegex(ValueError, "Unsupported city slug: miami"):
+            supported_city_config("miami")
+
 
 class TestDeduplication(unittest.TestCase):
     def test_deduplicates_by_source_and_external_event_id(self):
@@ -102,6 +113,34 @@ class TestDeduplication(unittest.TestCase):
         first = ticketmaster_event_document(event(id="first"), "nashville", [])
         second = ticketmaster_event_document(event(id="second"), "nashville", [])
         self.assertEqual(deduplicate_event_documents([first, second]), [first])
+
+
+class TestDateRangeReport(unittest.TestCase):
+    def test_aggregates_dates_and_deduplicates_without_writes(self):
+        client = FakeDateRangeClient({
+            "2026-06-01": [event(id="first")],
+            "2026-06-02": [
+                event(
+                    id="second",
+                    dates={"start": {"localDate": "2026-06-02", "localTime": "19:00:00"}},
+                ),
+                event(
+                    id="third",
+                    dates={"start": {"localDate": "2026-06-02", "localTime": "20:00:00"}},
+                ),
+            ],
+        })
+        report = date_range_sync_report(client, [], "nashville", days=2, start_date="2026-06-01")
+        self.assertEqual(report["mode"], "dry-run")
+        self.assertEqual(report["dates"], ["2026-06-01", "2026-06-02"])
+        self.assertEqual(report["fetched"], 3)
+        self.assertEqual(report["after_dedupe"], 1)
+        self.assertEqual(report["would_upsert"], 1)
+        self.assertEqual(report["duplicates_removed"], 2)
+
+    def test_rejects_out_of_range_days(self):
+        with self.assertRaisesRegex(ValueError, "days must be between 1 and 7"):
+            date_range_sync_report(FakeDateRangeClient({}), [], days=8)
 
 
 class TestDates(unittest.TestCase):
@@ -165,6 +204,11 @@ class TestClient(unittest.TestCase):
         self.assertNotIn("localStartDateTime", query)
         self.assertEqual(opener.timeout, 10)
 
+    def test_rejects_unsupported_city(self):
+        client = TicketmasterClient(api_key="backend-secret", opener=FakeOpener({}))
+        with self.assertRaisesRegex(ValueError, "Unsupported city slug"):
+            client.events_for_date("miami", "2026-06-01")
+
     def test_retries_504_then_returns_events(self):
         opener = SequenceOpener([
             HTTPError("https://example.com", 504, "Gateway Time-out", None, None),
@@ -220,6 +264,14 @@ class TestClient(unittest.TestCase):
 
 
 class TestApply(unittest.TestCase):
+    def test_api_apply_confirmation_accepts_exact_approve_only(self):
+        validate_apply_confirmation(False, "")
+        validate_apply_confirmation(True, "APPROVE")
+        for invalid in (None, "", "approve", " APPROVE", "APPROVE ", "anything"):
+            with self.subTest(confirm=invalid):
+                with self.assertRaisesRegex(ValueError, "Apply requires confirm=APPROVE"):
+                    validate_apply_confirmation(True, invalid)
+
     def test_requires_exact_typed_approval(self):
         require_apply_approval(input_fn=lambda _: "APPROVE")
         with self.assertRaisesRegex(RuntimeError, "Apply cancelled"):
@@ -256,6 +308,44 @@ class TestApply(unittest.TestCase):
         self.assertEqual(result["upserted"], 1)
         self.assertEqual(result["expired_deleted"], 2)
 
+    def test_shared_upsert_and_cleanup_operations(self):
+        document = ticketmaster_event_document(event(), "nashville", [])
+        selector, update = event_upsert(document)
+        self.assertEqual(selector, {"source": "ticketmaster", "external_event_id": "event-123"})
+        self.assertEqual(update["$set"]["title"], "Nashville Predators vs. Example")
+        self.assertEqual(update["$setOnInsert"]["id"], document["id"])
+        self.assertEqual(
+            expiration_cleanup_query("nashville", now=datetime(2026, 6, 1, 12, tzinfo=timezone.utc)),
+            {
+                "source": "ticketmaster",
+                "city_slug": "nashville",
+                "local_date": {"$lt": "2026-06-01"},
+            },
+        )
+
+    def test_api_dry_run_response_format(self):
+        response = api_sync_response(sync_report())
+        self.assertEqual(response["mode"], "dry-run")
+        self.assertTrue(response["success"])
+        self.assertEqual(response["dates"], ["2026-06-01"])
+        self.assertEqual(response["fetched"], 1)
+        self.assertEqual(response["after_dedupe"], 1)
+        self.assertEqual(response["would_upsert"], 1)
+        self.assertEqual(len(response["sample_events"]), 1)
+        self.assertNotIn("upserted", response)
+
+    def test_api_apply_response_format(self):
+        response = api_sync_response(sync_report(), {
+            "upserted": 1,
+            "modified": 2,
+            "expired_deleted": 3,
+            "expiration_cutoff": "2026-06-01",
+        })
+        self.assertEqual(response["mode"], "apply")
+        self.assertEqual(response["upserted"], 1)
+        self.assertEqual(response["updated"], 2)
+        self.assertEqual(response["removed"], 3)
+
 
 class FakeClient:
     def __init__(self, rows):
@@ -265,6 +355,27 @@ class FakeClient:
         self.city_slug = city_slug
         self.local_date = local_date
         return self.rows
+
+
+def sync_report():
+    return {
+        "dates": ["2026-06-01"],
+        "fetched": 1,
+        "after_dedupe": 1,
+        "would_upsert": 1,
+        "duplicates_removed": 0,
+        "matched": 0,
+        "unmatched": 1,
+        "events": [ticketmaster_event_document(event(), "nashville", [])],
+    }
+
+
+class FakeDateRangeClient:
+    def __init__(self, rows_by_date):
+        self.rows_by_date = rows_by_date
+
+    def events_for_date(self, city_slug, local_date):
+        return self.rows_by_date.get(local_date, [])
 
 
 class FakeResponse:
