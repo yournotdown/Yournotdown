@@ -236,6 +236,8 @@ export default function TonightPage() {
 
 function StepCard({ step, idx, total, onAction, directionsUrl }) {
   const b = step.business;
+  const event = step.event;
+  const imageUrl = event?.image_url || resolveImageUrl(b);
   const sponsored = b.sponsor_tier && b.sponsor_tier !== "none";
   const title = SLOT_TITLES[step.slot] || step.label.toUpperCase();
   const number = String(idx + 1).padStart(2, "0");
@@ -279,9 +281,9 @@ function StepCard({ step, idx, total, onAction, directionsUrl }) {
 
       {/* Image — hero */}
       <div className="relative aspect-[16/10] sm:aspect-[2/1] overflow-hidden border border-white/10 bg-[#0A0A0A] mb-5">
-        {resolveImageUrl(b) && (
+        {imageUrl && (
           <img
-            src={resolveImageUrl(b)}
+            src={imageUrl}
             alt={b.name}
             className="w-full h-full object-cover grayscale-[12%] hover:grayscale-0 transition-all duration-700"
             loading="lazy"
@@ -297,6 +299,17 @@ function StepCard({ step, idx, total, onAction, directionsUrl }) {
       >
         {b.name}
       </h2>
+
+      {event && (
+        <div className="mt-4 border-l-2 border-[#C6FF00] pl-3" data-testid={`tonight-event-${b.id}`}>
+          <div className="text-[10px] uppercase tracking-[0.24em] text-[#C6FF00]">
+            Tonight: {event.title}
+          </div>
+          <div className="mt-1 text-xs uppercase tracking-[0.18em] text-white/55">
+            {[event.local_time, event.venue_name].filter(Boolean).join(" · ")}
+          </div>
+        </div>
+      )}
 
       <p className="mt-3 text-white/65 text-sm leading-relaxed max-w-xl">
         {b.description}
@@ -334,6 +347,18 @@ function StepCard({ step, idx, total, onAction, directionsUrl }) {
             primary
           >
             Website
+          </ActionBtn>
+        ) : null}
+        {event?.ticket_url ? (
+          <ActionBtn
+            href={event.ticket_url}
+            target="_blank"
+            onClick={() => onAction("ticket_click", b)}
+            testid={`tonight-tickets-${b.id}`}
+            icon={<Globe className="w-3.5 h-3.5" />}
+            primary
+          >
+            Tickets
           </ActionBtn>
         ) : null}
       </div>

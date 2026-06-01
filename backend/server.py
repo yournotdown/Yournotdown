@@ -17,6 +17,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, ConfigDict
 
 from google_places_photos import fetch_google_places_photo, google_places_photo_media_url
+from ticketmaster_events import attach_event_to_step, events_by_business_id, local_today
 from storage_client import init_storage, put_object, get_object, APP_NAME
 from seed_data import (
     CATEGORIES,
@@ -192,6 +193,26 @@ class AnalyticsEvent(BaseModel):
     itinerary_id: Optional[str] = None
 
 
+class CityEvent(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    city_slug: str
+    venue_name: str
+    venue_business_id: Optional[str] = None
+    external_event_id: str
+    source: str
+    title: str
+    performers: List[str] = Field(default_factory=list)
+    starts_at: Optional[str] = None
+    local_date: str
+    local_time: Optional[str] = None
+    ticket_url: str = ""
+    image_url: str = ""
+    status: str = ""
+    created_at: str = Field(default_factory=now_iso)
+    updated_at: str = Field(default_factory=now_iso)
+
+
 class LeadCreate(BaseModel):
     business_id: str
     email: str
@@ -207,6 +228,8 @@ api_router = APIRouter(prefix="/api")
 async def startup():
     await db.businesses.create_index("google_place_id", unique=True, sparse=True)
     await db.businesses.create_index("normalized_name_address", unique=True, sparse=True)
+    await db.city_events.create_index([("city_slug", 1), ("local_date", 1)])
+    await db.city_events.create_index([("source", 1), ("external_event_id", 1)], unique=True)
 
     # Object storage
     try:
@@ -392,6 +415,21 @@ def _weighted_pick(
     return random.choices(pool, weights=weights, k=1)[0]
 
 
+async def _today_city_events(city: str) -> list[dict]:
+    try:
+        event_date = local_today(city)
+    except ValueError:
+        return []
+    return await db.city_events.find(
+        {
+            "city_slug": city,
+            "local_date": event_date,
+            "status": {"$nin": ["cancelled", "canceled"]},
+        },
+        {"_id": 0},
+    ).sort("starts_at", 1).to_list(1000)
+
+
 @api_router.post("/itinerary/generate")
 async def generate_itinerary(req: ItineraryRequest, request: Request):
     """Build a 4-step 'Tonight's Move' itinerary tuned to the user's mood."""
@@ -399,6 +437,8 @@ async def generate_itinerary(req: ItineraryRequest, request: Request):
         {"city_slug": req.city, "slots": {"$ne": []}, "imported_status": "approved"},
         {"_id": 0},
     ).to_list(2000)
+    event_rows = await _today_city_events(req.city)
+    today_events_by_business = events_by_business_id(event_rows)
 
     by_slot: dict = {}
     for b in all_biz:
@@ -413,14 +453,15 @@ async def generate_itinerary(req: ItineraryRequest, request: Request):
         pick = _weighted_pick(candidates, exclude | chosen_ids, req.vibe)
         if pick:
             chosen_ids.add(pick["id"])
-            steps.append({
+            step = {
                 "slot": label["slot"],
                 "number": label["number"],
                 "label": label["label"],
                 "emoji": label["emoji"],
                 "business": pick,
                 "relevance_score": round(_relevance_score(pick, req.vibe), 2),
-            })
+            }
+            steps.append(attach_event_to_step(step, today_events_by_business))
 
     itin_id = str(uuid.uuid4())
     itinerary = {
@@ -522,6 +563,12 @@ async def get_business(business_id: str):
     if not b:
         raise HTTPException(status_code=404, detail="Not found")
     return b
+
+
+# ------------- City events -------------
+@api_router.get("/events/today")
+async def list_today_events(city: str = "nashville"):
+    return await _today_city_events(city)
 
 
 # ------------- Google Places photos (public proxy) -------------
