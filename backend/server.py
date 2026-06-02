@@ -1,4 +1,5 @@
 """You're Not Down — FastAPI backend."""
+import asyncio
 import os
 import logging
 import uuid
@@ -47,10 +48,23 @@ load_dotenv(ROOT_DIR / ".env")
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
-# Mongo
-mongo_url = os.environ["MONGO_URL"]
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ["DB_NAME"]]
+# Mongo clients connect lazily. Keep process startup tolerant so Railway can
+# serve liveness diagnostics while an external database is temporarily down.
+MONGO_URL = os.environ.get("MONGO_URL", "").strip()
+DB_NAME = os.environ.get("DB_NAME", "").strip()
+ALLOW_EMPTY_DB_BOOTSTRAP = os.environ.get("ALLOW_EMPTY_DB_BOOTSTRAP", "").strip().lower() in {
+    "1", "true", "yes", "on",
+}
+client = AsyncIOMotorClient(
+    MONGO_URL or "mongodb://invalid:27017",
+    serverSelectionTimeoutMS=3000 if MONGO_URL else 1000,
+    connectTimeoutMS=3000,
+    socketTimeoutMS=5000,
+)
+db = client[DB_NAME or "unconfigured"]
+startup_maintenance_task = None
+startup_maintenance_status = "pending"
+STARTUP_MAINTENANCE_ATTEMPTS = 3
 
 EMERGENT_AUTH_URL = "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data"
 ADMIN_EMAILS = [e.strip().lower() for e in os.environ.get("ADMIN_EMAILS", "").split(",") if e.strip()]
@@ -242,19 +256,51 @@ app = FastAPI(title="You're Not Down")
 api_router = APIRouter(prefix="/api")
 
 
-@app.on_event("startup")
-async def startup():
+async def run_startup_maintenance():
+    global startup_maintenance_status
+    if not MONGO_URL or not DB_NAME:
+        startup_maintenance_status = "skipped-unconfigured"
+        logger.warning("Skipping startup maintenance: MONGO_URL and DB_NAME must both be configured")
+        return
+
+    startup_maintenance_status = "running"
+    logger.info("Starting Mongo startup maintenance for configured database %s", DB_NAME)
+    for attempt in range(1, STARTUP_MAINTENANCE_ATTEMPTS + 1):
+        try:
+            await db.command("ping")
+            business_count = await db.businesses.count_documents({})
+            if business_count == 0 and not ALLOW_EMPTY_DB_BOOTSTRAP:
+                startup_maintenance_status = "skipped-empty-database"
+                logger.warning(
+                    "Skipping startup maintenance for database %s with an empty business catalog. "
+                    "Set ALLOW_EMPTY_DB_BOOTSTRAP=true only when intentional.",
+                    DB_NAME,
+                )
+                return
+
+            await _apply_startup_maintenance()
+            startup_maintenance_status = "complete"
+            logger.info("Mongo startup maintenance complete")
+            return
+        except Exception as exc:
+            if attempt == STARTUP_MAINTENANCE_ATTEMPTS:
+                startup_maintenance_status = "deferred"
+                logger.warning("Mongo startup maintenance deferred after %s attempts: %s", attempt, exc)
+                return
+            logger.warning(
+                "Mongo startup maintenance attempt %s/%s failed; retrying: %s",
+                attempt,
+                STARTUP_MAINTENANCE_ATTEMPTS,
+                exc,
+            )
+            await asyncio.sleep(5)
+
+
+async def _apply_startup_maintenance():
     await db.businesses.create_index("google_place_id", unique=True, sparse=True)
     await db.businesses.create_index("normalized_name_address", unique=True, sparse=True)
     await db.city_events.create_index([("city_slug", 1), ("local_date", 1)])
     await db.city_events.create_index([("source", 1), ("external_event_id", 1)], unique=True)
-
-    # Object storage
-    try:
-        init_storage()
-        logger.info("Storage initialized")
-    except Exception as e:
-        logger.error(f"Storage init failed: {e}")
 
     # Seed cities
     for c in CITIES:
@@ -344,6 +390,19 @@ async def startup():
                 {"id": biz["id"], "tags": {"$exists": False}},
                 {"$set": {"tags": []}},
             )
+
+
+@app.on_event("startup")
+async def startup():
+    global startup_maintenance_task
+    try:
+        init_storage()
+        logger.info("Storage initialized")
+    except Exception as exc:
+        logger.warning("Storage initialization deferred: %s", exc)
+
+    startup_maintenance_task = asyncio.create_task(run_startup_maintenance())
+    logger.info("Application startup complete; Mongo maintenance is running in the background")
 
 
 @app.on_event("shutdown")
@@ -529,7 +588,24 @@ async def generate_itinerary(req: ItineraryRequest, request: Request):
 # ------------- Public endpoints -------------
 @api_router.get("/health")
 async def health():
-    return {"status": "ok", "ts": now_iso()}
+    return {
+        "status": "ok",
+        "ts": now_iso(),
+        "mongo_configured": bool(MONGO_URL and DB_NAME),
+        "startup_maintenance": startup_maintenance_status,
+    }
+
+
+@api_router.get("/ready")
+async def ready():
+    if not MONGO_URL or not DB_NAME:
+        return {"status": "degraded", "mongo": "unconfigured"}
+    try:
+        await asyncio.wait_for(db.command("ping"), timeout=2.0)
+    except Exception as exc:
+        logger.warning("Mongo readiness ping failed: %s", exc)
+        return {"status": "degraded", "mongo": "down"}
+    return {"status": "ready", "mongo": "up"}
 
 
 @api_router.get("/cities")
