@@ -27,6 +27,7 @@ from ticketmaster_events import (
     api_sync_response,
     attach_event_to_step,
     date_range_sync_report,
+    eligible_city_events,
     event_upsert,
     events_by_business_id,
     expiration_cleanup_query,
@@ -69,6 +70,7 @@ db = client[DB_NAME or "unconfigured"]
 startup_maintenance_task = None
 startup_maintenance_status = "pending"
 STARTUP_MAINTENANCE_ATTEMPTS = 3
+EVENT_START_GRACE_MINUTES = max(0, int(os.environ.get("EVENT_START_GRACE_MINUTES", "60")))
 
 EMERGENT_AUTH_URL = "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data"
 ADMIN_EMAILS = [e.strip().lower() for e in os.environ.get("ADMIN_EMAILS", "").split(",") if e.strip()]
@@ -501,14 +503,14 @@ async def _today_city_events(city: str) -> list[dict]:
         event_date = local_today(city)
     except ValueError:
         return []
-    return await db.city_events.find(
+    rows = await db.city_events.find(
         {
             "city_slug": city,
             "local_date": event_date,
-            "status": {"$nin": ["cancelled", "canceled"]},
         },
         {"_id": 0},
     ).sort("starts_at", 1).to_list(1000)
+    return eligible_city_events(rows, city, grace_minutes=EVENT_START_GRACE_MINUTES)
 
 
 @api_router.post("/itinerary/generate")

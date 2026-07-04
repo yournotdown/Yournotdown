@@ -32,7 +32,10 @@ CITY_CONFIG = {
 }
 VENUE_ALIASES = {
     "3rd and lindsley": "3rd & Lindsley",
+    "ole red nashville": "Ole Red",
 }
+EXCLUDED_EVENT_STATUSES = {"cancelled", "canceled", "offsale"}
+DEFAULT_EVENT_START_GRACE_MINUTES = max(0, int(os.environ.get("EVENT_START_GRACE_MINUTES", "60")))
 
 
 def now_iso() -> str:
@@ -109,6 +112,55 @@ def attach_event_to_step(step: dict, events: dict[str, dict]) -> dict:
     business_id = (step.get("business") or {}).get("id")
     event = events.get(business_id)
     return {**step, "event": event} if event else step
+
+
+def normalized_event_status(value: str) -> str:
+    return (value or "").strip().lower()
+
+
+def event_has_excluded_status(event: dict) -> bool:
+    return normalized_event_status(event.get("status", "")) in EXCLUDED_EVENT_STATUSES
+
+
+def event_is_eligible(event: dict, city_slug: str, now: Optional[datetime] = None,
+                      grace_minutes: int = DEFAULT_EVENT_START_GRACE_MINUTES) -> bool:
+    if event_has_excluded_status(event):
+        return False
+
+    local_date = event.get("local_date")
+    if not local_date:
+        return False
+
+    current = now or datetime.now(timezone.utc)
+    today = local_today(city_slug, now=current)
+    if local_date > today:
+        return True
+    if local_date < today:
+        return False
+
+    local_time = event.get("local_time")
+    if not local_time:
+        return True
+
+    try:
+        start_local = datetime.combine(
+            date.fromisoformat(local_date),
+            datetime_time.fromisoformat(local_time),
+            tzinfo=city_timezone(city_slug),
+        )
+    except ValueError:
+        return True
+
+    grace_delta = timedelta(minutes=max(0, grace_minutes))
+    return current.astimezone(city_timezone(city_slug)) <= start_local + grace_delta
+
+
+def eligible_city_events(events: Iterable[dict], city_slug: str, now: Optional[datetime] = None,
+                         grace_minutes: int = DEFAULT_EVENT_START_GRACE_MINUTES) -> list[dict]:
+    return [
+        event for event in events
+        if event_is_eligible(event, city_slug, now=now, grace_minutes=grace_minutes)
+    ]
 
 
 def ticketmaster_event_document(event: dict, city_slug: str, businesses: Iterable[dict],

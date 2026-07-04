@@ -22,7 +22,10 @@ from ticketmaster_events import (  # noqa: E402
     date_range_sync_report,
     deduplicate_event_documents,
     dry_run_sync,
+    eligible_city_events,
     event_upsert,
+    event_has_excluded_status,
+    event_is_eligible,
     event_is_on_local_date,
     events_by_business_id,
     expiration_cleanup_query,
@@ -74,6 +77,9 @@ class TestMatching(unittest.TestCase):
 
     def test_canonicalizes_3rd_and_lindsley_alias(self):
         self.assertEqual(canonical_venue_name("3rd and Lindsley"), "3rd & Lindsley")
+
+    def test_canonicalizes_ole_red_nashville_alias(self):
+        self.assertEqual(canonical_venue_name("Ole Red - Nashville"), "Ole Red")
 
     def test_document_maps_ticketmaster_fields_and_match(self):
         document = ticketmaster_event_document(
@@ -162,6 +168,92 @@ class TestDates(unittest.TestCase):
             utc_city_day_window("nashville", "2026-12-01"),
             ("2026-12-01T06:00:00Z", "2026-12-02T06:00:00Z"),
         )
+
+    def test_excludes_cancelled_canceled_and_offsale_statuses(self):
+        for status in ("cancelled", "canceled", "offsale", " offsale "):
+            with self.subTest(status=status):
+                self.assertTrue(event_has_excluded_status({"status": status}))
+                self.assertFalse(
+                    event_is_eligible(
+                        {
+                            "local_date": "2026-06-01",
+                            "local_time": "19:00:00",
+                            "status": status,
+                        },
+                        "nashville",
+                        now=datetime(2026, 6, 1, 12, tzinfo=timezone.utc),
+                    )
+                )
+
+    def test_keeps_future_same_day_event_before_start(self):
+        self.assertTrue(
+            event_is_eligible(
+                {
+                    "local_date": "2026-06-01",
+                    "local_time": "19:00:00",
+                    "status": "onsale",
+                },
+                "nashville",
+                now=datetime(2026, 6, 1, 22, 30, tzinfo=timezone.utc),
+            )
+        )
+
+    def test_keeps_same_day_event_within_grace_window(self):
+        self.assertTrue(
+            event_is_eligible(
+                {
+                    "local_date": "2026-06-01",
+                    "local_time": "19:00:00",
+                    "status": "onsale",
+                },
+                "nashville",
+                now=datetime(2026, 6, 2, 0, 30, tzinfo=timezone.utc),
+                grace_minutes=60,
+            )
+        )
+
+    def test_filters_same_day_event_after_grace_window(self):
+        self.assertFalse(
+            event_is_eligible(
+                {
+                    "local_date": "2026-06-01",
+                    "local_time": "19:00:00",
+                    "status": "onsale",
+                },
+                "nashville",
+                now=datetime(2026, 6, 2, 1, 1, tzinfo=timezone.utc),
+                grace_minutes=60,
+            )
+        )
+
+    def test_keeps_same_day_event_with_missing_local_time(self):
+        self.assertTrue(
+            event_is_eligible(
+                {
+                    "local_date": "2026-06-01",
+                    "local_time": None,
+                    "status": "onsale",
+                },
+                "nashville",
+                now=datetime(2026, 6, 2, 3, tzinfo=timezone.utc),
+            )
+        )
+
+    def test_filters_city_events_with_shared_eligibility_logic(self):
+        rows = [
+            {"title": "Cancelled", "local_date": "2026-06-01", "local_time": "19:00:00", "status": "cancelled"},
+            {"title": "Offsale", "local_date": "2026-06-01", "local_time": None, "status": "offsale"},
+            {"title": "Stale", "local_date": "2026-06-01", "local_time": "18:00:00", "status": "onsale"},
+            {"title": "Future", "local_date": "2026-06-01", "local_time": "21:00:00", "status": "onsale"},
+            {"title": "No Time", "local_date": "2026-06-01", "local_time": None, "status": "onsale"},
+        ]
+        filtered = eligible_city_events(
+            rows,
+            "nashville",
+            now=datetime(2026, 6, 2, 1, 1, tzinfo=timezone.utc),
+            grace_minutes=60,
+        )
+        self.assertEqual([row["title"] for row in filtered], ["Future", "No Time"])
 
 
 class TestItineraryAttachment(unittest.TestCase):
