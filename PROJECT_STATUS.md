@@ -20,6 +20,13 @@ Verified production state:
 - 7 Emergent-hosted image records were safely backfilled
 - 3 remaining image records are intentionally untouched for now: `Bastion`, `Santa's Pub`, and `The Bluebird Cafe`
 
+Known remaining Emergent dependencies:
+- Emergent is no longer the public production runtime for the customer-facing app; public traffic is on Railway.
+- Admin login still depends on Emergent Google OAuth redirect/exchange flow (`auth.emergentagent.com` and backend session exchange against `demobackend.emergentagent.com`).
+- After login, admin sessions are stored locally in Mongo for 7 days, but new admin logins still depend on Emergent being available.
+- Emergent object storage may still remain an admin upload dependency and should be treated as active until replaced.
+- Do not delete or fully decommission Emergent dependencies until first-party admin auth and storage replacements are in place.
+
 Operational constraints preserved in this session:
 - no deploy
 - no merge
@@ -43,8 +50,9 @@ The immediate focus has shifted from cutover work to production data quality and
 1. verify the new Ticketmaster/event eligibility patch locally
 2. verify production behavior after a future approved deploy, without running apply sync yet
 3. then decide whether to run a one-time Ticketmaster apply sync
-4. later review admin event controls and any additional venue matching work
-5. later resolve the remaining 3 intentionally untouched image records and the outbound IP follow-up if still open
+4. after the Ticketmaster/stale-event work, plan first-party admin auth replacement and a storage replacement path so Emergent can be removed safely
+5. later review admin event controls and any additional venue matching work
+6. later resolve the remaining 3 intentionally untouched image records and the outbound IP follow-up if still open
 
 ## Prior Session Notes
 

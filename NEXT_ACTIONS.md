@@ -3,8 +3,10 @@
 1. Run local backend tests for the Ticketmaster/event eligibility patch and confirm the new shared filter behavior stays green.
 2. After Blake approves deployment later, verify production `/api/events/today?city=nashville` behavior with the new exclusions and same-day grace-window logic.
 3. After production verification, decide whether to run a one-time Ticketmaster apply sync for Nashville; do not run apply sync before that verification.
-4. Review remaining venue matching gaps only where approved business records exist, without broad alias expansion or First Horizon Park itinerary matching.
-5. Resolve the 3 intentionally untouched image records later: `Bastion`, `Santa's Pub`, and `The Bluebird Cafe`, then revisit the Mongo Atlas outbound IP hardening if still open.
+4. After the Ticketmaster/stale-event work, replace Emergent-backed admin authentication with first-party admin auth plus the existing admin allowlist, without touching production secrets or deploying until Blake approves.
+5. After auth replacement planning, replace any remaining Emergent-backed admin upload/object-storage dependency so Emergent can be fully removed safely.
+6. Review remaining venue matching gaps only where approved business records exist, without broad alias expansion or First Horizon Park itinerary matching.
+7. Resolve the 3 intentionally untouched image records later: `Bastion`, `Santa's Pub`, and `The Bluebird Cafe`, then revisit the Mongo Atlas outbound IP hardening if still open.
 
 ## Guardrails
 
@@ -13,3 +15,4 @@
 - Do not delete data, secrets, branches, or production settings without Blake's explicit approval.
 - Do not run migrations unless Blake explicitly approves that step.
 - Do not stage or commit until Blake approves.
+- Do not delete or decommission Emergent auth/storage dependencies until first-party replacements are implemented and verified.

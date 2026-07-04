@@ -1,6 +1,21 @@
 ## Decisions
 
 - Date: 2026-07-04
+  Decision: Treat Railway as the public production runtime, but treat Emergent as a still-active admin dependency.
+  Reason: The customer-facing app now runs on Railway, but admin login still redirects through `auth.emergentagent.com`, backend `/api/auth/session` still exchanges against `demobackend.emergentagent.com`, and admin uploads may still depend on Emergent object storage.
+  Tradeoff: The public production path is cleaner and no longer depends on Emergent for normal visitors, but operationally Emergent still cannot be removed without breaking new admin logins and possibly admin uploads.
+
+- Date: 2026-07-04
+  Decision: Do not delete or decommission Emergent auth/storage dependencies until first-party admin auth and storage replacements are complete and verified.
+  Reason: Existing admin sessions are local and survive for up to 7 days, but any new admin login still depends on Emergent; storage replacement may also still be required for admin uploads.
+  Tradeoff: This preserves admin continuity and avoids a lockout or upload regression, but it means Emergent remains a temporary operational dependency after the public Railway cutover.
+
+- Date: 2026-07-04
+  Decision: Sequence first-party admin auth/storage replacement after the current Ticketmaster and stale-event correctness work.
+  Reason: Production event quality remains the highest immediate user-facing risk, while the Emergent admin dependency is important but currently bounded to admin access and admin uploads.
+  Tradeoff: This keeps the highest-impact product issue first, but prolongs the period where Emergent must remain available for admin operations.
+
+- Date: 2026-07-04
   Decision: The Railway production cutover is the current production baseline for You're Not Down.
   Reason: `www.yournotdown.com` and `yournotdown.com` now load correctly on Railway, Tonight's Move and photos are working, the Railway backend is healthy, and the Railway photo refresh cron exists.
   Tradeoff: The platform baseline is now cleaner and no longer depends on the previous frontend hosting path, but follow-up validation work shifts to event quality and residual infrastructure cleanup.
