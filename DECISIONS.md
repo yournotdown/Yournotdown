@@ -1,5 +1,25 @@
 ## Decisions
 
+- Date: 2026-07-04
+  Decision: The Railway production cutover is the current production baseline for You're Not Down.
+  Reason: `www.yournotdown.com` and `yournotdown.com` now load correctly on Railway, Tonight's Move and photos are working, the Railway backend is healthy, and the Railway photo refresh cron exists.
+  Tradeoff: The platform baseline is now cleaner and no longer depends on the previous frontend hosting path, but follow-up validation work shifts to event quality and residual infrastructure cleanup.
+
+- Date: 2026-07-04
+  Decision: Treat the Emergent frontend badge/script removal and Emergent-hosted asset cleanup as verified complete for the tested production pages.
+  Reason: Network checks returned zero results for `assets.emergent`, `emergent-main`, `emergentcf`, `whatsyoudown.cluster`, and `static.prod-images.emergentagent.com` on tested pages, and the badge/script are removed.
+  Tradeoff: Production is cleaner and less coupled to the prior hosting stack, but verification remains scoped to the tested surfaces rather than every possible route.
+
+- Date: 2026-07-04
+  Decision: Keep `Bastion`, `Santa's Pub`, and `The Bluebird Cafe` intentionally untouched for now.
+  Reason: The approved image cleanup safely backfilled 7 Emergent-hosted image records, while these 3 remaining records still require separate handling and should not be changed opportunistically.
+  Tradeoff: This leaves a small known cleanup tail, but avoids risky or ambiguous image changes during cutover closeout.
+
+- Date: 2026-07-04
+  Decision: The next product/ops priority order after cutover is events first, residual image cleanup later, and outbound IP hardening after that if still open.
+  Reason: The biggest remaining user-facing risk is Ticketmaster events not showing in Tonight's Move and stale or outdated event data; admin event controls are the next leverage point for keeping production data trustworthy.
+  Tradeoff: Event correctness gets immediate attention, while the final 3 image records and Mongo Atlas network hardening are deferred until the higher-impact production issues are understood.
+
 - Date: 2026-07-03
   Decision: You're Not Down is positioned as a nightlife and tourist discovery product, starting with Nashville.
   Reason: The product needs a clear initial market and a direct use case for visitors deciding what to do tonight.

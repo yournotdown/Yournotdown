@@ -1,5 +1,15 @@
-## Top 3 Safest Next Tasks
+## Top 5 Next Tasks
 
-1. Review `migrations/backfill_emergent_image_businesses.py` and `migrations/refresh_google_photo_names.py`, then run the backfill in dry-run mode with local `DEST_MONGO_URL`, `DEST_DB`, and `GOOGLE_PLACES_API_KEY` to confirm the 7 intended businesses are matched, `Bastion`, `The Bluebird Cafe`, and `Santa's Pub` remain untouched, duplicate `google_place_id` conflicts are printed clearly, and future refreshes will use `google_photo_source_place_id` when present.
-2. If the dry-run output is correct and fresh Google photos are returned, rerun `migrations/backfill_emergent_image_businesses.py --apply` to backfill only those 7 matched businesses, skipping `google_place_id` on any conflict records while still refreshing photo fields and clearing Emergent `image_url` values.
-3. After the backfill, audit the remaining 3 unmatched businesses separately and decide whether to map them to Google Places records or migrate their curated images to non-Emergent storage before clearing any additional `image_url` fields.
+1. Investigate why Ticketmaster events are not showing in Tonight's Move, including ingestion, filtering, storage, and frontend selection paths.
+2. Fix stale or outdated events so production event data reflects current listings and valid timing.
+3. Review existing admin event controls and decide what needs to be added or tightened for event visibility, freshness, and overrides.
+4. Resolve the 3 intentionally untouched image records later: `Bastion`, `Santa's Pub`, and `The Bluebird Cafe`.
+5. Replace Mongo Atlas `0.0.0.0/0` access with a Railway Static Outbound IP later if that security follow-up is still open.
+
+## Guardrails
+
+- Do not deploy without Blake's explicit approval.
+- Do not merge to `main` without Blake's explicit approval.
+- Do not delete data, secrets, branches, or production settings without Blake's explicit approval.
+- Do not run migrations unless Blake explicitly approves that step.
+- Do not stage or commit until Blake approves.
