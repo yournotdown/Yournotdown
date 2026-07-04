@@ -1,5 +1,5 @@
 ## Top 3 Safest Next Tasks
 
-1. Install frontend dependencies locally, then rerun `npm run build` so the Emergent asset cleanup can be verified with an actual production bundle.
-2. After a successful build, open the built frontend in a browser or preview environment and confirm the Network tab no longer requests `https://assets.emergent.sh/scripts/emergent-main.js` and that no `Made with Emergent` badge is rendered.
-3. Separately from this frontend cleanup, continue the Google Places photo-name refresh follow-up by reviewing or running the dry-run flow in `migrations/refresh_google_photo_names.py` only when the required local environment variables are available.
+1. Review `migrations/backfill_emergent_image_businesses.py` and `migrations/refresh_google_photo_names.py`, then run the backfill in dry-run mode with local `DEST_MONGO_URL`, `DEST_DB`, and `GOOGLE_PLACES_API_KEY` to confirm the 7 intended businesses are matched, `Bastion`, `The Bluebird Cafe`, and `Santa's Pub` remain untouched, duplicate `google_place_id` conflicts are printed clearly, and future refreshes will use `google_photo_source_place_id` when present.
+2. If the dry-run output is correct and fresh Google photos are returned, rerun `migrations/backfill_emergent_image_businesses.py --apply` to backfill only those 7 matched businesses, skipping `google_place_id` on any conflict records while still refreshing photo fields and clearing Emergent `image_url` values.
+3. After the backfill, audit the remaining 3 unmatched businesses separately and decide whether to map them to Google Places records or migrate their curated images to non-Emergent storage before clearing any additional `image_url` fields.

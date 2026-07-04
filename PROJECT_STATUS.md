@@ -6,7 +6,21 @@ The repo is currently on branch `main`. There are two unrelated untracked migrat
 
 ## Latest Work Session
 
-The current task was removing leftover production-facing Emergent assets from the Railway-served frontend without deploying, merging, staging, committing, touching secrets, touching migrations, or changing data.
+The current task was safely preparing data cleanup for the remaining Emergent-hosted business image dependencies without deploying, merging, staging, committing, touching secrets, or running any repair step.
+
+A new local-only script now exists at `migrations/backfill_emergent_image_businesses.py`. It reads `DEST_MONGO_URL`, `DEST_DB`, and `GOOGLE_PLACES_API_KEY`, defaults to dry-run, requires `--apply` to write, targets only approved businesses whose `image_url` contains `static.prod-images.emergentagent.com`, and only backfills the 7 explicitly allowed matched names using `migrations/nashville_imports_only.json` as the source for `google_place_id`.
+
+The script intentionally leaves `Bastion`, `The Bluebird Cafe`, and `Santa's Pub` untouched. It is now prepared to preflight duplicate `google_place_id` conflicts before any write: if a matched Google place ID already exists on another business document, the script will not set `google_place_id` on the older Emergent-image record and will instead plan only photo-field refreshes plus `google_photo_source_place_id`, with `image_url` cleared so the frontend can fall back to Google photos. It still skips writes when fresh photos are not returned, to avoid creating blank images.
+
+The Google photo refresh tooling was also updated locally in `migrations/refresh_google_photo_names.py` and `backend/refresh_google_photo_names_job.py`. Both scripts now derive a refresh place ID by preferring `google_photo_source_place_id` when present and otherwise falling back to `google_place_id`, while leaving both stored ID fields unchanged. Their summary output now distinguishes `businesses_with_google_place_id`, `businesses_with_google_photo_source_place_id`, and `businesses_with_refresh_place_id`, so conflict-handled Emergent-image records remain eligible for future photo-name refreshes.
+
+Validation status:
+- `migrations/backfill_emergent_image_businesses.py` has been updated locally to print duplicate conflict details in dry-run and avoid `DuplicateKeyError` from `google_place_id` conflicts in apply mode
+- `migrations/refresh_google_photo_names.py` and `backend/refresh_google_photo_names_job.py` both pass local syntax-only checks
+- the script was not run in dry-run or apply mode
+- no Mongo writes, deploy, merge, staging, commit, migration execution, or production changes were performed in this session
+
+Earlier frontend cleanup work in this repo removed the production-facing Emergent script and badge from the Railway-served frontend:
 
 The external script and badge injection were traced to `frontend/public/index.html`:
 - the hardcoded `<script src="https://assets.emergent.sh/scripts/emergent-main.js"></script>` in `<head>`

@@ -27,6 +27,7 @@ DEFAULT_SAMPLE_LIMIT = 5
 FIELD_MASK = "id,displayName,photos"
 REFRESHED_AT_FIELD = "google_photo_names_refreshed_at"
 REQUIRED_ENV_VARS = ("DEST_MONGO_URL", "DEST_DB", "GOOGLE_PLACES_API_KEY")
+PHOTO_SOURCE_PLACE_ID_FIELD = "google_photo_source_place_id"
 
 
 def now_iso() -> str:
@@ -119,6 +120,13 @@ def format_sample(business_id: str, place_id: str, business_name: str, photo_nam
     )
 
 
+def choose_refresh_place_id(business: dict) -> str:
+    source_place_id = str(business.get(PHOTO_SOURCE_PLACE_ID_FIELD) or "").strip()
+    if source_place_id:
+        return source_place_id
+    return str(business.get("google_place_id") or "").strip()
+
+
 def main() -> int:
     args = parse_args()
     for env_name in REQUIRED_ENV_VARS:
@@ -138,14 +146,28 @@ def main() -> int:
     client = MongoClient(dest_url)
     try:
         collection = client[dest_db_name][args.collection]
-        query = {"google_place_id": {"$exists": True, "$nin": [None, ""]}}
-        projection = {"_id": 1, "id": 1, "name": 1, "google_place_id": 1, "google_photo_names": 1}
+        query = {
+            "$or": [
+                {"google_place_id": {"$exists": True, "$nin": [None, ""]}},
+                {PHOTO_SOURCE_PLACE_ID_FIELD: {"$exists": True, "$nin": [None, ""]}},
+            ]
+        }
+        projection = {
+            "_id": 1,
+            "id": 1,
+            "name": 1,
+            "google_place_id": 1,
+            PHOTO_SOURCE_PLACE_ID_FIELD: 1,
+            "google_photo_names": 1,
+        }
         cursor = collection.find(query, projection).sort("id", 1)
         if args.limit:
             cursor = cursor.limit(args.limit)
 
         scanned = 0
         with_place_id = 0
+        with_photo_source_place_id = 0
+        with_refresh_place_id = 0
         with_fresh_photos = 0
         updated = 0
         unchanged = 0
@@ -158,10 +180,17 @@ def main() -> int:
 
         for business in cursor:
             scanned += 1
-            place_id = str(business.get("google_place_id") or "").strip()
+            google_place_id = str(business.get("google_place_id") or "").strip()
+            photo_source_place_id = str(business.get(PHOTO_SOURCE_PLACE_ID_FIELD) or "").strip()
+            if google_place_id:
+                with_place_id += 1
+            if photo_source_place_id:
+                with_photo_source_place_id += 1
+
+            place_id = choose_refresh_place_id(business)
             if not place_id:
                 continue
-            with_place_id += 1
+            with_refresh_place_id += 1
 
             try:
                 fresh_photo_names, display_name = fetch_fresh_photo_names(place_id, api_key)
@@ -214,6 +243,8 @@ def main() -> int:
 
         print(f"businesses_scanned={scanned}")
         print(f"businesses_with_google_place_id={with_place_id}")
+        print(f"businesses_with_google_photo_source_place_id={with_photo_source_place_id}")
+        print(f"businesses_with_refresh_place_id={with_refresh_place_id}")
         print(f"businesses_with_fresh_photos={with_fresh_photos}")
         print(f"businesses_needing_update={updated}")
         print(f"businesses_unchanged={unchanged}")
