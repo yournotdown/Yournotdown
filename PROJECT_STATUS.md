@@ -2,13 +2,32 @@
 
 You're Not Down is Blake's nightlife and tourist discovery product focused on helping visitors quickly decide what to do tonight, with Nashville as the first market. The intended product shape is lightweight and conversion-focused: hotel QR distribution, simple itinerary generation, and fast 1 to 4 step plans for tourists choosing bars, restaurants, and local activities.
 
-The current repository memory state was being established on branch `chore/add-codex-project-memory`. At the time these notes were created, the repo had one unrelated untracked file at `migrations/import_via_production_admin_api.py` that should not be modified as part of memory setup.
+The repo is currently on branch `main`. There are two unrelated untracked migration files, `migrations/copy_catalog_collections.py` and `migrations/import_via_production_admin_api.py`, and neither should be modified as part of frontend cleanup work.
+
+## Latest Work Session
+
+The current task was removing leftover production-facing Emergent assets from the Railway-served frontend without deploying, merging, staging, committing, touching secrets, touching migrations, or changing data.
+
+The external script and badge injection were traced to `frontend/public/index.html`:
+- the hardcoded `<script src="https://assets.emergent.sh/scripts/emergent-main.js"></script>` in `<head>`
+- the fixed-position `#emergent-badge` link rendering the `Made with Emergent` badge in `<body>`
+
+The production-facing cleanup completed locally:
+- removed the external `assets.emergent.sh/scripts/emergent-main.js` script tag
+- removed the `Made with Emergent` badge markup
+- replaced leftover public HTML branding from `Emergent | Fullstack App` / `A product of emergent.sh` to `You're Not Down`
+
+Validation status:
+- `yarn build` could not be run because `yarn` is not installed in this environment
+- `npm run build` exists, but failed immediately because `craco` is not installed locally, which indicates frontend dependencies are not installed in this workspace
+
+No deploy, no merge, no staging, no commit, no migration changes, and no production data changes were performed in this session.
 
 ## Last Known Focus
 
 The immediate focus is safely extracting catalog data from the old Emergent production API into local JSON exports, without changing application logic, touching production data, or running any import step yet.
 
-## Latest Work Session
+## Prior Session Notes
 
 A new read-only exporter now exists at `migrations/export_catalog_from_production_api.py`. It targets `https://yournotdown.com/api` by default, allows `API_BASE_URL` override, writes JSON files into `migrations/emergent_export`, supports `--collections`, and only performs HTTP GET requests.
 

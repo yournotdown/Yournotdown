@@ -1,5 +1,5 @@
 ## Top 3 Safest Next Tasks
 
-1. Review the local diff for `backend/google_places_photos.py`, `backend/server.py`, and `migrations/refresh_google_photo_names.py`, with emphasis on the sanitized Google Places error logging and the dry-run-only refresh flow.
-2. In a separate step, provide `DEST_MONGO_URL`, `DEST_DB`, and `GOOGLE_PLACES_API_KEY`, then run `migrations/refresh_google_photo_names.py` in default dry-run mode only to measure how many imported businesses can fetch fresh `photos[].name` values from Places Details New.
-3. If the dry-run output looks correct, decide whether to run the same script with `--apply` so it updates only `google_photo_names` and `google_photo_names_refreshed_at`, without touching any other business fields or deleting anything.
+1. Install frontend dependencies locally, then rerun `npm run build` so the Emergent asset cleanup can be verified with an actual production bundle.
+2. After a successful build, open the built frontend in a browser or preview environment and confirm the Network tab no longer requests `https://assets.emergent.sh/scripts/emergent-main.js` and that no `Made with Emergent` badge is rendered.
+3. Separately from this frontend cleanup, continue the Google Places photo-name refresh follow-up by reviewing or running the dry-run flow in `migrations/refresh_google_photo_names.py` only when the required local environment variables are available.
