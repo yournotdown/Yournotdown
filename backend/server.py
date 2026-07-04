@@ -17,7 +17,11 @@ from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, ConfigDict
 
-from google_places_photos import fetch_google_places_photo, google_places_photo_media_url
+from google_places_photos import (
+    describe_google_places_request_error,
+    fetch_google_places_photo,
+    google_places_photo_media_url,
+)
 from ticketmaster_events import (
     TicketmasterClient,
     api_sync_response,
@@ -704,7 +708,10 @@ async def google_places_photo(photo_name: Optional[str] = None, business_id: Opt
     except requests.RequestException as e:
         if upstream is not None:
             upstream.close()
-        logger.warning("Google Places photo request failed: %s", e)
+        logger.warning(
+            "Google Places photo request failed: %s",
+            describe_google_places_request_error(e),
+        )
         raise HTTPException(status_code=502, detail="Google Places photo request failed")
     return StreamingResponse(
         upstream.iter_content(chunk_size=64 * 1024),
