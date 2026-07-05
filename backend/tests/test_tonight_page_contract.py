@@ -38,6 +38,13 @@ class TestTonightPageContract(unittest.TestCase):
         self.assertIn('event.venue_name || b.name', TONIGHT_PAGE_SOURCE)
         self.assertIn('href={event.ticket_url}', TONIGHT_PAGE_SOURCE)
 
+    def test_tonight_page_renders_active_sponsorship_when_present(self):
+        self.assertIn("const sponsorship = itinerary?.tonight_move_sponsorship;", TONIGHT_PAGE_SOURCE)
+        self.assertIn('data-testid="tonight-sponsorship"', TONIGHT_PAGE_SOURCE)
+        self.assertIn("Sponsored by", TONIGHT_PAGE_SOURCE)
+        self.assertIn('data-testid="tonight-sponsorship-link"', TONIGHT_PAGE_SOURCE)
+        self.assertIn('data-testid="tonight-sponsorship-tagline"', TONIGHT_PAGE_SOURCE)
+
     def test_standalone_tonights_shows_section_is_removed(self):
         self.assertNotIn("live_music_events", TONIGHT_PAGE_SOURCE)
         self.assertNotIn("Tonight's Shows", TONIGHT_PAGE_SOURCE)

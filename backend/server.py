@@ -48,6 +48,10 @@ from ticketmaster_events import (
 )
 from storage_client import init_storage, put_object, get_object, APP_NAME
 from itinerary_buckets import annotate_itinerary_buckets
+from tonight_move_sponsorship import (
+    TONIGHT_MOVE_SPONSORSHIP_PLACEMENT,
+    active_tonight_move_sponsorship,
+)
 from seed_data import (
     CATEGORIES,
     CITIES,
@@ -279,6 +283,24 @@ class AdminFeaturedLiveMusicEvent(BaseModel):
     image_url: str = ""
     ticket_url: str = ""
     cta_label: str = "Buy Tickets"
+    priority: int = 0
+    internal_notes: str = ""
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+class AdminTonightMoveSponsorship(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: Optional[str] = None
+    city_slug: str = "nashville"
+    active: bool = False
+    placement: str = TONIGHT_MOVE_SPONSORSHIP_PLACEMENT
+    sponsor_name: str = ""
+    sponsor_logo_url: str = ""
+    sponsor_url: str = ""
+    tagline: str = ""
+    active_from: str = ""
+    active_until: str = ""
     priority: int = 0
     internal_notes: str = ""
     created_at: Optional[str] = None
@@ -589,6 +611,14 @@ async def _active_featured_live_music_event(city: str) -> Optional[dict]:
     return active_featured_live_music_event(rows, city)
 
 
+async def _active_tonight_move_sponsorship(city: str) -> Optional[dict]:
+    rows = await db.admin_sponsorships.find(
+        {"city_slug": city, "placement": TONIGHT_MOVE_SPONSORSHIP_PLACEMENT},
+        {"_id": 0},
+    ).sort([("priority", -1), ("updated_at", -1)]).to_list(200)
+    return active_tonight_move_sponsorship(rows, city)
+
+
 @api_router.post("/itinerary/generate")
 async def generate_itinerary(req: ItineraryRequest, request: Request):
     """Build a 4-step 'Tonight's Move' itinerary tuned to the user's mood."""
@@ -598,6 +628,7 @@ async def generate_itinerary(req: ItineraryRequest, request: Request):
     eligible_music_events = eligible_ticketmaster_music_events(event_rows, all_biz)
     live_music_event_mode = normalize_live_music_event_mode(req.live_music_event_mode)
     featured_live_music = await _active_featured_live_music_event(req.city)
+    tonight_move_sponsorship = await _active_tonight_move_sponsorship(req.city)
 
     by_slot: dict = {}
     for b in all_biz:
@@ -651,6 +682,7 @@ async def generate_itinerary(req: ItineraryRequest, request: Request):
         "vibe": req.vibe,
         "city": req.city,
         "steps": steps,
+        "tonight_move_sponsorship": tonight_move_sponsorship,
         "generated_at": now_iso(),
     }
 
@@ -987,6 +1019,44 @@ async def admin_save_featured_live_music_event(body: AdminFeaturedLiveMusicEvent
 @api_router.delete("/admin/featured-events/live-music/{event_id}")
 async def admin_delete_featured_live_music_event(event_id: str, user=Depends(require_admin)):
     result = await db.admin_featured_events.delete_one({"id": event_id, "slot": FEATURED_LIVE_MUSIC_SLOT})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Not found")
+    return {"ok": True}
+
+
+@api_router.get("/admin/sponsorships/tonight-move")
+async def admin_get_tonight_move_sponsorship(city: str = "nashville", user=Depends(require_admin)):
+    active = await _active_tonight_move_sponsorship(city)
+    if active:
+        return active
+    fallback = await db.admin_sponsorships.find_one(
+        {"city_slug": city, "placement": TONIGHT_MOVE_SPONSORSHIP_PLACEMENT},
+        {"_id": 0},
+        sort=[("updated_at", -1)],
+    )
+    return fallback or {}
+
+
+@api_router.put("/admin/sponsorships/tonight-move")
+async def admin_save_tonight_move_sponsorship(body: AdminTonightMoveSponsorship, user=Depends(require_admin)):
+    timestamp = now_iso()
+    sponsorship_id = body.id or str(uuid.uuid4())
+    record = {
+        **body.model_dump(),
+        "id": sponsorship_id,
+        "placement": TONIGHT_MOVE_SPONSORSHIP_PLACEMENT,
+        "updated_at": timestamp,
+        "created_at": body.created_at or timestamp,
+    }
+    await db.admin_sponsorships.update_one({"id": sponsorship_id}, {"$set": record}, upsert=True)
+    return record
+
+
+@api_router.delete("/admin/sponsorships/tonight-move/{sponsorship_id}")
+async def admin_delete_tonight_move_sponsorship(sponsorship_id: str, user=Depends(require_admin)):
+    result = await db.admin_sponsorships.delete_one(
+        {"id": sponsorship_id, "placement": TONIGHT_MOVE_SPONSORSHIP_PLACEMENT}
+    )
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Not found")
     return {"ok": True}

@@ -87,7 +87,10 @@ Latest local patch state:
 - kept Ticketmaster event rendering only inside the numbered `LIVE MUSIC` step and preserved the removal of any standalone Tonight page “Tonight’s Shows” section
 - added admin-only `itinerary_buckets` visibility derived from canonical business `slots`, plus matching admin filters and bucket badges for Dinner, Drinks, Live Music, and Late Night auditing
 - added admin-managed featured live music overrides backed by a separate `admin_featured_events` collection, with helper logic that prioritizes an active featured live-music event above Ticketmaster and normal cadence when its active window and local date are valid for tonight
-- added admin dashboard controls to view, save, activate/deactivate, and clear a Featured Live Music Event using `image_url` + `ticket_url` fields without modifying existing business data
+- moved Featured Live Music controls out of the Businesses tab and into a dedicated admin Sponsorships tab
+- added admin-managed Tonight’s Move page sponsorships backed by a separate `admin_sponsorships` collection, including active-window and priority resolution plus public itinerary response support via `tonight_move_sponsorship`
+- added admin dashboard controls to view, save, activate/deactivate, and clear both Featured Live Music and Tonight’s Move Sponsorship records using `image_url` / `sponsor_logo_url` and `ticket_url` / `sponsor_url` fields without modifying existing business data
+- added Tonight page sponsor rendering near the header so active Tonight’s Move sponsorships display independently from the itinerary-selection logic
 - kept the safe Ticketmaster alias `Ole Red - Nashville` -> `Ole Red`
 - did not add First Horizon Park itinerary matching
 - did not add broad aliases for venues missing approved business records
@@ -120,6 +123,7 @@ Verification completed in this local patching session:
 - after the Another Night exhaustion fix, `python3 -m unittest backend.tests.test_ticketmaster_events_unit backend.tests.test_city_events_filtering_contract backend.tests.test_tonight_page_contract` passed again (`59` tests)
 - after the live-music cadence plus admin bucket audit update, `python3 -m unittest backend.tests.test_ticketmaster_events_unit backend.tests.test_city_events_filtering_contract backend.tests.test_tonight_page_contract backend.tests.test_itinerary_buckets_unit backend.tests.test_admin_dashboard_contract` passed (`66` tests)
 - after the first-load Ticketmaster preference plus admin featured live music override update, `python3 -m unittest backend.tests.test_ticketmaster_events_unit backend.tests.test_featured_live_music_unit backend.tests.test_city_events_filtering_contract backend.tests.test_tonight_page_contract backend.tests.test_itinerary_buckets_unit backend.tests.test_admin_dashboard_contract` passed (`74` tests)
+- after the admin Sponsorships tab plus Tonight’s Move sponsorship update, `python3 -m unittest backend.tests.test_ticketmaster_events_unit backend.tests.test_featured_live_music_unit backend.tests.test_tonight_move_sponsorship_unit backend.tests.test_city_events_filtering_contract backend.tests.test_tonight_page_contract backend.tests.test_itinerary_buckets_unit backend.tests.test_admin_dashboard_contract` is the required rerun target
 
 Unverified in this local patching session:
 - frontend Jest was not runnable locally because workspace JS dependencies are not installed and `craco` is unavailable on PATH

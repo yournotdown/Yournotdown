@@ -38,6 +38,7 @@ class TestCityEventsFilteringContract(unittest.TestCase):
         self.assertIn("eligible_music_events = eligible_ticketmaster_music_events(event_rows, all_biz)", source)
         self.assertIn("live_music_event_mode = normalize_live_music_event_mode(req.live_music_event_mode)", source)
         self.assertIn("featured_live_music = await _active_featured_live_music_event(req.city)", source)
+        self.assertIn("tonight_move_sponsorship = await _active_tonight_move_sponsorship(req.city)", source)
         self.assertIn("today_events_by_business = events_by_business_id(event_rows)", source)
         self.assertIn("exclude_event_ids = set(req.exclude_event_ids)", source)
         self.assertIn('if label["slot"] == "entertainment":', source)
@@ -51,6 +52,7 @@ class TestCityEventsFilteringContract(unittest.TestCase):
         self.assertIn("pick = _weighted_pick(event_candidates or candidates, exclude | chosen_ids, req.vibe)", source)
         self.assertIn('elif label["slot"] == "entertainment":', source)
         self.assertNotIn('"live_music_events":', source)
+        self.assertIn('"tonight_move_sponsorship": tonight_move_sponsorship', source)
 
 
 if __name__ == "__main__":

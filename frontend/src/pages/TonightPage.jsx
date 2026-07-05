@@ -28,6 +28,7 @@ export default function TonightPage() {
   const [searchParams] = useSearchParams();
   const vibe = searchParams.get("vibe") || "down";
   const vibeMeta = VIBE_LABELS[vibe] || { emoji: "✨", label: vibe };
+  const sponsorship = itinerary?.tonight_move_sponsorship;
 
   const [itinerary, setItinerary] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -133,6 +134,40 @@ export default function TonightPage() {
         <div className="text-[10px] uppercase tracking-[0.3em] text-white/40 mb-3">
           Curated for {vibeMeta.emoji} {vibeMeta.label}
         </div>
+        {sponsorship?.sponsor_name && (
+          <div className="mb-4 flex items-center gap-3 text-white/70" data-testid="tonight-sponsorship">
+            {sponsorship.sponsor_logo_url ? (
+              <img
+                src={sponsorship.sponsor_logo_url}
+                alt=""
+                className="h-8 w-8 rounded-md object-cover border border-white/10"
+              />
+            ) : null}
+            <div className="min-w-0">
+              <div className="text-[10px] uppercase tracking-[0.28em] text-white/40">Sponsored by</div>
+              {sponsorship.sponsor_url ? (
+                <a
+                  href={sponsorship.sponsor_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-display text-sm text-white hover:text-[#C6FF00] transition-colors"
+                  data-testid="tonight-sponsorship-link"
+                >
+                  {sponsorship.sponsor_name}
+                </a>
+              ) : (
+                <div className="font-display text-sm text-white" data-testid="tonight-sponsorship-name">
+                  {sponsorship.sponsor_name}
+                </div>
+              )}
+              {sponsorship.tagline ? (
+                <div className="text-xs text-white/45" data-testid="tonight-sponsorship-tagline">
+                  {sponsorship.tagline}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        )}
         <motion.h1
           className="font-flyer text-white uppercase"
           style={{

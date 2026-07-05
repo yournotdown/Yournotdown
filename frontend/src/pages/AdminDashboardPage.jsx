@@ -55,6 +55,21 @@ const emptyFeaturedLiveMusic = {
   internal_notes: "",
 };
 
+const emptyTonightMoveSponsorship = {
+  id: "",
+  city_slug: "nashville",
+  active: false,
+  placement: "tonight_move",
+  sponsor_name: "",
+  sponsor_logo_url: "",
+  sponsor_url: "",
+  tagline: "",
+  active_from: "",
+  active_until: "",
+  priority: 0,
+  internal_notes: "",
+};
+
 const ITINERARY_BUCKET_META = {
   dinner: { label: "Dinner", className: "bg-orange-500/10 text-orange-300" },
   drinks: { label: "Drinks", className: "bg-sky-500/10 text-sky-300" },
@@ -75,6 +90,7 @@ export default function AdminDashboardPage() {
   const [analytics, setAnalytics] = useState(null);
   const [importSummary, setImportSummary] = useState(null);
   const [featuredLiveMusic, setFeaturedLiveMusic] = useState(emptyFeaturedLiveMusic);
+  const [tonightMoveSponsorship, setTonightMoveSponsorship] = useState(emptyTonightMoveSponsorship);
   const [selectedImports, setSelectedImports] = useState([]);
   const [editing, setEditing] = useState(null); // business object or null
   const [open, setOpen] = useState(false);
@@ -82,6 +98,7 @@ export default function AdminDashboardPage() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [savingFeaturedLiveMusic, setSavingFeaturedLiveMusic] = useState(false);
+  const [savingTonightMoveSponsorship, setSavingTonightMoveSponsorship] = useState(false);
   const fileInputRef = useRef(null);
 
   // Auth check
@@ -105,13 +122,14 @@ export default function AdminDashboardPage() {
 
   const loadAll = useCallback(async () => {
     try {
-      const [biz, cats, tagsRes, analytics, importSummary, featured] = await Promise.all([
+      const [biz, cats, tagsRes, analytics, importSummary, featured, sponsorship] = await Promise.all([
         api.get("/admin/businesses").then((r) => r.data),
         api.get("/admin/categories").then((r) => r.data),
         api.get("/admin/tags").then((r) => r.data),
         api.get("/admin/analytics/summary").then((r) => r.data),
         api.get("/admin/businesses/import-summary").then((r) => r.data),
         api.get("/admin/featured-events/live-music").then((r) => r.data),
+        api.get("/admin/sponsorships/tonight-move").then((r) => r.data),
       ]);
       setBusinesses(biz);
       setCategories(cats);
@@ -119,6 +137,7 @@ export default function AdminDashboardPage() {
       setAnalytics(analytics);
       setImportSummary(importSummary);
       setFeaturedLiveMusic({ ...emptyFeaturedLiveMusic, ...(featured || {}) });
+      setTonightMoveSponsorship({ ...emptyTonightMoveSponsorship, ...(sponsorship || {}) });
     } catch (e) {
       toast.error("Failed to load admin data");
     }
@@ -168,6 +187,37 @@ export default function AdminDashboardPage() {
       toast.success("Featured live music event cleared");
     } catch (e) {
       toast.error("Failed to clear featured live music event");
+    }
+  };
+
+  const handleSaveTonightMoveSponsorship = async () => {
+    if (!tonightMoveSponsorship.sponsor_name) {
+      toast.error("Sponsor name is required");
+      return;
+    }
+    setSavingTonightMoveSponsorship(true);
+    try {
+      const response = await api.put("/admin/sponsorships/tonight-move", tonightMoveSponsorship);
+      setTonightMoveSponsorship({ ...emptyTonightMoveSponsorship, ...response.data });
+      toast.success("Tonight's Move sponsorship saved");
+    } catch (e) {
+      toast.error("Failed to save Tonight's Move sponsorship");
+    } finally {
+      setSavingTonightMoveSponsorship(false);
+    }
+  };
+
+  const handleDeleteTonightMoveSponsorship = async () => {
+    if (!tonightMoveSponsorship.id) {
+      setTonightMoveSponsorship(emptyTonightMoveSponsorship);
+      return;
+    }
+    try {
+      await api.delete(`/admin/sponsorships/tonight-move/${tonightMoveSponsorship.id}`);
+      setTonightMoveSponsorship(emptyTonightMoveSponsorship);
+      toast.success("Tonight's Move sponsorship cleared");
+    } catch (e) {
+      toast.error("Failed to clear Tonight's Move sponsorship");
     }
   };
 
@@ -323,6 +373,7 @@ export default function AdminDashboardPage() {
         <div className="flex gap-2 border-b border-white/10">
           {[
             { id: "businesses", label: "Businesses", icon: Store },
+            { id: "sponsorships", label: "Sponsorships", icon: Star },
             { id: "imports", label: `Import Review${importSummary?.pending ? ` (${importSummary.pending})` : ""}`, icon: ClipboardCheck },
             { id: "analytics", label: "Analytics", icon: BarChart3 },
           ].map((t) => (
@@ -346,25 +397,30 @@ export default function AdminDashboardPage() {
       {/* Content */}
       <div className="px-6 py-8 max-w-7xl mx-auto">
         {tab === "businesses" && (
-          <>
-            <FeaturedLiveMusicPanel
-              value={featuredLiveMusic}
-              onChange={setFeaturedLiveMusic}
-              onSave={handleSaveFeaturedLiveMusic}
-              onDelete={handleDeleteFeaturedLiveMusic}
-              saving={savingFeaturedLiveMusic}
-            />
-            <BusinessesPanel
-              businesses={businesses}
-              categories={categories}
-              onCreate={openCreate}
-              onEdit={openEdit}
-              onDelete={handleDelete}
-              onToggleFeatured={handleToggleFeatured}
-              onReorder={handleReorder}
-              onAnalytics={(b) => navigate(`/admin/business/${b.id}`)}
-            />
-          </>
+          <BusinessesPanel
+            businesses={businesses}
+            categories={categories}
+            onCreate={openCreate}
+            onEdit={openEdit}
+            onDelete={handleDelete}
+            onToggleFeatured={handleToggleFeatured}
+            onReorder={handleReorder}
+            onAnalytics={(b) => navigate(`/admin/business/${b.id}`)}
+          />
+        )}
+        {tab === "sponsorships" && (
+          <SponsorshipsPanel
+            featuredLiveMusic={featuredLiveMusic}
+            onFeaturedLiveMusicChange={setFeaturedLiveMusic}
+            onSaveFeaturedLiveMusic={handleSaveFeaturedLiveMusic}
+            onDeleteFeaturedLiveMusic={handleDeleteFeaturedLiveMusic}
+            savingFeaturedLiveMusic={savingFeaturedLiveMusic}
+            tonightMoveSponsorship={tonightMoveSponsorship}
+            onTonightMoveSponsorshipChange={setTonightMoveSponsorship}
+            onSaveTonightMoveSponsorship={handleSaveTonightMoveSponsorship}
+            onDeleteTonightMoveSponsorship={handleDeleteTonightMoveSponsorship}
+            savingTonightMoveSponsorship={savingTonightMoveSponsorship}
+          />
         )}
         {tab === "analytics" && <AnalyticsPanel analytics={analytics} categories={categories} onOpenBusiness={(bid) => navigate(`/admin/business/${bid}`)} />}
         {tab === "imports" && (
@@ -957,6 +1013,182 @@ function FeaturedLiveMusicPanel({ value, onChange, onSave, onDelete, saving }) {
           Clear featured event
         </Button>
       </div>
+    </div>
+  );
+}
+
+function TonightMoveSponsorshipPanel({ value, onChange, onSave, onDelete, saving }) {
+  return (
+    <div className="rounded-3xl border border-white/10 bg-[#121218] p-6" data-testid="admin-tonight-move-sponsorship">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h2 className="font-display text-3xl font-bold">Tonight&apos;s Move Sponsorship</h2>
+          <p className="mt-1 text-sm text-[#A1A1AA]">
+            Shows a subtle sponsor treatment near the Tonight page hero without affecting itinerary selection.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className={`inline-flex rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] ${
+            value.active ? "bg-[#C6FF00]/10 text-[#D7FF6B]" : "bg-white/5 text-white/45"
+          }`}>
+            {value.active ? "Active" : "Inactive"}
+          </span>
+        </div>
+      </div>
+
+      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Field label="Sponsor name">
+          <Input
+            value={value.sponsor_name}
+            onChange={(e) => onChange({ ...value, sponsor_name: e.target.value })}
+            className="bg-[#1A1A22] border-white/10 text-white"
+            data-testid="tonight-move-sponsorship-name"
+          />
+        </Field>
+        <Field label="City slug">
+          <Input
+            value={value.city_slug}
+            onChange={(e) => onChange({ ...value, city_slug: e.target.value })}
+            className="bg-[#1A1A22] border-white/10 text-white"
+            data-testid="tonight-move-sponsorship-city-slug"
+          />
+        </Field>
+        <Field label="Sponsor logo URL">
+          <Input
+            value={value.sponsor_logo_url}
+            onChange={(e) => onChange({ ...value, sponsor_logo_url: e.target.value })}
+            className="bg-[#1A1A22] border-white/10 text-white"
+            data-testid="tonight-move-sponsorship-logo-url"
+          />
+        </Field>
+        <Field label="Sponsor URL">
+          <Input
+            value={value.sponsor_url}
+            onChange={(e) => onChange({ ...value, sponsor_url: e.target.value })}
+            className="bg-[#1A1A22] border-white/10 text-white"
+            data-testid="tonight-move-sponsorship-url"
+          />
+        </Field>
+        <Field label="Active from">
+          <Input
+            type="datetime-local"
+            value={value.active_from}
+            onChange={(e) => onChange({ ...value, active_from: e.target.value })}
+            className="bg-[#1A1A22] border-white/10 text-white"
+            data-testid="tonight-move-sponsorship-active-from"
+          />
+        </Field>
+        <Field label="Active until">
+          <Input
+            type="datetime-local"
+            value={value.active_until}
+            onChange={(e) => onChange({ ...value, active_until: e.target.value })}
+            className="bg-[#1A1A22] border-white/10 text-white"
+            data-testid="tonight-move-sponsorship-active-until"
+          />
+        </Field>
+        <Field label="Priority">
+          <Input
+            type="number"
+            value={String(value.priority ?? 0)}
+            onChange={(e) => onChange({ ...value, priority: Number(e.target.value || 0) })}
+            className="bg-[#1A1A22] border-white/10 text-white"
+            data-testid="tonight-move-sponsorship-priority"
+          />
+        </Field>
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Field label="Tagline">
+          <Textarea
+            value={value.tagline}
+            onChange={(e) => onChange({ ...value, tagline: e.target.value })}
+            rows={3}
+            className="bg-[#1A1A22] border-white/10 text-white"
+            data-testid="tonight-move-sponsorship-tagline"
+          />
+        </Field>
+        <Field label="Internal notes">
+          <Textarea
+            value={value.internal_notes}
+            onChange={(e) => onChange({ ...value, internal_notes: e.target.value })}
+            rows={3}
+            className="bg-[#1A1A22] border-white/10 text-white"
+            data-testid="tonight-move-sponsorship-internal-notes"
+          />
+        </Field>
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center gap-4">
+        <label className="flex items-center gap-2 text-sm text-white" data-testid="tonight-move-sponsorship-active-toggle">
+          <input
+            type="checkbox"
+            checked={value.active}
+            onChange={(e) => onChange({ ...value, active: e.target.checked })}
+            className="h-4 w-4 accent-[#C6FF00]"
+          />
+          <span>Active sponsorship</span>
+        </label>
+      </div>
+
+      <div className="mt-6 flex flex-wrap gap-3">
+        <Button
+          onClick={onSave}
+          disabled={saving}
+          className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white"
+          data-testid="tonight-move-sponsorship-save"
+        >
+          {saving ? "Saving…" : "Save sponsorship"}
+        </Button>
+        <Button
+          variant="ghost"
+          onClick={() => onChange({ ...emptyTonightMoveSponsorship, city_slug: value.city_slug || "nashville" })}
+          className="text-white/70 hover:text-white hover:bg-white/5"
+          data-testid="tonight-move-sponsorship-reset"
+        >
+          Reset form
+        </Button>
+        <Button
+          variant="ghost"
+          onClick={onDelete}
+          className="text-red-300 hover:text-red-200 hover:bg-red-500/10"
+          data-testid="tonight-move-sponsorship-delete"
+        >
+          Clear sponsorship
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function SponsorshipsPanel({
+  featuredLiveMusic,
+  onFeaturedLiveMusicChange,
+  onSaveFeaturedLiveMusic,
+  onDeleteFeaturedLiveMusic,
+  savingFeaturedLiveMusic,
+  tonightMoveSponsorship,
+  onTonightMoveSponsorshipChange,
+  onSaveTonightMoveSponsorship,
+  onDeleteTonightMoveSponsorship,
+  savingTonightMoveSponsorship,
+}) {
+  return (
+    <div data-testid="admin-sponsorships-tab">
+      <FeaturedLiveMusicPanel
+        value={featuredLiveMusic}
+        onChange={onFeaturedLiveMusicChange}
+        onSave={onSaveFeaturedLiveMusic}
+        onDelete={onDeleteFeaturedLiveMusic}
+        saving={savingFeaturedLiveMusic}
+      />
+      <TonightMoveSponsorshipPanel
+        value={tonightMoveSponsorship}
+        onChange={onTonightMoveSponsorshipChange}
+        onSave={onSaveTonightMoveSponsorship}
+        onDelete={onDeleteTonightMoveSponsorship}
+        saving={savingTonightMoveSponsorship}
+      />
     </div>
   );
 }
