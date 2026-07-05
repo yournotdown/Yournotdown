@@ -5,12 +5,14 @@
    - `/api/events/today?city=nashville`
    - `/:citySlug/tonight?vibe=send-it`
    - the “Another Night” refresh flow on the Tonight page
-2. Confirm the new `LIVE MUSIC` cadence on the Tonight page feels right in production-like QA:
-   - normal refreshes should rotate standard live-music venues
-   - every fourth `Another Night` should request a Ticketmaster-backed live-music step when eligible shows exist
-   - Ticketmaster mode should rotate to a different eligible show when possible and safely recycle when the event pool is exhausted
-3. Manually QA the desktop and tablet layouts for `/:citySlug` and `/:citySlug/vibe` at 1440px, 1728px, tablet, and mobile widths to confirm the landing hero and 2x2 vibe grid now feel intentional without regressing mobile.
-4. Use the new admin itinerary bucket chips/filters to audit which businesses currently feed Dinner, Drinks, Live Music, and Late Night, then identify any polluted/event-like catalog rows that need cleanup.
+2. Confirm the revised `LIVE MUSIC` precedence on the Tonight page feels right in production-like QA:
+   - active admin featured live music event overrides everything
+   - first load uses Ticketmaster when eligible and no featured override exists
+   - normal refreshes rotate standard live-music venues
+   - every fourth `Another Night` requests a Ticketmaster-backed live-music step
+   - Ticketmaster mode rotates when possible and safely recycles when the eligible pool is exhausted
+3. Use the new admin Featured Live Music controls plus itinerary bucket chips/filters to audit paid/event promotion behavior and identify polluted/event-like catalog rows that still need cleanup.
+4. Manually QA the desktop and tablet layouts for `/:citySlug` and `/:citySlug/vibe` at 1440px, 1728px, tablet, and mobile widths to confirm the landing hero and 2x2 vibe grid now feel intentional without regressing mobile.
 5. Define and implement a schema/data cleanup for event-like catalog rows so future public suppression can be generic and data-driven instead of name-based.
 6. If frontend regression testing is needed locally, install the frontend JS dependencies first so `craco test` and `craco build` can run; current workspace does not have `craco` or `react-scripts` available.
 7. Keep `First Horizon Park` and `Grand Ole Opry House` intentionally unmatched unless approved business records or explicit mapping rules change.

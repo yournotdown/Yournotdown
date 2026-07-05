@@ -36,6 +36,25 @@ const empty = {
   order: 0,
 };
 
+const emptyFeaturedLiveMusic = {
+  id: "",
+  city_slug: "nashville",
+  active: false,
+  slot: "live_music",
+  title: "",
+  venue_name: "",
+  description: "",
+  local_date: "",
+  local_time: "",
+  active_from: "",
+  active_until: "",
+  image_url: "",
+  ticket_url: "",
+  cta_label: "Buy Tickets",
+  priority: 0,
+  internal_notes: "",
+};
+
 const ITINERARY_BUCKET_META = {
   dinner: { label: "Dinner", className: "bg-orange-500/10 text-orange-300" },
   drinks: { label: "Drinks", className: "bg-sky-500/10 text-sky-300" },
@@ -55,12 +74,14 @@ export default function AdminDashboardPage() {
   const [allTags, setAllTags] = useState([]);
   const [analytics, setAnalytics] = useState(null);
   const [importSummary, setImportSummary] = useState(null);
+  const [featuredLiveMusic, setFeaturedLiveMusic] = useState(emptyFeaturedLiveMusic);
   const [selectedImports, setSelectedImports] = useState([]);
   const [editing, setEditing] = useState(null); // business object or null
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(empty);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [savingFeaturedLiveMusic, setSavingFeaturedLiveMusic] = useState(false);
   const fileInputRef = useRef(null);
 
   // Auth check
@@ -84,18 +105,20 @@ export default function AdminDashboardPage() {
 
   const loadAll = useCallback(async () => {
     try {
-      const [biz, cats, tagsRes, analytics, importSummary] = await Promise.all([
+      const [biz, cats, tagsRes, analytics, importSummary, featured] = await Promise.all([
         api.get("/admin/businesses").then((r) => r.data),
         api.get("/admin/categories").then((r) => r.data),
         api.get("/admin/tags").then((r) => r.data),
         api.get("/admin/analytics/summary").then((r) => r.data),
         api.get("/admin/businesses/import-summary").then((r) => r.data),
+        api.get("/admin/featured-events/live-music").then((r) => r.data),
       ]);
       setBusinesses(biz);
       setCategories(cats);
       setAllTags(tagsRes.tags || []);
       setAnalytics(analytics);
       setImportSummary(importSummary);
+      setFeaturedLiveMusic({ ...emptyFeaturedLiveMusic, ...(featured || {}) });
     } catch (e) {
       toast.error("Failed to load admin data");
     }
@@ -115,6 +138,37 @@ export default function AdminDashboardPage() {
     setEditing(b);
     setForm({ ...empty, ...b });
     setOpen(true);
+  };
+
+  const handleSaveFeaturedLiveMusic = async () => {
+    if (!featuredLiveMusic.title || !featuredLiveMusic.venue_name) {
+      toast.error("Title and venue name are required");
+      return;
+    }
+    setSavingFeaturedLiveMusic(true);
+    try {
+      const response = await api.put("/admin/featured-events/live-music", featuredLiveMusic);
+      setFeaturedLiveMusic({ ...emptyFeaturedLiveMusic, ...response.data });
+      toast.success("Featured live music event saved");
+    } catch (e) {
+      toast.error("Failed to save featured live music event");
+    } finally {
+      setSavingFeaturedLiveMusic(false);
+    }
+  };
+
+  const handleDeleteFeaturedLiveMusic = async () => {
+    if (!featuredLiveMusic.id) {
+      setFeaturedLiveMusic(emptyFeaturedLiveMusic);
+      return;
+    }
+    try {
+      await api.delete(`/admin/featured-events/live-music/${featuredLiveMusic.id}`);
+      setFeaturedLiveMusic(emptyFeaturedLiveMusic);
+      toast.success("Featured live music event cleared");
+    } catch (e) {
+      toast.error("Failed to clear featured live music event");
+    }
   };
 
   const handleSave = async () => {
@@ -292,16 +346,25 @@ export default function AdminDashboardPage() {
       {/* Content */}
       <div className="px-6 py-8 max-w-7xl mx-auto">
         {tab === "businesses" && (
-          <BusinessesPanel
-            businesses={businesses}
-            categories={categories}
-            onCreate={openCreate}
-            onEdit={openEdit}
-            onDelete={handleDelete}
-            onToggleFeatured={handleToggleFeatured}
-            onReorder={handleReorder}
-            onAnalytics={(b) => navigate(`/admin/business/${b.id}`)}
-          />
+          <>
+            <FeaturedLiveMusicPanel
+              value={featuredLiveMusic}
+              onChange={setFeaturedLiveMusic}
+              onSave={handleSaveFeaturedLiveMusic}
+              onDelete={handleDeleteFeaturedLiveMusic}
+              saving={savingFeaturedLiveMusic}
+            />
+            <BusinessesPanel
+              businesses={businesses}
+              categories={categories}
+              onCreate={openCreate}
+              onEdit={openEdit}
+              onDelete={handleDelete}
+              onToggleFeatured={handleToggleFeatured}
+              onReorder={handleReorder}
+              onAnalytics={(b) => navigate(`/admin/business/${b.id}`)}
+            />
+          </>
         )}
         {tab === "analytics" && <AnalyticsPanel analytics={analytics} categories={categories} onOpenBusiness={(bid) => navigate(`/admin/business/${bid}`)} />}
         {tab === "imports" && (
@@ -717,6 +780,182 @@ function ImportReviewPanel({ businesses, summary, selected, onSelectedChange, on
             ))}
           </tbody>
         </table>
+      </div>
+    </div>
+  );
+}
+
+function FeaturedLiveMusicPanel({ value, onChange, onSave, onDelete, saving }) {
+  return (
+    <div className="mb-8 rounded-3xl border border-white/10 bg-[#121218] p-6" data-testid="admin-featured-live-music">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h2 className="font-display text-3xl font-bold">Featured Live Music Event</h2>
+          <p className="mt-1 text-sm text-[#A1A1AA]">
+            Overrides the Tonight page LIVE MUSIC step while active. If none is active, the normal Ticketmaster cadence applies.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className={`inline-flex rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] ${
+            value.active ? "bg-[#C6FF00]/10 text-[#D7FF6B]" : "bg-white/5 text-white/45"
+          }`}>
+            {value.active ? "Active" : "Inactive"}
+          </span>
+        </div>
+      </div>
+
+      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Field label="Title">
+          <Input
+            value={value.title}
+            onChange={(e) => onChange({ ...value, title: e.target.value })}
+            className="bg-[#1A1A22] border-white/10 text-white"
+            data-testid="featured-live-music-title"
+          />
+        </Field>
+        <Field label="Venue name">
+          <Input
+            value={value.venue_name}
+            onChange={(e) => onChange({ ...value, venue_name: e.target.value })}
+            className="bg-[#1A1A22] border-white/10 text-white"
+            data-testid="featured-live-music-venue-name"
+          />
+        </Field>
+        <Field label="Local date">
+          <Input
+            type="date"
+            value={value.local_date}
+            onChange={(e) => onChange({ ...value, local_date: e.target.value })}
+            className="bg-[#1A1A22] border-white/10 text-white"
+            data-testid="featured-live-music-local-date"
+          />
+        </Field>
+        <Field label="Show time">
+          <Input
+            type="time"
+            value={value.local_time}
+            onChange={(e) => onChange({ ...value, local_time: e.target.value })}
+            className="bg-[#1A1A22] border-white/10 text-white"
+            data-testid="featured-live-music-local-time"
+          />
+        </Field>
+        <Field label="Active from">
+          <Input
+            type="datetime-local"
+            value={value.active_from}
+            onChange={(e) => onChange({ ...value, active_from: e.target.value })}
+            className="bg-[#1A1A22] border-white/10 text-white"
+            data-testid="featured-live-music-active-from"
+          />
+        </Field>
+        <Field label="Active until">
+          <Input
+            type="datetime-local"
+            value={value.active_until}
+            onChange={(e) => onChange({ ...value, active_until: e.target.value })}
+            className="bg-[#1A1A22] border-white/10 text-white"
+            data-testid="featured-live-music-active-until"
+          />
+        </Field>
+        <Field label="Image URL">
+          <Input
+            value={value.image_url}
+            onChange={(e) => onChange({ ...value, image_url: e.target.value })}
+            className="bg-[#1A1A22] border-white/10 text-white"
+            data-testid="featured-live-music-image-url"
+          />
+        </Field>
+        <Field label="Ticket URL">
+          <Input
+            value={value.ticket_url}
+            onChange={(e) => onChange({ ...value, ticket_url: e.target.value })}
+            className="bg-[#1A1A22] border-white/10 text-white"
+            data-testid="featured-live-music-ticket-url"
+          />
+        </Field>
+        <Field label="CTA label">
+          <Input
+            value={value.cta_label}
+            onChange={(e) => onChange({ ...value, cta_label: e.target.value })}
+            className="bg-[#1A1A22] border-white/10 text-white"
+            data-testid="featured-live-music-cta-label"
+          />
+        </Field>
+        <Field label="Priority">
+          <Input
+            type="number"
+            value={String(value.priority ?? 0)}
+            onChange={(e) => onChange({ ...value, priority: Number(e.target.value || 0) })}
+            className="bg-[#1A1A22] border-white/10 text-white"
+            data-testid="featured-live-music-priority"
+          />
+        </Field>
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Field label="Description">
+          <Textarea
+            value={value.description}
+            onChange={(e) => onChange({ ...value, description: e.target.value })}
+            rows={4}
+            className="bg-[#1A1A22] border-white/10 text-white"
+            data-testid="featured-live-music-description"
+          />
+        </Field>
+        <Field label="Internal notes">
+          <Textarea
+            value={value.internal_notes}
+            onChange={(e) => onChange({ ...value, internal_notes: e.target.value })}
+            rows={4}
+            className="bg-[#1A1A22] border-white/10 text-white"
+            data-testid="featured-live-music-internal-notes"
+          />
+        </Field>
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center gap-4">
+        <label className="flex items-center gap-2 text-sm text-white" data-testid="featured-live-music-active-toggle">
+          <input
+            type="checkbox"
+            checked={value.active}
+            onChange={(e) => onChange({ ...value, active: e.target.checked })}
+            className="h-4 w-4 accent-[#C6FF00]"
+          />
+          <span>Active override</span>
+        </label>
+        <Input
+          value={value.city_slug}
+          onChange={(e) => onChange({ ...value, city_slug: e.target.value })}
+          className="w-40 bg-[#1A1A22] border-white/10 text-white"
+          data-testid="featured-live-music-city-slug"
+        />
+      </div>
+
+      <div className="mt-6 flex flex-wrap gap-3">
+        <Button
+          onClick={onSave}
+          disabled={saving}
+          className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white"
+          data-testid="featured-live-music-save"
+        >
+          {saving ? "Saving…" : "Save featured event"}
+        </Button>
+        <Button
+          variant="ghost"
+          onClick={() => onChange({ ...emptyFeaturedLiveMusic, city_slug: value.city_slug || "nashville" })}
+          className="text-white/70 hover:text-white hover:bg-white/5"
+          data-testid="featured-live-music-reset"
+        >
+          Reset form
+        </Button>
+        <Button
+          variant="ghost"
+          onClick={onDelete}
+          className="text-red-300 hover:text-red-200 hover:bg-red-500/10"
+          data-testid="featured-live-music-delete"
+        >
+          Clear featured event
+        </Button>
       </div>
     </div>
   );

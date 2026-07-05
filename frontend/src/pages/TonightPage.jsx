@@ -51,12 +51,14 @@ export default function TonightPage() {
         setItinerary(r.data);
         trackEvent("itinerary_view", { vibe, itinerary_id: r.data.id, city_slug: citySlug });
         const newIds = r.data.steps.map((s) => s.business.id);
-        const newEventIds = r.data.steps
-          .map((s) => s.event?.external_event_id || s.event?.id)
-          .filter(Boolean);
+        const liveMusicStep = r.data.steps.find((step) => step.slot === "entertainment");
+        const liveMusicEvent = liveMusicStep?.event;
+        const liveMusicEventId = liveMusicEvent?.external_event_id || liveMusicEvent?.id;
         setSeenIds(newIds);
-        if (liveMusicEventMode === "ticketmaster") {
-          setLastTicketmasterEventIds(newEventIds);
+        if (liveMusicEvent?.source === "ticketmaster" && liveMusicEventId) {
+          setLastTicketmasterEventIds([liveMusicEventId]);
+        } else if (liveMusicEventMode === "ticketmaster") {
+          setLastTicketmasterEventIds([]);
         }
       } catch (e) {
         setError(e?.response?.data?.detail || "Couldn't plan tonight. Try again.");
@@ -73,7 +75,7 @@ export default function TonightPage() {
     setSeenIds([]);
     setRefreshCount(0);
     setLastTicketmasterEventIds([]);
-    generate();
+    generate({ liveMusicEventMode: "ticketmaster_preferred" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [citySlug, vibe]);
 

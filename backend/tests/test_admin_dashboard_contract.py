@@ -1,4 +1,4 @@
-"""Source contract tests for admin itinerary bucket visibility."""
+"""Source contract tests for admin itinerary bucket and featured-event visibility."""
 import unittest
 from pathlib import Path
 
@@ -23,6 +23,20 @@ class TestAdminDashboardContract(unittest.TestCase):
     def test_admin_businesses_panel_renders_bucket_badges(self):
         self.assertIn("admin-itinerary-buckets-", ADMIN_PAGE_SOURCE)
         self.assertIn("ItineraryBucketBadge", ADMIN_PAGE_SOURCE)
+
+    def test_admin_featured_live_music_panel_renders_core_fields(self):
+        self.assertIn("Featured Live Music Event", ADMIN_PAGE_SOURCE)
+        self.assertIn('data-testid="admin-featured-live-music"', ADMIN_PAGE_SOURCE)
+        self.assertIn('data-testid="featured-live-music-title"', ADMIN_PAGE_SOURCE)
+        self.assertIn('data-testid="featured-live-music-venue-name"', ADMIN_PAGE_SOURCE)
+        self.assertIn('data-testid="featured-live-music-local-date"', ADMIN_PAGE_SOURCE)
+        self.assertIn('data-testid="featured-live-music-ticket-url"', ADMIN_PAGE_SOURCE)
+        self.assertIn('data-testid="featured-live-music-save"', ADMIN_PAGE_SOURCE)
+
+    def test_server_exposes_admin_featured_live_music_endpoints(self):
+        self.assertIn('@api_router.get("/admin/featured-events/live-music")', SERVER_SOURCE)
+        self.assertIn('@api_router.put("/admin/featured-events/live-music")', SERVER_SOURCE)
+        self.assertIn('@api_router.delete("/admin/featured-events/live-music/{event_id}")', SERVER_SOURCE)
 
 
 if __name__ == "__main__":

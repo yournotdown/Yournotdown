@@ -22,6 +22,13 @@ from google_places_photos import (
     fetch_google_places_photo,
     google_places_photo_media_url,
 )
+from featured_live_music import (
+    FEATURED_LIVE_MUSIC_SLOT,
+    active_featured_live_music_event,
+    featured_live_music_business,
+    featured_live_music_step_event,
+    normalize_live_music_event_mode,
+)
 from ticketmaster_events import (
     TicketmasterClient,
     api_sync_response,
@@ -254,6 +261,28 @@ class TicketmasterSyncPayload(BaseModel):
     days: int = Field(default=2, ge=1, le=7)
     apply: bool = False
     confirm: str = ""
+
+
+class AdminFeaturedLiveMusicEvent(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: Optional[str] = None
+    city_slug: str = "nashville"
+    active: bool = False
+    slot: str = FEATURED_LIVE_MUSIC_SLOT
+    title: str = ""
+    venue_name: str = ""
+    description: str = ""
+    local_date: str = ""
+    local_time: str = ""
+    active_from: str = ""
+    active_until: str = ""
+    image_url: str = ""
+    ticket_url: str = ""
+    cta_label: str = "Buy Tickets"
+    priority: int = 0
+    internal_notes: str = ""
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
 
 
 class LeadCreate(BaseModel):
@@ -552,6 +581,14 @@ async def _public_business(business_id: str) -> Optional[dict]:
     return eligible[0] if eligible else None
 
 
+async def _active_featured_live_music_event(city: str) -> Optional[dict]:
+    rows = await db.admin_featured_events.find(
+        {"city_slug": city, "slot": FEATURED_LIVE_MUSIC_SLOT},
+        {"_id": 0},
+    ).sort([("priority", -1), ("updated_at", -1)]).to_list(200)
+    return active_featured_live_music_event(rows, city)
+
+
 @api_router.post("/itinerary/generate")
 async def generate_itinerary(req: ItineraryRequest, request: Request):
     """Build a 4-step 'Tonight's Move' itinerary tuned to the user's mood."""
@@ -559,7 +596,8 @@ async def generate_itinerary(req: ItineraryRequest, request: Request):
     all_biz = await _public_businesses(req.city, limit=2000, require_slots=True, event_rows=event_rows)
     today_events_by_business = events_by_business_id(event_rows)
     eligible_music_events = eligible_ticketmaster_music_events(event_rows, all_biz)
-    live_music_event_mode = (req.live_music_event_mode or "normal").strip().lower()
+    live_music_event_mode = normalize_live_music_event_mode(req.live_music_event_mode)
+    featured_live_music = await _active_featured_live_music_event(req.city)
 
     by_slot: dict = {}
     for b in all_biz:
@@ -576,7 +614,10 @@ async def generate_itinerary(req: ItineraryRequest, request: Request):
         forced_event = None
         if label["slot"] == "entertainment":
             event_candidates = [business for business in candidates if business_supports_live_music_event(business)]
-            if live_music_event_mode == "ticketmaster":
+            if featured_live_music:
+                pick = featured_live_music_business(featured_live_music)
+                forced_event = featured_live_music_step_event(featured_live_music)
+            elif live_music_event_mode in {"ticketmaster", "ticketmaster_preferred"}:
                 pick, forced_event = itinerary_event_pick(
                     event_candidates,
                     eligible_music_events,
@@ -913,6 +954,42 @@ async def admin_list_businesses(imported_status: Optional[str] = None, user=Depe
     query = {"imported_status": imported_status} if imported_status else {}
     items = await db.businesses.find(query, {"_id": 0}).sort([("order", 1)]).to_list(5000)
     return annotate_itinerary_buckets(items)
+
+
+@api_router.get("/admin/featured-events/live-music")
+async def admin_get_featured_live_music_event(city: str = "nashville", user=Depends(require_admin)):
+    active = await _active_featured_live_music_event(city)
+    if active:
+        return active
+    fallback = await db.admin_featured_events.find_one(
+        {"city_slug": city, "slot": FEATURED_LIVE_MUSIC_SLOT},
+        {"_id": 0},
+        sort=[("updated_at", -1)],
+    )
+    return fallback or {}
+
+
+@api_router.put("/admin/featured-events/live-music")
+async def admin_save_featured_live_music_event(body: AdminFeaturedLiveMusicEvent, user=Depends(require_admin)):
+    timestamp = now_iso()
+    event_id = body.id or str(uuid.uuid4())
+    record = {
+        **body.model_dump(),
+        "id": event_id,
+        "slot": FEATURED_LIVE_MUSIC_SLOT,
+        "updated_at": timestamp,
+        "created_at": body.created_at or timestamp,
+    }
+    await db.admin_featured_events.update_one({"id": event_id}, {"$set": record}, upsert=True)
+    return record
+
+
+@api_router.delete("/admin/featured-events/live-music/{event_id}")
+async def admin_delete_featured_live_music_event(event_id: str, user=Depends(require_admin)):
+    result = await db.admin_featured_events.delete_one({"id": event_id, "slot": FEATURED_LIVE_MUSIC_SLOT})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Not found")
+    return {"ok": True}
 
 
 @api_router.post("/admin/businesses")

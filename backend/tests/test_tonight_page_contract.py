@@ -11,8 +11,14 @@ class TestTonightPageContract(unittest.TestCase):
     def test_another_night_posts_excluded_event_ids(self):
         self.assertIn("exclude_event_ids: excludeEventIds", TONIGHT_PAGE_SOURCE)
         self.assertIn("live_music_event_mode: liveMusicEventMode", TONIGHT_PAGE_SOURCE)
+        self.assertIn('const liveMusicStep = r.data.steps.find((step) => step.slot === "entertainment");', TONIGHT_PAGE_SOURCE)
+        self.assertIn("const liveMusicEvent = liveMusicStep?.event;", TONIGHT_PAGE_SOURCE)
+        self.assertIn("const liveMusicEventId = liveMusicEvent?.external_event_id || liveMusicEvent?.id;", TONIGHT_PAGE_SOURCE)
         self.assertIn("setSeenIds(newIds)", TONIGHT_PAGE_SOURCE)
-        self.assertIn("setLastTicketmasterEventIds(newEventIds)", TONIGHT_PAGE_SOURCE)
+        self.assertIn('if (liveMusicEvent?.source === "ticketmaster" && liveMusicEventId)', TONIGHT_PAGE_SOURCE)
+        self.assertIn("setLastTicketmasterEventIds([liveMusicEventId]);", TONIGHT_PAGE_SOURCE)
+        self.assertIn('} else if (liveMusicEventMode === "ticketmaster") {', TONIGHT_PAGE_SOURCE)
+        self.assertIn("setLastTicketmasterEventIds([]);", TONIGHT_PAGE_SOURCE)
         self.assertNotIn("new Set([...prev, ...newIds])", TONIGHT_PAGE_SOURCE)
         self.assertNotIn("new Set([...prev, ...newEventIds])", TONIGHT_PAGE_SOURCE)
 
@@ -21,6 +27,10 @@ class TestTonightPageContract(unittest.TestCase):
         self.assertIn("const nextRefreshCount = refreshCount + 1;", TONIGHT_PAGE_SOURCE)
         self.assertIn('const liveMusicEventMode = nextRefreshCount % 4 === 0 ? "ticketmaster" : "normal";', TONIGHT_PAGE_SOURCE)
         self.assertIn('excludeEventIds: liveMusicEventMode === "ticketmaster" ? lastTicketmasterEventIds : [],', TONIGHT_PAGE_SOURCE)
+
+    def test_first_load_requests_ticketmaster_preferred_mode(self):
+        self.assertIn('generate({ liveMusicEventMode: "ticketmaster_preferred" });', TONIGHT_PAGE_SOURCE)
+        self.assertIn('if (liveMusicEvent?.source === "ticketmaster" && liveMusicEventId)', TONIGHT_PAGE_SOURCE)
 
     def test_live_music_step_renders_event_details_inline(self):
         self.assertIn("Tonight: {event.title}", TONIGHT_PAGE_SOURCE)
