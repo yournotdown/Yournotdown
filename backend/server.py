@@ -32,6 +32,7 @@ from ticketmaster_events import (
     event_upsert,
     events_by_business_id,
     expiration_cleanup_query,
+    itinerary_live_music_events,
     local_today,
     supported_city_config,
     validate_apply_confirmation,
@@ -582,6 +583,7 @@ async def generate_itinerary(req: ItineraryRequest, request: Request):
         "vibe": req.vibe,
         "city": req.city,
         "steps": steps,
+        "live_music_events": itinerary_live_music_events(event_rows),
         "generated_at": now_iso(),
     }
 

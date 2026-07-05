@@ -28,6 +28,8 @@ Investigated user-facing event paths and root causes:
 - `Tomato Art Fest` is currently coming from legacy seeded business data migrated from the removed `events` category into `night-out`, not from Ticketmaster.
 - no reliable structured field currently distinguishes those rows from normal public business/venue rows after import and category migration; generic suppression will require schema/data cleanup rather than name matching.
 - no static frontend fixtures or prompt text were found to be injecting those names into the public experience; the leakage was from public business catalog reads.
+- the actual public Tonight product surface is `/:citySlug/tonight?vibe=...`, which calls only `POST /api/itinerary/generate` plus the same call again for the “Another Night” refresh flow.
+- `CategoryDetailPage.jsx` is still publicly routed at `/:citySlug/c/:slug`, but it is not the real Tonight flow and should not be treated as the primary event-surfacing path.
 
 Verified production platform state still preserved:
 - `www.yournotdown.com` works on the Railway frontend
@@ -69,6 +71,8 @@ Latest local patch state:
 - updated Live Music business cards and Tonight’s Move cards to show event title, show date/time, and a `Buy Tickets` button when `ticket_url` exists
 - removed the temporary name-based suppression for event-like business rows because it was not generic or data-driven enough to keep
 - identified follow-up schema/data work still needed if those rows should be hidden from today/tonight public business discovery without relying on names
+- added `live_music_events` to the itinerary response so Tonight’s Move can render all eligible Ticketmaster events for tonight independently of which 3-4 step venues were selected
+- updated `frontend/src/pages/TonightPage.jsx` to render a dedicated Live Music section from `itinerary.live_music_events`, so Exit/In / The Basement East style matched Ticketmaster events show even when the itinerary picked different venues
 - kept the safe Ticketmaster alias `Ole Red - Nashville` -> `Ole Red`
 - did not add First Horizon Park itinerary matching
 - did not add broad aliases for venues missing approved business records
@@ -95,6 +99,7 @@ Before this cron-entrypoint update, the repo had local-only tooling prepared for
 Verification completed in this local patching session:
 - `python3 -m unittest backend.tests.test_ticketmaster_events_unit backend.tests.test_city_events_filtering_contract` passed (`45` tests)
 - Python AST parse check passed for `backend/server.py` and `backend/ticketmaster_events.py`
+- after the Tonight-flow patch, `python3 -m unittest backend.tests.test_ticketmaster_events_unit backend.tests.test_city_events_filtering_contract` passed again (`49` tests)
 
 Unverified in this local patching session:
 - frontend Jest was not runnable locally because workspace JS dependencies are not installed and `craco` is unavailable on PATH

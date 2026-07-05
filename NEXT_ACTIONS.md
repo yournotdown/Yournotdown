@@ -1,10 +1,10 @@
 ## Top 5 Next Tasks
 
 1. Manually verify the patched public event surfaces with real data:
-   - `/api/businesses?category=live-music&city=nashville`
-   - `/api/businesses?category=night-out&city=nashville`
-   - `/api/events/today?city=nashville`
    - `/api/itinerary/generate`
+   - `/api/events/today?city=nashville`
+   - `/:citySlug/tonight?vibe=send-it`
+   - the “Another Night” refresh flow on the Tonight page
 2. Confirm the Live Music UI now renders matched Ticketmaster event title, show date/time, and `Buy Tickets` CTA on the correct venue cards.
 3. Define and implement a schema/data cleanup for event-like catalog rows so future public suppression can be generic and data-driven instead of name-based.
 4. If frontend regression testing is needed locally, install the frontend JS dependencies first so `craco test` can run; current workspace does not have `craco` available.

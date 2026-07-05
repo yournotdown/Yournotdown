@@ -176,6 +176,14 @@ def eligible_city_events(events: Iterable[dict], city_slug: str, now: Optional[d
     ]
 
 
+def itinerary_live_music_events(events: Iterable[dict]) -> list[dict]:
+    return [
+        dict(event)
+        for event in sorted(events, key=lambda row: (row.get("starts_at") or "", row.get("local_time") or "", row.get("title") or ""))
+        if normalized_event_status(event.get("source", "")) == TICKETMASTER_SOURCE
+    ]
+
+
 def ticketmaster_event_document(event: dict, city_slug: str, businesses: Iterable[dict],
                                 synced_at: Optional[str] = None) -> dict:
     embedded = event.get("_embedded") or {}

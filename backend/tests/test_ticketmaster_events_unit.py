@@ -32,6 +32,7 @@ from ticketmaster_events import (  # noqa: E402
     event_is_on_local_date,
     events_by_business_id,
     expiration_cleanup_query,
+    itinerary_live_music_events,
     match_business_for_venue,
     normalize_venue_name,
     require_apply_approval,
@@ -261,6 +262,22 @@ class TestDates(unittest.TestCase):
             grace_minutes=60,
         )
         self.assertEqual([row["title"] for row in filtered], ["Future", "No Time"])
+
+    def test_itinerary_live_music_events_keep_only_ticketmaster_rows(self):
+        rows = [
+            {"title": "Partner Event", "source": "partner", "starts_at": "2026-06-01T23:00:00Z"},
+            {"title": "Early Show", "source": "ticketmaster", "starts_at": "2026-06-01T22:00:00Z", "local_time": "17:00:00"},
+            {"title": "Late Show", "source": "ticketmaster", "starts_at": "2026-06-02T01:00:00Z", "local_time": "20:00:00"},
+        ]
+        events = itinerary_live_music_events(rows)
+        self.assertEqual([row["title"] for row in events], ["Early Show", "Late Show"])
+
+    def test_itinerary_live_music_events_empty_when_no_eligible_ticketmaster_rows(self):
+        self.assertEqual(itinerary_live_music_events([]), [])
+        self.assertEqual(
+            itinerary_live_music_events([{"title": "Partner Event", "source": "partner"}]),
+            [],
+        )
 
 
 class TestItineraryAttachment(unittest.TestCase):

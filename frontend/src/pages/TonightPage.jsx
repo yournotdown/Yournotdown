@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Phone, Navigation, Globe, RotateCw, ExternalLink } from "lucide-react";
 import { api, formatEventSchedule, trackEvent, resolveImageUrl } from "../lib/api";
 import { activeCitySlug, cityPath } from "../lib/cities";
+import EventCard from "../components/EventCard";
 
 const VIBE_LABELS = {
   "just-vibing": { emoji: "😇", label: "Take It Easy" },
@@ -167,16 +168,19 @@ export default function TonightPage() {
                   The catalog's thin. Pick a different vibe.
                 </div>
               ) : (
-                itinerary.steps.map((step, idx) => (
-                  <StepCard
-                    key={`${itinerary.id}-${step.slot}`}
-                    step={step}
-                    idx={idx}
-                    total={itinerary.steps.length}
-                    onAction={handleAction}
-                    directionsUrl={directionsUrl}
-                  />
-                ))
+                <>
+                  {itinerary.steps.map((step, idx) => (
+                    <StepCard
+                      key={`${itinerary.id}-${step.slot}`}
+                      step={step}
+                      idx={idx}
+                      total={itinerary.steps.length}
+                      onAction={handleAction}
+                      directionsUrl={directionsUrl}
+                    />
+                  ))}
+                  <LiveMusicSection events={itinerary.live_music_events || []} />
+                </>
               )}
             </motion.div>
           </AnimatePresence>
@@ -231,6 +235,33 @@ export default function TonightPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+function LiveMusicSection({ events }) {
+  return (
+    <section className="border-t border-white/10 py-8 sm:py-10" data-testid="tonight-live-music-section">
+      <div className="text-[10px] uppercase tracking-[0.3em] text-[#C6FF00]">
+        Live Music
+      </div>
+      <h2
+        className="mt-2 font-flyer uppercase text-white leading-[0.9]"
+        style={{ fontSize: "clamp(1.8rem, 6vw, 3.75rem)" }}
+      >
+        Tonight's Shows<span className="lime-dot">.</span>
+      </h2>
+      {events.length === 0 ? (
+        <p className="mt-4 text-sm text-white/60" data-testid="tonight-live-music-empty">
+          No eligible Ticketmaster shows listed for tonight.
+        </p>
+      ) : (
+        <div className="mt-6 space-y-4">
+          {events.map((event, index) => (
+            <EventCard key={event.id || event.external_event_id} event={event} index={index} />
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 

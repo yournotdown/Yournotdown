@@ -36,6 +36,7 @@ class TestCityEventsFilteringContract(unittest.TestCase):
         self.assertIn("event_rows = await _today_city_events(req.city)", source)
         self.assertIn("all_biz = await _public_businesses(req.city, limit=2000, require_slots=True, event_rows=event_rows)", source)
         self.assertIn("today_events_by_business = events_by_business_id(event_rows)", source)
+        self.assertIn('"live_music_events": itinerary_live_music_events(event_rows)', source)
 
 
 if __name__ == "__main__":
