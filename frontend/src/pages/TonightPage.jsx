@@ -2,9 +2,8 @@ import { useEffect, useState, useCallback } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Phone, Navigation, Globe, RotateCw, ExternalLink } from "lucide-react";
-import { api, formatEventSchedule, trackEvent, resolveImageUrl } from "../lib/api";
+import { api, formatEventTime, trackEvent, resolveImageUrl } from "../lib/api";
 import { activeCitySlug, cityPath } from "../lib/cities";
-import EventCard from "../components/EventCard";
 
 const VIBE_LABELS = {
   "just-vibing": { emoji: "😇", label: "Take It Easy" },
@@ -34,21 +33,27 @@ export default function TonightPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [seenIds, setSeenIds] = useState([]);
+  const [seenEventIds, setSeenEventIds] = useState([]);
   const [regenerating, setRegenerating] = useState(false);
 
   const generate = useCallback(
-    async (excludeIds = []) => {
+    async (excludeIds = [], excludeEventIds = []) => {
       setError(null);
       try {
         const r = await api.post("/itinerary/generate", {
           vibe,
           city: citySlug,
           exclude_ids: excludeIds,
+          exclude_event_ids: excludeEventIds,
         });
         setItinerary(r.data);
         trackEvent("itinerary_view", { vibe, itinerary_id: r.data.id, city_slug: citySlug });
         const newIds = r.data.steps.map((s) => s.business.id);
+        const newEventIds = r.data.steps
+          .map((s) => s.event?.external_event_id || s.event?.id)
+          .filter(Boolean);
         setSeenIds((prev) => Array.from(new Set([...prev, ...newIds])));
+        setSeenEventIds((prev) => Array.from(new Set([...prev, ...newEventIds])));
       } catch (e) {
         setError(e?.response?.data?.detail || "Couldn't plan tonight. Try again.");
       } finally {
@@ -62,6 +67,7 @@ export default function TonightPage() {
   useEffect(() => {
     setLoading(true);
     setSeenIds([]);
+    setSeenEventIds([]);
     generate([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [citySlug, vibe]);
@@ -69,7 +75,7 @@ export default function TonightPage() {
   const handleAnother = () => {
     setRegenerating(true);
     trackEvent("another_night_click", { vibe, city_slug: citySlug });
-    generate(seenIds);
+    generate(seenIds, seenEventIds);
   };
 
   const directionsUrl = (b) => {
@@ -168,19 +174,16 @@ export default function TonightPage() {
                   The catalog's thin. Pick a different vibe.
                 </div>
               ) : (
-                <>
-                  {itinerary.steps.map((step, idx) => (
-                    <StepCard
-                      key={`${itinerary.id}-${step.slot}`}
-                      step={step}
-                      idx={idx}
-                      total={itinerary.steps.length}
-                      onAction={handleAction}
-                      directionsUrl={directionsUrl}
-                    />
-                  ))}
-                  <LiveMusicSection events={itinerary.live_music_events || []} />
-                </>
+                itinerary.steps.map((step, idx) => (
+                  <StepCard
+                    key={`${itinerary.id}-${step.slot}`}
+                    step={step}
+                    idx={idx}
+                    total={itinerary.steps.length}
+                    onAction={handleAction}
+                    directionsUrl={directionsUrl}
+                  />
+                ))
               )}
             </motion.div>
           </AnimatePresence>
@@ -238,41 +241,14 @@ export default function TonightPage() {
   );
 }
 
-function LiveMusicSection({ events }) {
-  return (
-    <section className="border-t border-white/10 py-8 sm:py-10" data-testid="tonight-live-music-section">
-      <div className="text-[10px] uppercase tracking-[0.3em] text-[#C6FF00]">
-        Live Music
-      </div>
-      <h2
-        className="mt-2 font-flyer uppercase text-white leading-[0.9]"
-        style={{ fontSize: "clamp(1.8rem, 6vw, 3.75rem)" }}
-      >
-        Tonight's Shows<span className="lime-dot">.</span>
-      </h2>
-      {events.length === 0 ? (
-        <p className="mt-4 text-sm text-white/60" data-testid="tonight-live-music-empty">
-          No eligible Ticketmaster shows listed for tonight.
-        </p>
-      ) : (
-        <div className="mt-6 space-y-4">
-          {events.map((event, index) => (
-            <EventCard key={event.id || event.external_event_id} event={event} index={index} />
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
-
 function StepCard({ step, idx, total, onAction, directionsUrl }) {
   const b = step.business;
   const event = step.event;
-  const imageUrl = event?.image_url || resolveImageUrl(b);
+  const imageUrl = resolveImageUrl(b) || event?.image_url;
   const sponsored = b.sponsor_tier && b.sponsor_tier !== "none";
   const title = SLOT_TITLES[step.slot] || step.label.toUpperCase();
   const number = String(idx + 1).padStart(2, "0");
-  const eventSchedule = formatEventSchedule(event);
+  const eventTime = formatEventTime(event?.local_time);
 
   return (
     <motion.section
@@ -338,7 +314,7 @@ function StepCard({ step, idx, total, onAction, directionsUrl }) {
             Tonight: {event.title}
           </div>
           <div className="mt-1 text-xs uppercase tracking-[0.18em] text-white/55">
-            {[eventSchedule, event.venue_name].filter(Boolean).join(" · ")}
+            {[eventTime, event.venue_name || b.name].filter(Boolean).join(" · ")}
           </div>
         </div>
       )}

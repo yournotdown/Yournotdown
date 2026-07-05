@@ -26,13 +26,15 @@ from ticketmaster_events import (
     TicketmasterClient,
     api_sync_response,
     attach_event_to_step,
+    business_supports_live_music_event,
     date_range_sync_report,
     eligible_public_businesses,
     eligible_city_events,
+    eligible_ticketmaster_music_events,
     event_upsert,
     events_by_business_id,
     expiration_cleanup_query,
-    itinerary_live_music_events,
+    itinerary_event_pick,
     local_today,
     supported_city_config,
     validate_apply_confirmation,
@@ -463,6 +465,7 @@ class ItineraryRequest(BaseModel):
     vibe: Optional[str] = None
     city: str = "nashville"
     exclude_ids: List[str] = Field(default_factory=list)
+    exclude_event_ids: List[str] = Field(default_factory=list)
 
 
 def _relevance_score(business: dict, vibe: Optional[str]) -> float:
@@ -553,6 +556,7 @@ async def generate_itinerary(req: ItineraryRequest, request: Request):
     event_rows = await _today_city_events(req.city)
     all_biz = await _public_businesses(req.city, limit=2000, require_slots=True, event_rows=event_rows)
     today_events_by_business = events_by_business_id(event_rows)
+    eligible_music_events = eligible_ticketmaster_music_events(event_rows, all_biz)
 
     by_slot: dict = {}
     for b in all_biz:
@@ -560,11 +564,25 @@ async def generate_itinerary(req: ItineraryRequest, request: Request):
             by_slot.setdefault(slot, []).append(b)
 
     exclude = set(req.exclude_ids)
+    exclude_event_ids = set(req.exclude_event_ids)
     chosen_ids: set = set()
     steps = []
     for label in SLOT_LABELS:
         candidates = by_slot.get(label["slot"], [])
-        pick = _weighted_pick(candidates, exclude | chosen_ids, req.vibe)
+        pick = None
+        forced_event = None
+        if label["slot"] == "entertainment":
+            event_candidates = [business for business in candidates if business_supports_live_music_event(business)]
+            pick, forced_event = itinerary_event_pick(
+                event_candidates,
+                eligible_music_events,
+                exclude | chosen_ids,
+                exclude_event_ids,
+            )
+            if not pick:
+                pick = _weighted_pick(event_candidates or candidates, exclude | chosen_ids, req.vibe)
+        elif not pick:
+            pick = _weighted_pick(candidates, exclude | chosen_ids, req.vibe)
         if pick:
             chosen_ids.add(pick["id"])
             step = {
@@ -575,7 +593,10 @@ async def generate_itinerary(req: ItineraryRequest, request: Request):
                 "business": pick,
                 "relevance_score": round(_relevance_score(pick, req.vibe), 2),
             }
-            steps.append(attach_event_to_step(step, today_events_by_business))
+            if forced_event:
+                steps.append({**step, "event": forced_event})
+            else:
+                steps.append(attach_event_to_step(step, today_events_by_business))
 
     itin_id = str(uuid.uuid4())
     itinerary = {
@@ -583,7 +604,6 @@ async def generate_itinerary(req: ItineraryRequest, request: Request):
         "vibe": req.vibe,
         "city": req.city,
         "steps": steps,
-        "live_music_events": itinerary_live_music_events(event_rows),
         "generated_at": now_iso(),
     }
 

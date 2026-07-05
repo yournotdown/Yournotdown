@@ -36,6 +36,7 @@ VENUE_ALIASES = {
 }
 EXCLUDED_EVENT_STATUSES = {"cancelled", "canceled", "offsale"}
 DEFAULT_EVENT_START_GRACE_MINUTES = max(0, int(os.environ.get("EVENT_START_GRACE_MINUTES", "60")))
+MUSIC_CLASSIFICATION_SEGMENT = "music"
 
 
 def now_iso() -> str:
@@ -104,6 +105,14 @@ def events_by_business_id(events: Iterable[dict]) -> dict[str, dict]:
         if business_id and business_id not in by_business:
             by_business[business_id] = event
     return by_business
+
+
+def businesses_by_id(businesses: Iterable[dict]) -> dict[str, dict]:
+    return {
+        business.get("id"): business
+        for business in businesses
+        if business.get("id")
+    }
 
 
 def attach_event_to_step(step: dict, events: dict[str, dict]) -> dict:
@@ -176,12 +185,67 @@ def eligible_city_events(events: Iterable[dict], city_slug: str, now: Optional[d
     ]
 
 
-def itinerary_live_music_events(events: Iterable[dict]) -> list[dict]:
+def event_classification_segment(event: dict) -> str:
+    return normalized_event_status(event.get("classification_segment", ""))
+
+
+def event_classification_genre(event: dict) -> str:
+    return normalized_event_status(event.get("classification_genre", ""))
+
+
+def event_classification_subgenre(event: dict) -> str:
+    return normalized_event_status(event.get("classification_subgenre", ""))
+
+
+def business_supports_live_music_event(business: dict) -> bool:
+    slots = set(business.get("slots") or [])
+    tags = set(business.get("tags") or [])
+    return (
+        business.get("category_slug") == "live-music"
+        or "live_music" in tags
+        or "concerts" in tags
+        or ("entertainment" in slots and "live_music" in tags)
+    )
+
+
+def event_is_ticketmaster_music(event: dict, business: Optional[dict] = None) -> bool:
+    if normalized_event_status(event.get("source", "")) != TICKETMASTER_SOURCE:
+        return False
+
+    segment = event_classification_segment(event)
+    if segment:
+        return segment == MUSIC_CLASSIFICATION_SEGMENT
+
+    return bool(business and business_supports_live_music_event(business))
+
+
+def eligible_ticketmaster_music_events(events: Iterable[dict], businesses: Iterable[dict]) -> list[dict]:
+    business_lookup = businesses_by_id(businesses)
     return [
         dict(event)
         for event in sorted(events, key=lambda row: (row.get("starts_at") or "", row.get("local_time") or "", row.get("title") or ""))
-        if normalized_event_status(event.get("source", "")) == TICKETMASTER_SOURCE
+        if event_is_ticketmaster_music(event, business_lookup.get(event.get("venue_business_id")))
     ]
+
+
+def itinerary_event_pick(candidates: Iterable[dict], events: Iterable[dict], exclude_business_ids: set[str],
+                         exclude_event_ids: set[str]) -> tuple[Optional[dict], Optional[dict]]:
+    candidate_list = list(candidates)
+    event_lookup = events_by_business_id(events)
+    for business in candidate_list:
+        event = event_lookup.get(business.get("id"))
+        if not event:
+            continue
+        event_id = event.get("external_event_id") or event.get("id")
+        if business.get("id") in exclude_business_ids or event_id in exclude_event_ids:
+            continue
+        return business, event
+    return None, None
+
+
+def primary_classification(event: dict) -> dict:
+    classifications = event.get("classifications") or []
+    return classifications[0] if classifications else {}
 
 
 def ticketmaster_event_document(event: dict, city_slug: str, businesses: Iterable[dict],
@@ -190,6 +254,7 @@ def ticketmaster_event_document(event: dict, city_slug: str, businesses: Iterabl
     venue = ((embedded.get("venues") or [{}])[0]) or {}
     venue_name = canonical_venue_name(venue.get("name", ""))
     start = event.get("dates", {}).get("start", {}) or {}
+    classification = primary_classification(event)
     matched_business = match_business_for_venue(venue_name, businesses)
     timestamp = synced_at or now_iso()
     return {
@@ -211,6 +276,9 @@ def ticketmaster_event_document(event: dict, city_slug: str, businesses: Iterabl
         "ticket_url": event.get("url", ""),
         "image_url": select_event_image(event.get("images") or []),
         "status": (event.get("dates", {}).get("status") or {}).get("code", ""),
+        "classification_segment": ((classification.get("segment") or {}).get("name")) or "",
+        "classification_genre": ((classification.get("genre") or {}).get("name")) or "",
+        "classification_subgenre": ((classification.get("subGenre") or {}).get("name")) or "",
         "created_at": timestamp,
         "updated_at": timestamp,
     }

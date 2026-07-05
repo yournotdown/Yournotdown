@@ -67,12 +67,15 @@ Latest local patch state:
 - kept `local_time == null` events eligible for now unless status is excluded
 - added shared public business filtering so `/api/businesses`, `/api/businesses/{id}`, and itinerary generation all use the same today/tonight event context
 - attached matched `city_events` onto public business responses as `event`, preserving `title`, `venue_name`, `local_date`, `local_time`, `ticket_url`, and `venue_business_id`
-- updated the Live Music category UI to derive “Tonight’s Shows” from matched venue events instead of a separate city-wide `/events/today` fetch
-- updated Live Music business cards and Tonight’s Move cards to show event title, show date/time, and a `Buy Tickets` button when `ticket_url` exists
+- updated Tonight’s Move step cards to show attached event title, formatted show time, and a `Buy Tickets` button when `ticket_url` exists
 - removed the temporary name-based suppression for event-like business rows because it was not generic or data-driven enough to keep
 - identified follow-up schema/data work still needed if those rows should be hidden from today/tonight public business discovery without relying on names
-- added `live_music_events` to the itinerary response so Tonight’s Move can render all eligible Ticketmaster events for tonight independently of which 3-4 step venues were selected
-- updated `frontend/src/pages/TonightPage.jsx` to render a dedicated Live Music section from `itinerary.live_music_events`, so Exit/In / The Basement East style matched Ticketmaster events show even when the itinerary picked different venues
+- removed the standalone Tonight page “Live Music / Tonight’s Shows” section after confirming it was the wrong product surface
+- updated itinerary generation so the numbered `LIVE MUSIC` step now prefers eligible Ticketmaster music events only, using Ticketmaster `classification_segment == Music` when present and falling back to approved live-music venue metadata when older synced rows lack stored classifications
+- excluded sports/baseball Ticketmaster rows from the numbered `LIVE MUSIC` step
+- updated “Another Night” to send `exclude_event_ids` so Ticketmaster-backed live-music steps can rotate to a different eligible show when available
+- kept the numbered `LIVE MUSIC` step pinned to normal live-music venues when no eligible Ticketmaster music event exists, instead of falling through to arbitrary non-music entertainment businesses
+- updated the Tonight step hero image preference to use the matched venue/business image first and the event image only as fallback
 - kept the safe Ticketmaster alias `Ole Red - Nashville` -> `Ole Red`
 - did not add First Horizon Park itinerary matching
 - did not add broad aliases for venues missing approved business records
@@ -82,7 +85,7 @@ Latest local patch state:
 
 The immediate focus has shifted from cron verification to customer-facing event correctness:
 1. verify the patched `/api/businesses`, `/api/businesses/{id}`, `/api/events/today`, and `/api/itinerary/generate` behavior against the real local/prod-like data shape
-2. confirm the Live Music page now shows matched venue events, show times, and Ticketmaster purchase CTAs instead of generic city-wide events
+2. confirm the numbered `LIVE MUSIC` step on `/:citySlug/tonight?vibe=...` now shows matched Ticketmaster music events, formatted show times, and Ticketmaster purchase CTAs without a separate standalone shows section
 3. design a schema/data cleanup for event-like business rows so today/tonight public suppression can become generic and data-driven without relying on business names
 4. keep `First Horizon Park` and `Grand Ole Opry House` intentionally unmatched unless approved business records or rules change
 5. after event-surface verification, return to the backend-local cron entrypoint validation and later Railway cron service creation only after Blake approves that infra step
@@ -100,6 +103,7 @@ Verification completed in this local patching session:
 - `python3 -m unittest backend.tests.test_ticketmaster_events_unit backend.tests.test_city_events_filtering_contract` passed (`45` tests)
 - Python AST parse check passed for `backend/server.py` and `backend/ticketmaster_events.py`
 - after the Tonight-flow patch, `python3 -m unittest backend.tests.test_ticketmaster_events_unit backend.tests.test_city_events_filtering_contract` passed again (`49` tests)
+- after the Live Music step correction, `python3 -m unittest backend.tests.test_ticketmaster_events_unit backend.tests.test_city_events_filtering_contract backend.tests.test_tonight_page_contract` passed (`57` tests)
 
 Unverified in this local patching session:
 - frontend Jest was not runnable locally because workspace JS dependencies are not installed and `craco` is unavailable on PATH

@@ -26,13 +26,15 @@ from ticketmaster_events import (  # noqa: E402
     dry_run_sync,
     eligible_public_businesses,
     eligible_city_events,
+    eligible_ticketmaster_music_events,
+    event_is_ticketmaster_music,
     event_upsert,
     event_has_excluded_status,
     event_is_eligible,
     event_is_on_local_date,
     events_by_business_id,
     expiration_cleanup_query,
-    itinerary_live_music_events,
+    itinerary_event_pick,
     match_business_for_venue,
     normalize_venue_name,
     require_apply_approval,
@@ -102,7 +104,22 @@ class TestMatching(unittest.TestCase):
         self.assertEqual(document["local_date"], "2026-06-01")
         self.assertEqual(document["local_time"], "19:00:00")
         self.assertEqual(document["image_url"], "https://example.com/hero.jpg")
+        self.assertEqual(document["classification_segment"], "")
         self.assertEqual(document["updated_at"], "2026-06-01T12:00:00+00:00")
+
+    def test_document_stores_ticketmaster_classification_fields(self):
+        document = ticketmaster_event_document(
+            event(classifications=[{
+                "segment": {"name": "Music"},
+                "genre": {"name": "Rock"},
+                "subGenre": {"name": "Alternative Rock"},
+            }]),
+            "nashville",
+            [],
+        )
+        self.assertEqual(document["classification_segment"], "Music")
+        self.assertEqual(document["classification_genre"], "Rock")
+        self.assertEqual(document["classification_subgenre"], "Alternative Rock")
 
     def test_document_stores_canonical_venue_alias(self):
         document = ticketmaster_event_document(
@@ -263,21 +280,48 @@ class TestDates(unittest.TestCase):
         )
         self.assertEqual([row["title"] for row in filtered], ["Future", "No Time"])
 
-    def test_itinerary_live_music_events_keep_only_ticketmaster_rows(self):
+    def test_ticketmaster_music_events_require_music_segment_when_present(self):
+        businesses = [{"id": "venue", "name": "Exit/In", "slots": ["entertainment"], "category_slug": "live-music"}]
         rows = [
-            {"title": "Partner Event", "source": "partner", "starts_at": "2026-06-01T23:00:00Z"},
-            {"title": "Early Show", "source": "ticketmaster", "starts_at": "2026-06-01T22:00:00Z", "local_time": "17:00:00"},
-            {"title": "Late Show", "source": "ticketmaster", "starts_at": "2026-06-02T01:00:00Z", "local_time": "20:00:00"},
+            {"title": "Ballgame", "source": "ticketmaster", "classification_segment": "Sports", "venue_business_id": "venue"},
+            {"title": "Concert", "source": "ticketmaster", "classification_segment": "Music", "venue_business_id": "venue"},
         ]
-        events = itinerary_live_music_events(rows)
-        self.assertEqual([row["title"] for row in events], ["Early Show", "Late Show"])
+        events = eligible_ticketmaster_music_events(rows, businesses)
+        self.assertEqual([row["title"] for row in events], ["Concert"])
 
-    def test_itinerary_live_music_events_empty_when_no_eligible_ticketmaster_rows(self):
-        self.assertEqual(itinerary_live_music_events([]), [])
-        self.assertEqual(
-            itinerary_live_music_events([{"title": "Partner Event", "source": "partner"}]),
-            [],
-        )
+    def test_ticketmaster_music_events_fallback_to_live_music_business_when_classification_missing(self):
+        businesses = [
+            {"id": "music-venue", "name": "Exit/In", "slots": ["entertainment"], "category_slug": "live-music"},
+            {"id": "sports-venue", "name": "First Horizon Park", "slots": ["late-night"], "category_slug": "night-out"},
+        ]
+        rows = [
+            {"title": "Indie Show", "source": "ticketmaster", "venue_business_id": "music-venue"},
+            {"title": "Baseball", "source": "ticketmaster", "venue_business_id": "sports-venue"},
+        ]
+        events = eligible_ticketmaster_music_events(rows, businesses)
+        self.assertEqual([row["title"] for row in events], ["Indie Show"])
+
+    def test_event_is_ticketmaster_music_rejects_non_ticketmaster_rows(self):
+        business = {"id": "venue", "slots": ["entertainment"], "category_slug": "live-music"}
+        self.assertFalse(event_is_ticketmaster_music({"source": "partner"}, business))
+
+    def test_itinerary_event_pick_respects_excluded_event_ids(self):
+        businesses = [
+            {"id": "exit", "name": "Exit/In"},
+            {"id": "basement", "name": "The Basement East"},
+        ]
+        events = [
+            {"title": "First Show", "venue_business_id": "exit", "external_event_id": "event-1"},
+            {"title": "Second Show", "venue_business_id": "basement", "external_event_id": "event-2"},
+        ]
+        business, event_row = itinerary_event_pick(businesses, events, {"none"}, {"event-1"})
+        self.assertEqual(business["id"], "basement")
+        self.assertEqual(event_row["external_event_id"], "event-2")
+
+    def test_itinerary_event_pick_returns_none_when_no_candidate_available(self):
+        business, event_row = itinerary_event_pick([], [], set(), set())
+        self.assertIsNone(business)
+        self.assertIsNone(event_row)
 
 
 class TestItineraryAttachment(unittest.TestCase):
@@ -323,6 +367,14 @@ class TestItineraryAttachment(unittest.TestCase):
         events = [{"id": "event-1", "venue_business_id": "music-corner", "title": "Sunday Show"}]
         visible = eligible_public_businesses(businesses, events)
         self.assertEqual(visible[0]["event"]["title"], "Sunday Show")
+
+    def test_live_music_fallback_rejects_generic_entertainment_only_business(self):
+        self.assertFalse(
+            event_is_ticketmaster_music(
+                {"source": "ticketmaster", "venue_business_id": "family-option"},
+                {"id": "family-option", "slots": ["entertainment"], "category_slug": "family-fun", "tags": []},
+            )
+        )
 
 
 class TestClient(unittest.TestCase):

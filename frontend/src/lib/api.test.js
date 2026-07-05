@@ -4,7 +4,7 @@ jest.mock("axios", () => ({
   })),
 }));
 
-import { API, formatEventSchedule, matchedEventsForBusinesses, resolveImageUrl } from "./api";
+import { API, formatEventSchedule, formatEventTime, matchedEventsForBusinesses, resolveImageUrl } from "./api";
 
 describe("resolveImageUrl", () => {
   test("prefers uploaded image paths", () => {
@@ -38,6 +38,11 @@ describe("event helpers", () => {
     expect(formatEventSchedule({ local_date: "2026-07-05", local_time: "19:30:00" }))
       .toBe("2026-07-05 · 19:30:00");
     expect(formatEventSchedule({ local_date: "2026-07-05" })).toBe("2026-07-05");
+  });
+
+  test("formats event time for Tonight step cards", () => {
+    expect(formatEventTime("18:05:00")).toBe("6:05 PM");
+    expect(formatEventTime("00:15:00")).toBe("12:15 AM");
   });
 
   test("collects unique matched events from businesses", () => {

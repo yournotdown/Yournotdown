@@ -37,6 +37,19 @@ export const formatEventSchedule = (event) => {
   return [event.local_date, event.local_time].filter(Boolean).join(" · ");
 };
 
+export const formatEventTime = (value) => {
+  if (!value) return "";
+  const [hourText = "0", minuteText = "00"] = String(value).split(":");
+  const hour = Number(hourText);
+  const minute = Number(minuteText);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) {
+    return value;
+  }
+  const suffix = hour >= 12 ? "PM" : "AM";
+  const normalizedHour = hour % 12 || 12;
+  return `${normalizedHour}:${String(minute).padStart(2, "0")} ${suffix}`;
+};
+
 export const matchedEventsForBusinesses = (businesses = []) => {
   const seen = new Set();
   return businesses
