@@ -1,7 +1,10 @@
 import { motion } from "framer-motion";
 import { Clock, ExternalLink, MapPin } from "lucide-react";
+import { formatEventSchedule } from "../lib/api";
 
 export default function EventCard({ event, index }) {
+  const schedule = formatEventSchedule(event);
+
   return (
     <motion.article
       initial={{ opacity: 0, y: 20 }}
@@ -40,10 +43,10 @@ export default function EventCard({ event, index }) {
               <span>{event.venue_name}</span>
             </div>
           )}
-          {event.local_time && (
+          {schedule && (
             <div className="flex items-center gap-2">
               <Clock className="w-3.5 h-3.5 text-[#C6FF00]" />
-              <span>{event.local_time}</span>
+              <span>{schedule}</span>
             </div>
           )}
         </div>
@@ -56,7 +59,7 @@ export default function EventCard({ event, index }) {
             className="mt-5 inline-flex items-center gap-2 bg-[#C6FF00] px-4 py-3 text-[10px] font-bold uppercase tracking-[0.22em] text-black transition-colors hover:bg-white active:scale-95"
             data-testid={`event-tickets-${event.id || event.external_event_id}`}
           >
-            Tickets
+            Buy Tickets
             <ExternalLink className="w-3.5 h-3.5" />
           </a>
         )}

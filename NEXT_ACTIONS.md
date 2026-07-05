@@ -1,13 +1,18 @@
 ## Top 5 Next Tasks
 
-1. Run local syntax checks and backend unit tests for the new `backend/ticketmaster_sync_job.py` cron entrypoint plus the existing Ticketmaster helper coverage.
-2. After Blake approves the infra step later, create a Railway cron service that runs the backend-local command in intentional apply mode: `python ticketmaster_sync_job.py`.
-3. Before allowing the first scheduled apply run, execute the same cron command once with `--dry-run` in Railway or an equivalent safe environment and verify the log summary includes `dates`, `fetched`, `after_dedupe`, `matched`, `unmatched`, `upserted`, `deleted_expired`, and `errors`.
-4. After the first approved apply-mode cron run, verify `city_events` counts and production `/api/events/today?city=nashville` behavior, confirming the known matched/unmatched shape remains sensible.
+1. Manually verify the patched public event surfaces with real data:
+   - `/api/businesses?category=live-music&city=nashville`
+   - `/api/businesses?category=night-out&city=nashville`
+   - `/api/events/today?city=nashville`
+   - `/api/itinerary/generate`
+2. Confirm the Live Music UI now renders matched Ticketmaster event title, show date/time, and `Buy Tickets` CTA on the correct venue cards.
+3. Define and implement a schema/data cleanup for event-like catalog rows so future public suppression can be generic and data-driven instead of name-based.
+4. If frontend regression testing is needed locally, install the frontend JS dependencies first so `craco test` can run; current workspace does not have `craco` available.
 5. Keep `First Horizon Park` and `Grand Ole Opry House` intentionally unmatched unless approved business records or explicit mapping rules change.
-6. After the Ticketmaster/cron work, replace Emergent-backed admin authentication with first-party admin auth plus the existing admin allowlist, without touching production secrets or deploying until Blake approves.
-7. After auth replacement planning, replace any remaining Emergent-backed admin upload/object-storage dependency so Emergent can be fully removed safely.
-8. Resolve the 3 intentionally untouched image records later: `Bastion`, `Santa's Pub`, and `The Bluebird Cafe`, then revisit the Mongo Atlas outbound IP hardening if still open.
+6. After the event-surface verification work, return to the backend-local `ticketmaster_sync_job.py` validation and only later create the Railway cron service after Blake explicitly approves that infra step.
+7. After the Ticketmaster/event correctness work, replace Emergent-backed admin authentication with first-party admin auth plus the existing admin allowlist, without touching production secrets or deploying until Blake approves.
+8. After auth replacement planning, replace any remaining Emergent-backed admin upload/object-storage dependency so Emergent can be fully removed safely.
+9. Resolve the 3 intentionally untouched image records later: `Bastion`, `Santa's Pub`, and `The Bluebird Cafe`, then revisit the Mongo Atlas outbound IP hardening if still open.
 
 ## Guardrails
 

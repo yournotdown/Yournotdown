@@ -114,6 +114,19 @@ def attach_event_to_step(step: dict, events: dict[str, dict]) -> dict:
     return {**step, "event": event} if event else step
 
 
+def attach_events_to_businesses(businesses: Iterable[dict], events: Iterable[dict]) -> list[dict]:
+    by_business = events_by_business_id(events)
+    attached = []
+    for business in businesses:
+        event = by_business.get(business.get("id"))
+        attached.append({**business, "event": event} if event else dict(business))
+    return attached
+
+
+def eligible_public_businesses(businesses: Iterable[dict], events: Iterable[dict]) -> list[dict]:
+    return attach_events_to_businesses(businesses, events)
+
+
 def normalized_event_status(value: str) -> str:
     return (value or "").strip().lower()
 

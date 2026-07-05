@@ -27,6 +27,7 @@ from ticketmaster_events import (
     api_sync_response,
     attach_event_to_step,
     date_range_sync_report,
+    eligible_public_businesses,
     eligible_city_events,
     event_upsert,
     events_by_business_id,
@@ -513,14 +514,43 @@ async def _today_city_events(city: str) -> list[dict]:
     return eligible_city_events(rows, city, grace_minutes=EVENT_START_GRACE_MINUTES)
 
 
+async def _public_businesses(
+    city: str = "nashville",
+    category: Optional[str] = None,
+    featured: Optional[bool] = None,
+    limit: int = 200,
+    require_slots: bool = False,
+    event_rows: Optional[list[dict]] = None,
+) -> list[dict]:
+    q = {"city_slug": city, "imported_status": "approved"}
+    if category and category != "surprise-me":
+        q["category_slug"] = category
+    if featured is not None:
+        q["featured"] = featured
+    if require_slots:
+        q["slots"] = {"$ne": []}
+    cursor = db.businesses.find(q, {"_id": 0}).sort([("featured", -1), ("order", 1)]).limit(limit)
+    businesses = await cursor.to_list(limit)
+    return eligible_public_businesses(businesses, event_rows if event_rows is not None else await _today_city_events(city))
+
+
+async def _public_business(business_id: str) -> Optional[dict]:
+    business = await db.businesses.find_one(
+        {"id": business_id, "imported_status": "approved"},
+        {"_id": 0},
+    )
+    if not business:
+        return None
+    event_rows = await _today_city_events(business.get("city_slug", "nashville"))
+    eligible = eligible_public_businesses([business], event_rows)
+    return eligible[0] if eligible else None
+
+
 @api_router.post("/itinerary/generate")
 async def generate_itinerary(req: ItineraryRequest, request: Request):
     """Build a 4-step 'Tonight's Move' itinerary tuned to the user's mood."""
-    all_biz = await db.businesses.find(
-        {"city_slug": req.city, "slots": {"$ne": []}, "imported_status": "approved"},
-        {"_id": 0},
-    ).to_list(2000)
     event_rows = await _today_city_events(req.city)
+    all_biz = await _public_businesses(req.city, limit=2000, require_slots=True, event_rows=event_rows)
     today_events_by_business = events_by_business_id(event_rows)
 
     by_slot: dict = {}
@@ -643,13 +673,7 @@ async def list_businesses(
     featured: Optional[bool] = None,
     limit: int = 200,
 ):
-    q = {"city_slug": city, "imported_status": "approved"}
-    if category and category != "surprise-me":
-        q["category_slug"] = category
-    if featured is not None:
-        q["featured"] = featured
-    cursor = db.businesses.find(q, {"_id": 0}).sort([("featured", -1), ("order", 1)]).limit(limit)
-    items = await cursor.to_list(limit)
+    items = await _public_businesses(city, category=category, featured=featured, limit=limit)
     if category == "surprise-me":
         import random
         random.shuffle(items)
@@ -659,7 +683,7 @@ async def list_businesses(
 
 @api_router.get("/businesses/{business_id}")
 async def get_business(business_id: str):
-    b = await db.businesses.find_one({"id": business_id, "imported_status": "approved"}, {"_id": 0})
+    b = await _public_business(business_id)
     if not b:
         raise HTTPException(status_code=404, detail="Not found")
     return b

@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Phone, Navigation, Globe, RotateCw } from "lucide-react";
-import { api, trackEvent, resolveImageUrl } from "../lib/api";
+import { Phone, Navigation, Globe, RotateCw, ExternalLink } from "lucide-react";
+import { api, formatEventSchedule, trackEvent, resolveImageUrl } from "../lib/api";
 import { activeCitySlug, cityPath } from "../lib/cities";
 
 const VIBE_LABELS = {
@@ -241,6 +241,7 @@ function StepCard({ step, idx, total, onAction, directionsUrl }) {
   const sponsored = b.sponsor_tier && b.sponsor_tier !== "none";
   const title = SLOT_TITLES[step.slot] || step.label.toUpperCase();
   const number = String(idx + 1).padStart(2, "0");
+  const eventSchedule = formatEventSchedule(event);
 
   return (
     <motion.section
@@ -306,7 +307,7 @@ function StepCard({ step, idx, total, onAction, directionsUrl }) {
             Tonight: {event.title}
           </div>
           <div className="mt-1 text-xs uppercase tracking-[0.18em] text-white/55">
-            {[event.local_time, event.venue_name].filter(Boolean).join(" · ")}
+            {[eventSchedule, event.venue_name].filter(Boolean).join(" · ")}
           </div>
         </div>
       )}
@@ -355,10 +356,10 @@ function StepCard({ step, idx, total, onAction, directionsUrl }) {
             target="_blank"
             onClick={() => onAction("ticket_click", b)}
             testid={`tonight-tickets-${b.id}`}
-            icon={<Globe className="w-3.5 h-3.5" />}
+            icon={<ExternalLink className="w-3.5 h-3.5" />}
             primary
           >
-            Tickets
+            Buy Tickets
           </ActionBtn>
         ) : null}
       </div>

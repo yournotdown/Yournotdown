@@ -11,17 +11,20 @@ from urllib.parse import parse_qs, urlparse
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 FRONTEND_SRC_DIR = BACKEND_DIR.parent / "frontend" / "src"
+TICKETMASTER_EVENTS_SOURCE = (BACKEND_DIR / "ticketmaster_events.py").read_text()
 sys.path.insert(0, str(BACKEND_DIR))
 
 from ticketmaster_events import (  # noqa: E402
     TicketmasterClient,
     api_sync_response,
     apply_event_sync,
+    attach_events_to_businesses,
     attach_event_to_step,
     canonical_venue_name,
     date_range_sync_report,
     deduplicate_event_documents,
     dry_run_sync,
+    eligible_public_businesses,
     eligible_city_events,
     event_upsert,
     event_has_excluded_status,
@@ -67,6 +70,10 @@ def event(**overrides):
 
 
 class TestMatching(unittest.TestCase):
+    def test_public_business_filter_has_no_name_based_suppression_list(self):
+        self.assertNotIn("PUBLIC_EVENT_ONLY_BUSINESS_NAMES", TICKETMASTER_EVENTS_SOURCE)
+        self.assertNotIn("business_requires_eligible_event", TICKETMASTER_EVENTS_SOURCE)
+
     def test_normalizes_venue_names(self):
         self.assertEqual(normalize_venue_name("The Basement East"), "basement east")
         self.assertEqual(normalize_venue_name("Exit/In"), "exit in")
@@ -269,6 +276,36 @@ class TestItineraryAttachment(unittest.TestCase):
     def test_does_not_attach_event_to_dinner_step(self):
         step = {"slot": "dinner", "business": {"id": "venue"}}
         self.assertEqual(attach_event_to_step(step, {"venue": {"title": "Show"}}), step)
+
+    def test_attaches_event_to_business_records(self):
+        businesses = [{"id": "venue", "name": "Exit/In"}]
+        events = [{"id": "event-1", "venue_business_id": "venue", "title": "Late Show"}]
+        attached = attach_events_to_businesses(businesses, events)
+        self.assertEqual(attached[0]["event"]["title"], "Late Show")
+
+    def test_public_businesses_keep_normal_live_music_venue_without_event(self):
+        businesses = [
+            {"id": "basement", "name": "The Basement East"},
+        ]
+        visible = eligible_public_businesses(businesses, [])
+        self.assertEqual([business["name"] for business in visible], ["The Basement East"])
+        self.assertNotIn("event", visible[0])
+
+    def test_public_businesses_keep_musicians_corner_like_row_without_name_matching(self):
+        businesses = [{"id": "music-corner", "name": "Community Concert Series", "category_slug": "live-music"}]
+        visible = eligible_public_businesses(businesses, [])
+        self.assertEqual([business["name"] for business in visible], ["Community Concert Series"])
+
+    def test_public_businesses_keep_tomato_fest_like_row_without_name_matching(self):
+        businesses = [{"id": "street-fest", "name": "Neighborhood Street Fest", "category_slug": "night-out"}]
+        visible = eligible_public_businesses(businesses, [])
+        self.assertEqual([business["name"] for business in visible], ["Neighborhood Street Fest"])
+
+    def test_keeps_normal_live_music_venue_with_eligible_matched_event(self):
+        businesses = [{"id": "music-corner", "name": "Ryman Auditorium"}]
+        events = [{"id": "event-1", "venue_business_id": "music-corner", "title": "Sunday Show"}]
+        visible = eligible_public_businesses(businesses, events)
+        self.assertEqual(visible[0]["event"]["title"], "Sunday Show")
 
 
 class TestClient(unittest.TestCase):

@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Phone, Navigation, Globe, Flame } from "lucide-react";
-import { api, trackEvent, resolveImageUrl } from "../lib/api";
+import { ArrowLeft, Phone, Navigation, Globe, Flame, ExternalLink } from "lucide-react";
+import { api, formatEventSchedule, matchedEventsForBusinesses, trackEvent, resolveImageUrl } from "../lib/api";
 import { activeCitySlug } from "../lib/cities";
 import EventCard from "../components/EventCard";
 
@@ -19,13 +19,12 @@ export default function CategoryDetailPage() {
     Promise.all([
       api.get("/categories").then((r) => r.data),
       api.get("/businesses", { params: { category: slug, city: citySlug } }).then((r) => r.data),
-      api.get("/events/today", { params: { city: citySlug } }).then((r) => r.data).catch(() => []),
     ])
-      .then(([cats, biz, todayEvents]) => {
+      .then(([cats, biz]) => {
         const cat = cats.find((c) => c.slug === slug);
         setCategory(cat || { slug, name: slug, emoji: "✨" });
         setBusinesses(biz);
-        setEvents(todayEvents);
+        setEvents(matchedEventsForBusinesses(biz));
         // One view event per business per page-load (not per render)
         const seen = new Set();
         biz.forEach((b) => {
@@ -86,25 +85,29 @@ export default function CategoryDetailPage() {
         ) : (
           <>
             <section className="mb-14" data-testid="tonights-events-section">
-              <div className="mb-5 border-t border-white/10 pt-5">
-                <div className="text-[10px] uppercase tracking-[0.3em] text-[#C6FF00]">
-                  Live calendar
-                </div>
-                <h2 className="mt-2 font-flyer text-3xl uppercase text-white">
-                  Tonight's Events<span className="lime-dot">.</span>
-                </h2>
-              </div>
+              {slug === "live-music" && (
+                <>
+                  <div className="mb-5 border-t border-white/10 pt-5">
+                    <div className="text-[10px] uppercase tracking-[0.3em] text-[#C6FF00]">
+                      Live calendar
+                    </div>
+                    <h2 className="mt-2 font-flyer text-3xl uppercase text-white">
+                      Tonight's Shows<span className="lime-dot">.</span>
+                    </h2>
+                  </div>
 
-              {events.length === 0 ? (
-                <p className="border border-white/10 bg-[#121218] px-5 py-6 text-sm text-[#A1A1AA]">
-                  No events listed for tonight.
-                </p>
-              ) : (
-                <div className="space-y-4">
-                  {events.map((event, i) => (
-                    <EventCard key={event.id || event.external_event_id} event={event} index={i} />
-                  ))}
-                </div>
+                  {events.length === 0 ? (
+                    <p className="border border-white/10 bg-[#121218] px-5 py-6 text-sm text-[#A1A1AA]">
+                      No matched live music shows listed for tonight.
+                    </p>
+                  ) : (
+                    <div className="space-y-4">
+                      {events.map((event, i) => (
+                        <EventCard key={event.id || event.external_event_id} event={event} index={i} />
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
             </section>
 
@@ -124,7 +127,9 @@ export default function CategoryDetailPage() {
                 </div>
               ) : (
                 <div className="space-y-8">
-                  {businesses.map((b, i) => (
+                  {businesses.map((b, i) => {
+                    const eventSchedule = formatEventSchedule(b.event);
+                    return (
                     <motion.div
                       key={b.id}
                       initial={{ opacity: 0, y: 24 }}
@@ -153,10 +158,20 @@ export default function CategoryDetailPage() {
                         <h3 className="font-display text-2xl sm:text-3xl font-bold text-white" data-testid={`business-name-${b.id}`}>
                           {b.name}
                         </h3>
+                        {b.event && (
+                          <div className="mt-4 border-l-2 border-[#C6FF00] pl-3" data-testid={`business-event-${b.id}`}>
+                            <div className="text-[10px] uppercase tracking-[0.24em] text-[#C6FF00]">
+                              Tonight: {b.event.title}
+                            </div>
+                            <div className="mt-1 text-xs uppercase tracking-[0.16em] text-white/55">
+                              {[eventSchedule, b.event.venue_name].filter(Boolean).join(" · ")}
+                            </div>
+                          </div>
+                        )}
                         <p className="mt-2 text-[#A1A1AA] text-sm leading-relaxed line-clamp-3">
                           {b.description}
                         </p>
-                        <div className="grid grid-cols-3 gap-3 mt-6">
+                        <div className={`grid gap-3 mt-6 ${b.event?.ticket_url ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3"}`}>
                           {b.phone ? (
                             <a
                               href={`tel:${b.phone}`}
@@ -194,10 +209,25 @@ export default function CategoryDetailPage() {
                               <span className="hidden sm:inline">Website</span>
                             </a>
                           ) : <div />}
+                          {b.event?.ticket_url ? (
+                            <a
+                              href={b.event.ticket_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={() => handleAction("ticket_click", b)}
+                              className="py-4 rounded-full bg-[#C6FF00] hover:bg-white text-black text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-colors active:scale-95"
+                              data-testid={`business-tickets-${b.id}`}
+                            >
+                              <ExternalLink className="w-4 h-4" />
+                              <span className="hidden sm:inline">Buy Tickets</span>
+                              <span className="sm:hidden">Tickets</span>
+                            </a>
+                          ) : null}
                         </div>
                       </div>
                     </motion.div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </section>

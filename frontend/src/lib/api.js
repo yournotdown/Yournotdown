@@ -31,3 +31,20 @@ export const resolveImageUrl = (b) => {
   }
   return "";
 };
+
+export const formatEventSchedule = (event) => {
+  if (!event) return "";
+  return [event.local_date, event.local_time].filter(Boolean).join(" · ");
+};
+
+export const matchedEventsForBusinesses = (businesses = []) => {
+  const seen = new Set();
+  return businesses
+    .map((business) => business?.event)
+    .filter((event) => {
+      const key = event?.id || event?.external_event_id;
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+};
