@@ -78,6 +78,13 @@ Latest local patch state:
 - updated the Tonight step hero image preference to use the matched venue/business image first and the event image only as fallback
 - fixed the Another Night exhaustion bug by stopping the frontend from accumulating itinerary business/event exclusions forever; the refresh payload now sends only the immediately previous itinerary ids
 - updated live-music event picking to relax event/business exclusions when they exhaust the eligible Ticketmaster music pool, so the numbered `LIVE MUSIC` step does not get stuck without Ticketmaster forever
+- updated the `/:citySlug` landing page desktop hero sizing so the headline and `I'M DOWN` CTA sit inside a centered max-width composition instead of scaling aggressively across wide desktop viewports
+- updated the `/:citySlug/vibe` page desktop layout so the headline and 2x2 card grid sit inside a controlled-width container with constrained card heights and calmer desktop emoji scaling
+- preserved mobile-first defaults for those pages and left `TonightPage.jsx` untouched in this session
+- updated Tonight’s Move refresh cadence so the frontend now explicitly requests `live_music_event_mode` and only asks for a Ticketmaster-backed `LIVE MUSIC` step every fourth `Another Night` refresh
+- changed normal Tonight refreshes to rotate standard live-music venues without forcing Ticketmaster event rendering into the numbered `LIVE MUSIC` step
+- kept Ticketmaster event rendering only inside the numbered `LIVE MUSIC` step and preserved the removal of any standalone Tonight page “Tonight’s Shows” section
+- added admin-only `itinerary_buckets` visibility derived from canonical business `slots`, plus matching admin filters and bucket badges for Dinner, Drinks, Live Music, and Late Night auditing
 - kept the safe Ticketmaster alias `Ole Red - Nashville` -> `Ole Red`
 - did not add First Horizon Park itinerary matching
 - did not add broad aliases for venues missing approved business records
@@ -92,6 +99,7 @@ The immediate focus has shifted from cron verification to customer-facing event 
 4. keep `First Horizon Park` and `Grand Ole Opry House` intentionally unmatched unless approved business records or rules change
 5. after event-surface verification, return to the backend-local cron entrypoint validation and later Railway cron service creation only after Blake approves that infra step
 6. after the Ticketmaster/event correctness work, plan first-party admin auth replacement and a storage replacement path so Emergent can be removed safely
+7. fix desktop responsiveness on the landing page and vibe selection page without redesigning the Tonight’s Move results page or altering backend logic
 
 ## Prior Session Notes
 
@@ -107,8 +115,10 @@ Verification completed in this local patching session:
 - after the Tonight-flow patch, `python3 -m unittest backend.tests.test_ticketmaster_events_unit backend.tests.test_city_events_filtering_contract` passed again (`49` tests)
 - after the Live Music step correction, `python3 -m unittest backend.tests.test_ticketmaster_events_unit backend.tests.test_city_events_filtering_contract backend.tests.test_tonight_page_contract` passed (`57` tests)
 - after the Another Night exhaustion fix, `python3 -m unittest backend.tests.test_ticketmaster_events_unit backend.tests.test_city_events_filtering_contract backend.tests.test_tonight_page_contract` passed again (`59` tests)
+- after the live-music cadence plus admin bucket audit update, `python3 -m unittest backend.tests.test_ticketmaster_events_unit backend.tests.test_city_events_filtering_contract backend.tests.test_tonight_page_contract backend.tests.test_itinerary_buckets_unit backend.tests.test_admin_dashboard_contract` passed (`66` tests)
 
 Unverified in this local patching session:
 - frontend Jest was not runnable locally because workspace JS dependencies are not installed and `craco` is unavailable on PATH
+- frontend build/lint was not runnable locally because `frontend/node_modules` is missing and neither `craco` nor `react-scripts` is available in the workspace
 - no browser/manual QA was run here
 - no production changes were made

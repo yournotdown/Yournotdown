@@ -33,11 +33,12 @@ export default function TonightPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [seenIds, setSeenIds] = useState([]);
-  const [seenEventIds, setSeenEventIds] = useState([]);
+  const [refreshCount, setRefreshCount] = useState(0);
+  const [lastTicketmasterEventIds, setLastTicketmasterEventIds] = useState([]);
   const [regenerating, setRegenerating] = useState(false);
 
   const generate = useCallback(
-    async (excludeIds = [], excludeEventIds = []) => {
+    async ({ excludeIds = [], excludeEventIds = [], liveMusicEventMode = "normal" } = {}) => {
       setError(null);
       try {
         const r = await api.post("/itinerary/generate", {
@@ -45,6 +46,7 @@ export default function TonightPage() {
           city: citySlug,
           exclude_ids: excludeIds,
           exclude_event_ids: excludeEventIds,
+          live_music_event_mode: liveMusicEventMode,
         });
         setItinerary(r.data);
         trackEvent("itinerary_view", { vibe, itinerary_id: r.data.id, city_slug: citySlug });
@@ -53,7 +55,9 @@ export default function TonightPage() {
           .map((s) => s.event?.external_event_id || s.event?.id)
           .filter(Boolean);
         setSeenIds(newIds);
-        setSeenEventIds(newEventIds);
+        if (liveMusicEventMode === "ticketmaster") {
+          setLastTicketmasterEventIds(newEventIds);
+        }
       } catch (e) {
         setError(e?.response?.data?.detail || "Couldn't plan tonight. Try again.");
       } finally {
@@ -67,15 +71,23 @@ export default function TonightPage() {
   useEffect(() => {
     setLoading(true);
     setSeenIds([]);
-    setSeenEventIds([]);
-    generate([]);
+    setRefreshCount(0);
+    setLastTicketmasterEventIds([]);
+    generate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [citySlug, vibe]);
 
   const handleAnother = () => {
     setRegenerating(true);
     trackEvent("another_night_click", { vibe, city_slug: citySlug });
-    generate(seenIds, seenEventIds);
+    const nextRefreshCount = refreshCount + 1;
+    const liveMusicEventMode = nextRefreshCount % 4 === 0 ? "ticketmaster" : "normal";
+    setRefreshCount(nextRefreshCount);
+    generate({
+      excludeIds: seenIds,
+      excludeEventIds: liveMusicEventMode === "ticketmaster" ? lastTicketmasterEventIds : [],
+      liveMusicEventMode,
+    });
   };
 
   const directionsUrl = (b) => {
@@ -142,7 +154,7 @@ export default function TonightPage() {
           <div className="border-t border-white/10 py-10 text-white/60" data-testid="tonight-error">
             {error}
             <button
-              onClick={() => generate([])}
+              onClick={() => generate()}
               className="mt-4 block font-flyer uppercase text-[#C6FF00] hover:underline text-sm tracking-[0.2em]"
             >
               Try again →

@@ -36,13 +36,16 @@ class TestCityEventsFilteringContract(unittest.TestCase):
         self.assertIn("event_rows = await _today_city_events(req.city)", source)
         self.assertIn("all_biz = await _public_businesses(req.city, limit=2000, require_slots=True, event_rows=event_rows)", source)
         self.assertIn("eligible_music_events = eligible_ticketmaster_music_events(event_rows, all_biz)", source)
+        self.assertIn('live_music_event_mode = (req.live_music_event_mode or "normal").strip().lower()', source)
         self.assertIn("today_events_by_business = events_by_business_id(event_rows)", source)
         self.assertIn("exclude_event_ids = set(req.exclude_event_ids)", source)
         self.assertIn('if label["slot"] == "entertainment":', source)
         self.assertIn('event_candidates = [business for business in candidates if business_supports_live_music_event(business)]', source)
+        self.assertIn('if live_music_event_mode == "ticketmaster":', source)
         self.assertIn("pick, forced_event = itinerary_event_pick(", source)
         self.assertIn("exclude_event_ids,", source)
         self.assertIn("pick = _weighted_pick(event_candidates or candidates, exclude | chosen_ids, req.vibe)", source)
+        self.assertIn('elif label["slot"] == "entertainment":', source)
         self.assertNotIn('"live_music_events":', source)
 
 

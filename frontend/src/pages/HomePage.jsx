@@ -37,49 +37,50 @@ export default function HomePage() {
 
       {/* HERO TYPE */}
       <motion.div
-        className="relative z-10 min-h-screen flex flex-col justify-center px-6 sm:px-10 pb-24 pt-24"
+        className="relative z-10 min-h-[100svh] flex flex-col justify-center px-6 sm:px-10 pb-28 pt-24 md:pt-28"
         initial={{ opacity: 0, y: 14 }}
         animate={crashing ? { scale: 0.98, opacity: 0 } : { opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: crashing ? 0.24 : 0.7, ease: [0.22, 1, 0.36, 1] }}
       >
-        <motion.h2
-          className="font-flyer flicker-neon text-white uppercase select-none"
-          style={{
-            fontSize: "clamp(2.5rem, 8.5vw, 7rem)",
-            transform: "rotate(-1.5deg) translateX(-1%)",
-            transformOrigin: "left",
-          }}
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.6, delay: 0.05 }}
-          data-testid="homepage-headline"
-        >
-          You're not down?
-        </motion.h2>
+        <div className="mx-auto flex w-full max-w-[1200px] flex-col justify-center lg:min-h-[calc(100svh-8rem)] lg:justify-center">
+          <motion.h2
+            className="font-flyer flicker-neon text-white uppercase select-none max-w-[11ch]"
+            style={{
+              fontSize: "clamp(2.5rem, 5.6vw, 5.75rem)",
+              transform: "rotate(-1.5deg) translateX(-1%)",
+              transformOrigin: "left",
+            }}
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.6, delay: 0.05 }}
+            data-testid="homepage-headline"
+          >
+            You're not down?
+          </motion.h2>
 
-        <motion.button
-          onClick={handleClick}
-          className="group relative font-flyer text-white uppercase select-none text-left bg-transparent border-0 p-0 mt-2 sm:mt-3 cursor-pointer focus:outline-none"
-          style={{
-            fontSize: "clamp(7rem, 28vw, 22rem)",
-          }}
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.75, delay: 0.18, ease: [0.22, 1, 0.36, 1] }}
-          whileHover={{ x: 4 }}
-          whileTap={{ scale: 0.985 }}
-          data-testid="homepage-im-down-button"
-          aria-label="I'm Down — start tonight"
-        >
-          {/* Letters — invert on hover */}
-          <span className="relative inline-block transition-colors duration-150 group-hover:text-[#C6FF00]">
-            I'M DOWN
-          </span>
-          <span className="lime-dot inline-block ml-1 sm:ml-2">.</span>
-          <span className="inline-block ml-2 sm:ml-4 align-middle font-display text-xs sm:text-base md:text-xl tracking-[0.28em] text-white/65">
-            {cityDisplayName(citySlug)}
-          </span>
-        </motion.button>
+          <motion.button
+            onClick={handleClick}
+            className="group relative mt-3 bg-transparent p-0 text-left font-flyer uppercase text-white select-none cursor-pointer focus:outline-none md:mt-4 lg:max-w-[1100px]"
+            style={{
+              fontSize: "clamp(5rem, 15vw, 12.5rem)",
+            }}
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.75, delay: 0.18, ease: [0.22, 1, 0.36, 1] }}
+            whileHover={{ x: 4 }}
+            whileTap={{ scale: 0.985 }}
+            data-testid="homepage-im-down-button"
+            aria-label="I'm Down — start tonight"
+          >
+            <span className="relative inline-block transition-colors duration-150 group-hover:text-[#C6FF00]">
+              I'M DOWN
+            </span>
+            <span className="lime-dot inline-block ml-1 sm:ml-2">.</span>
+            <span className="mt-3 block font-display text-[11px] tracking-[0.32em] text-white/65 sm:text-sm md:text-base lg:mt-4 lg:text-lg">
+              {cityDisplayName(citySlug)}
+            </span>
+          </motion.button>
+        </div>
       </motion.div>
 
       {/* MARQUEE STRIP */}

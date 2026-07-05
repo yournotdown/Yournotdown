@@ -40,6 +40,7 @@ from ticketmaster_events import (
     validate_apply_confirmation,
 )
 from storage_client import init_storage, put_object, get_object, APP_NAME
+from itinerary_buckets import annotate_itinerary_buckets
 from seed_data import (
     CATEGORIES,
     CITIES,
@@ -466,6 +467,7 @@ class ItineraryRequest(BaseModel):
     city: str = "nashville"
     exclude_ids: List[str] = Field(default_factory=list)
     exclude_event_ids: List[str] = Field(default_factory=list)
+    live_music_event_mode: str = "normal"
 
 
 def _relevance_score(business: dict, vibe: Optional[str]) -> float:
@@ -557,6 +559,7 @@ async def generate_itinerary(req: ItineraryRequest, request: Request):
     all_biz = await _public_businesses(req.city, limit=2000, require_slots=True, event_rows=event_rows)
     today_events_by_business = events_by_business_id(event_rows)
     eligible_music_events = eligible_ticketmaster_music_events(event_rows, all_biz)
+    live_music_event_mode = (req.live_music_event_mode or "normal").strip().lower()
 
     by_slot: dict = {}
     for b in all_biz:
@@ -573,12 +576,13 @@ async def generate_itinerary(req: ItineraryRequest, request: Request):
         forced_event = None
         if label["slot"] == "entertainment":
             event_candidates = [business for business in candidates if business_supports_live_music_event(business)]
-            pick, forced_event = itinerary_event_pick(
-                event_candidates,
-                eligible_music_events,
-                exclude | chosen_ids,
-                exclude_event_ids,
-            )
+            if live_music_event_mode == "ticketmaster":
+                pick, forced_event = itinerary_event_pick(
+                    event_candidates,
+                    eligible_music_events,
+                    exclude | chosen_ids,
+                    exclude_event_ids,
+                )
             if not pick:
                 pick = _weighted_pick(event_candidates or candidates, exclude | chosen_ids, req.vibe)
         elif not pick:
@@ -595,6 +599,8 @@ async def generate_itinerary(req: ItineraryRequest, request: Request):
             }
             if forced_event:
                 steps.append({**step, "event": forced_event})
+            elif label["slot"] == "entertainment":
+                steps.append(step)
             else:
                 steps.append(attach_event_to_step(step, today_events_by_business))
 
@@ -906,7 +912,7 @@ async def admin_list_businesses(imported_status: Optional[str] = None, user=Depe
         raise HTTPException(status_code=400, detail="Invalid imported_status")
     query = {"imported_status": imported_status} if imported_status else {}
     items = await db.businesses.find(query, {"_id": 0}).sort([("order", 1)]).to_list(5000)
-    return items
+    return annotate_itinerary_buckets(items)
 
 
 @api_router.post("/admin/businesses")

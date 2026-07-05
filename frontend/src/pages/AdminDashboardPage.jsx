@@ -36,6 +36,13 @@ const empty = {
   order: 0,
 };
 
+const ITINERARY_BUCKET_META = {
+  dinner: { label: "Dinner", className: "bg-orange-500/10 text-orange-300" },
+  drinks: { label: "Drinks", className: "bg-sky-500/10 text-sky-300" },
+  live_music: { label: "Live Music", className: "bg-[#C6FF00]/10 text-[#D7FF6B]" },
+  late_night: { label: "Late Night", className: "bg-fuchsia-500/10 text-fuchsia-300" },
+};
+
 export default function AdminDashboardPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -717,7 +724,12 @@ function ImportReviewPanel({ businesses, summary, selected, onSelectedChange, on
 
 function BusinessesPanel({ businesses, categories, onCreate, onEdit, onDelete, onToggleFeatured, onReorder, onAnalytics }) {
   const [filter, setFilter] = useState("all");
-  const filtered = filter === "all" ? businesses : businesses.filter((b) => b.category_slug === filter);
+  const [bucketFilter, setBucketFilter] = useState("all");
+  const filtered = businesses.filter((business) => {
+    const matchesCategory = filter === "all" || business.category_slug === filter;
+    const matchesBucket = bucketFilter === "all" || (business.itinerary_buckets || []).includes(bucketFilter);
+    return matchesCategory && matchesBucket;
+  });
 
   return (
     <div>
@@ -738,6 +750,18 @@ function BusinessesPanel({ businesses, categories, onCreate, onEdit, onDelete, o
                   {c.emoji} {c.name}
                 </SelectItem>
               ))}
+            </SelectContent>
+          </Select>
+          <Select value={bucketFilter} onValueChange={setBucketFilter}>
+            <SelectTrigger className="w-44 bg-[#121218] border-white/10 text-white" data-testid="admin-filter-bucket">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="bg-[#121218] border-white/10 text-white">
+              <SelectItem value="all" className="focus:bg-white/10 focus:text-white">All itinerary buckets</SelectItem>
+              <SelectItem value="dinner" className="focus:bg-white/10 focus:text-white">Dinner</SelectItem>
+              <SelectItem value="drinks" className="focus:bg-white/10 focus:text-white">Drinks</SelectItem>
+              <SelectItem value="live_music" className="focus:bg-white/10 focus:text-white">Live Music</SelectItem>
+              <SelectItem value="late_night" className="focus:bg-white/10 focus:text-white">Late Night</SelectItem>
             </SelectContent>
           </Select>
           <Button
@@ -786,6 +810,15 @@ function BusinessesPanel({ businesses, categories, onCreate, onEdit, onDelete, o
                 <td className="px-2 py-3">
                   <div className="font-bold text-white">{b.name}</div>
                   <div className="text-xs text-[#A1A1AA] line-clamp-1 max-w-md">{b.description}</div>
+                  <div className="mt-2 flex flex-wrap gap-1.5" data-testid={`admin-itinerary-buckets-${b.id}`}>
+                    {(b.itinerary_buckets || []).length > 0 ? (
+                      b.itinerary_buckets.map((bucket) => (
+                        <ItineraryBucketBadge key={`${b.id}-${bucket}`} bucket={bucket} />
+                      ))
+                    ) : (
+                      <span className="text-[10px] uppercase tracking-[0.18em] text-white/30">No itinerary bucket</span>
+                    )}
+                  </div>
                 </td>
                 <td className="px-5 py-3 hidden md:table-cell text-xs text-[#A1A1AA]">
                   {(b.slots && b.slots.length > 0) ? b.slots.join(", ") : <span className="text-white/30">—</span>}
@@ -853,6 +886,15 @@ function SponsorBadge({ tier, testid }) {
       data-testid={testid}
     >
       {s.label}
+    </span>
+  );
+}
+
+function ItineraryBucketBadge({ bucket }) {
+  const meta = ITINERARY_BUCKET_META[bucket] || { label: bucket, className: "bg-white/5 text-white/45" };
+  return (
+    <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] ${meta.className}`}>
+      {meta.label}
     </span>
   );
 }
