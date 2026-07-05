@@ -52,8 +52,8 @@ export default function TonightPage() {
         const newEventIds = r.data.steps
           .map((s) => s.event?.external_event_id || s.event?.id)
           .filter(Boolean);
-        setSeenIds((prev) => Array.from(new Set([...prev, ...newIds])));
-        setSeenEventIds((prev) => Array.from(new Set([...prev, ...newEventIds])));
+        setSeenIds(newIds);
+        setSeenEventIds(newEventIds);
       } catch (e) {
         setError(e?.response?.data?.detail || "Couldn't plan tonight. Try again.");
       } finally {

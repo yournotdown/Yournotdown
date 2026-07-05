@@ -5,7 +5,7 @@
    - `/api/events/today?city=nashville`
    - `/:citySlug/tonight?vibe=send-it`
    - the “Another Night” refresh flow on the Tonight page
-2. Confirm the numbered `LIVE MUSIC` itinerary step now surfaces Ticketmaster music events only, with formatted show time and `Buy Tickets` CTA, and that sports/baseball rows do not appear there.
+2. Confirm repeated “Another Night” clicks keep the numbered `LIVE MUSIC` itinerary step on Ticketmaster music shows when eligible events exist, including cycling back after the event pool is exhausted instead of dropping Ticketmaster entirely.
 3. Define and implement a schema/data cleanup for event-like catalog rows so future public suppression can be generic and data-driven instead of name-based.
 4. If frontend regression testing is needed locally, install the frontend JS dependencies first so `craco test` can run; current workspace does not have `craco` available.
 5. Keep `First Horizon Park` and `Grand Ole Opry House` intentionally unmatched unless approved business records or explicit mapping rules change.

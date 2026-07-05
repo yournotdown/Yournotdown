@@ -76,6 +76,8 @@ Latest local patch state:
 - updated “Another Night” to send `exclude_event_ids` so Ticketmaster-backed live-music steps can rotate to a different eligible show when available
 - kept the numbered `LIVE MUSIC` step pinned to normal live-music venues when no eligible Ticketmaster music event exists, instead of falling through to arbitrary non-music entertainment businesses
 - updated the Tonight step hero image preference to use the matched venue/business image first and the event image only as fallback
+- fixed the Another Night exhaustion bug by stopping the frontend from accumulating itinerary business/event exclusions forever; the refresh payload now sends only the immediately previous itinerary ids
+- updated live-music event picking to relax event/business exclusions when they exhaust the eligible Ticketmaster music pool, so the numbered `LIVE MUSIC` step does not get stuck without Ticketmaster forever
 - kept the safe Ticketmaster alias `Ole Red - Nashville` -> `Ole Red`
 - did not add First Horizon Park itinerary matching
 - did not add broad aliases for venues missing approved business records
@@ -104,6 +106,7 @@ Verification completed in this local patching session:
 - Python AST parse check passed for `backend/server.py` and `backend/ticketmaster_events.py`
 - after the Tonight-flow patch, `python3 -m unittest backend.tests.test_ticketmaster_events_unit backend.tests.test_city_events_filtering_contract` passed again (`49` tests)
 - after the Live Music step correction, `python3 -m unittest backend.tests.test_ticketmaster_events_unit backend.tests.test_city_events_filtering_contract backend.tests.test_tonight_page_contract` passed (`57` tests)
+- after the Another Night exhaustion fix, `python3 -m unittest backend.tests.test_ticketmaster_events_unit backend.tests.test_city_events_filtering_contract backend.tests.test_tonight_page_contract` passed again (`59` tests)
 
 Unverified in this local patching session:
 - frontend Jest was not runnable locally because workspace JS dependencies are not installed and `craco` is unavailable on PATH

@@ -232,15 +232,25 @@ def itinerary_event_pick(candidates: Iterable[dict], events: Iterable[dict], exc
                          exclude_event_ids: set[str]) -> tuple[Optional[dict], Optional[dict]]:
     candidate_list = list(candidates)
     event_lookup = events_by_business_id(events)
-    for business in candidate_list:
-        event = event_lookup.get(business.get("id"))
-        if not event:
-            continue
-        event_id = event.get("external_event_id") or event.get("id")
-        if business.get("id") in exclude_business_ids or event_id in exclude_event_ids:
-            continue
-        return business, event
-    return None, None
+
+    def pick_with(active_business_excludes: set[str], active_event_excludes: set[str]) -> tuple[Optional[dict], Optional[dict]]:
+        for business in candidate_list:
+            event = event_lookup.get(business.get("id"))
+            if not event:
+                continue
+            event_id = event.get("external_event_id") or event.get("id")
+            if business.get("id") in active_business_excludes or event_id in active_event_excludes:
+                continue
+            return business, event
+        return None, None
+
+    pick = pick_with(exclude_business_ids, exclude_event_ids)
+    if pick != (None, None):
+        return pick
+
+    # Mirror the normal itinerary picker behavior: if refresh exclusions exhaust
+    # the live-music event pool, relax them so the slot still returns a show.
+    return pick_with(set(), set())
 
 
 def primary_classification(event: dict) -> dict:

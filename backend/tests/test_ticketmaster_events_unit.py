@@ -318,8 +318,28 @@ class TestDates(unittest.TestCase):
         self.assertEqual(business["id"], "basement")
         self.assertEqual(event_row["external_event_id"], "event-2")
 
+    def test_itinerary_event_pick_relaxes_exclusions_when_all_events_are_exhausted(self):
+        businesses = [{"id": "exit", "name": "Exit/In"}]
+        events = [{"title": "Only Show", "venue_business_id": "exit", "external_event_id": "event-1"}]
+        business, event_row = itinerary_event_pick(businesses, events, {"exit"}, {"event-1"})
+        self.assertEqual(business["id"], "exit")
+        self.assertEqual(event_row["external_event_id"], "event-1")
+
+    def test_itinerary_event_pick_rotates_to_different_event_when_possible(self):
+        businesses = [
+            {"id": "exit", "name": "Exit/In"},
+            {"id": "basement", "name": "The Basement East"},
+        ]
+        events = [
+            {"title": "First Show", "venue_business_id": "exit", "external_event_id": "event-1"},
+            {"title": "Second Show", "venue_business_id": "basement", "external_event_id": "event-2"},
+        ]
+        business, event_row = itinerary_event_pick(businesses, events, {"exit"}, {"event-1"})
+        self.assertEqual(business["id"], "basement")
+        self.assertEqual(event_row["external_event_id"], "event-2")
+
     def test_itinerary_event_pick_returns_none_when_no_candidate_available(self):
-        business, event_row = itinerary_event_pick([], [], set(), set())
+        business, event_row = itinerary_event_pick([], [], {"exit"}, {"event-1"})
         self.assertIsNone(business)
         self.assertIsNone(event_row)
 
