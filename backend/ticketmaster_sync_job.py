@@ -24,7 +24,13 @@ except ImportError:
     def load_dotenv(path):
         return None
 
-from ticketmaster_events import CITY_CONFIG, TicketmasterClient, apply_event_sync, date_range_sync_report
+from ticketmaster_events import (
+    CITY_CONFIG,
+    TicketmasterClient,
+    TicketmasterRateLimitError,
+    apply_event_sync,
+    date_range_sync_report,
+)
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
@@ -71,8 +77,9 @@ def redact_secret_text(text: str, secrets: list[str]) -> str:
 
 
 def print_summary(report: dict, apply_summary: dict | None = None, mode: str = "apply",
-                  errors: list[str] | None = None) -> None:
-    print(f"status={'ok' if not errors else 'error'}")
+                  errors: list[str] | None = None, status: str | None = None,
+                  extra_fields: dict[str, str | int] | None = None) -> None:
+    print(f"status={status or ('ok' if not errors else 'error')}")
     print(f"mode={mode}")
     print(f"dates={','.join(report.get('dates') or [])}")
     print(f"fetched={report.get('fetched', 0)}")
@@ -81,6 +88,9 @@ def print_summary(report: dict, apply_summary: dict | None = None, mode: str = "
     print(f"unmatched={report.get('unmatched', 0)}")
     print(f"upserted={(apply_summary or {}).get('upserted', 0)}")
     print(f"deleted_expired={(apply_summary or {}).get('expired_deleted', 0)}")
+    for key, value in (extra_fields or {}).items():
+        if value not in (None, ""):
+            print(f"{key}={value}")
     if errors:
         print(f"errors={len(errors)}")
         for error in errors:
@@ -124,6 +134,15 @@ def main() -> int:
 
         apply_summary = apply_event_sync(database.city_events, report, args.city)
         print_summary(report, apply_summary=apply_summary, mode="apply")
+        return 0
+    except TicketmasterRateLimitError as exc:
+        fallback_report = {"dates": []}
+        print_summary(
+            fallback_report,
+            mode="dry-run" if args.dry_run else "apply",
+            status="rate_limited",
+            extra_fields={"retry_after": exc.retry_after},
+        )
         return 0
     except Exception as exc:
         error = redact_secret_text(f"{type(exc).__name__}: {exc}", secrets)

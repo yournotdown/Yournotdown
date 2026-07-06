@@ -10,6 +10,7 @@ import time
 import unicodedata
 import uuid
 from datetime import date, datetime, time as datetime_time, timedelta, timezone
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Iterable, Optional
 from urllib import parse, request
@@ -37,6 +38,12 @@ VENUE_ALIASES = {
 EXCLUDED_EVENT_STATUSES = {"cancelled", "canceled", "offsale"}
 DEFAULT_EVENT_START_GRACE_MINUTES = max(0, int(os.environ.get("EVENT_START_GRACE_MINUTES", "60")))
 MUSIC_CLASSIFICATION_SEGMENT = "music"
+
+
+class TicketmasterRateLimitError(RuntimeError):
+    def __init__(self, retry_after: str = ""):
+        super().__init__("Ticketmaster API rate limited")
+        self.retry_after = (retry_after or "").strip()
 
 
 def now_iso() -> str:
@@ -301,6 +308,26 @@ def normalized_ticket_url(value: str) -> str:
     return parse.urlunsplit((parts.scheme.lower(), parts.netloc.lower(), parts.path.rstrip("/"), parts.query, ""))
 
 
+def retry_after_delay_seconds(value: str, now: Optional[datetime] = None) -> Optional[float]:
+    if not value:
+        return None
+    raw = value.strip()
+    if not raw:
+        return None
+    try:
+        return max(0.0, float(int(raw)))
+    except ValueError:
+        pass
+    try:
+        retry_at = parsedate_to_datetime(raw)
+    except (TypeError, ValueError, IndexError, OverflowError):
+        return None
+    if retry_at.tzinfo is None:
+        retry_at = retry_at.replace(tzinfo=timezone.utc)
+    current = now or datetime.now(timezone.utc)
+    return max(0.0, (retry_at.astimezone(timezone.utc) - current).total_seconds())
+
+
 def deduplicate_event_documents(documents: Iterable[dict]) -> list[dict]:
     unique = []
     seen_external_ids = set()
@@ -356,11 +383,26 @@ class TicketmasterClient:
         return (payload.get("_embedded") or {}).get("events") or []
 
     def _get_json(self, url: str) -> dict:
+        retried_rate_limit = False
         for attempt in range(self.max_attempts):
             try:
                 with self.opener(url, timeout=self.request_timeout_seconds) as response:
                     return json.loads(response.read().decode("utf-8"))
             except HTTPError as exc:
+                if exc.code == 429:
+                    retry_after = ""
+                    if exc.headers:
+                        retry_after = exc.headers.get("Retry-After", "")
+                    if not retried_rate_limit and attempt + 1 < self.max_attempts:
+                        retried_rate_limit = True
+                        delay = retry_after_delay_seconds(retry_after)
+                        sleep_for = self.retry_delay_seconds if delay is None else min(
+                            max(delay, self.retry_delay_seconds),
+                            5.0,
+                        )
+                        self.sleeper(sleep_for)
+                        continue
+                    raise TicketmasterRateLimitError(retry_after=retry_after) from exc
                 if exc.code != 504 or attempt + 1 == self.max_attempts:
                     raise
             except (TimeoutError, socket.timeout):

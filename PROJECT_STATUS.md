@@ -91,6 +91,12 @@ Latest local patch state:
 - added admin-managed Tonight’s Move page sponsorships backed by a separate `admin_sponsorships` collection, including active-window and priority resolution plus public itinerary response support via `tonight_move_sponsorship`
 - added admin dashboard controls to view, save, activate/deactivate, and clear both Featured Live Music and Tonight’s Move Sponsorship records using `image_url` / `sponsor_logo_url` and `ticket_url` / `sponsor_url` fields without modifying existing business data
 - added Tonight page sponsor rendering near the header so active Tonight’s Move sponsorships display independently from the itinerary-selection logic
+- hardened `backend/ticketmaster_sync_job.py` for Ticketmaster HTTP 429 rate limiting so cron logs emit `status=rate_limited` plus optional `retry_after`, skip deletes/writes on failed fetches, and exit cleanly instead of surfacing an expected rate limit as a crash
+- added one bounded Ticketmaster client backoff path for HTTP 429 using `Retry-After` when present, capped to a short wait so the cron does not hammer the API
+- added a new dry-run Google Places discovery script at `backend/discover_ynd_candidates.py` that excludes the current local catalog by `google_place_id` and normalized name/address, scores candidates for Dinner / Drinks / Live Music / Late Night fit, and writes local CSV/JSON reports without touching Mongo
+- generated a Nashville discovery report at `backend/discovery_reports/nashville_next_candidates.json` and `.csv` covering ZIP codes `37201`, `37203`, `37204`, `37205`, `37206`, `37207`, `37208`, `37209`, `37210`, `37211`, and `37212`
+- added a second-stage curation script at `backend/curate_ynd_candidates.py` that rebuilds the full dry-run candidate pool when needed, applies stronger YND taste filters, assigns curation metadata, and writes balanced `top60`, `maybe`, and `rejected` review files without importing anything
+- generated balanced curation outputs at `backend/discovery_reports/nashville_next_candidates_balanced_top60.json`, `.csv`, `..._maybe.csv`, and `..._rejected.csv`; current balanced result lands at `56` candidates with a remaining live-music shortfall of `4`
 - kept the safe Ticketmaster alias `Ole Red - Nashville` -> `Ole Red`
 - did not add First Horizon Park itinerary matching
 - did not add broad aliases for venues missing approved business records
@@ -124,9 +130,13 @@ Verification completed in this local patching session:
 - after the live-music cadence plus admin bucket audit update, `python3 -m unittest backend.tests.test_ticketmaster_events_unit backend.tests.test_city_events_filtering_contract backend.tests.test_tonight_page_contract backend.tests.test_itinerary_buckets_unit backend.tests.test_admin_dashboard_contract` passed (`66` tests)
 - after the first-load Ticketmaster preference plus admin featured live music override update, `python3 -m unittest backend.tests.test_ticketmaster_events_unit backend.tests.test_featured_live_music_unit backend.tests.test_city_events_filtering_contract backend.tests.test_tonight_page_contract backend.tests.test_itinerary_buckets_unit backend.tests.test_admin_dashboard_contract` passed (`74` tests)
 - after the admin Sponsorships tab plus Tonight’s Move sponsorship update, `python3 -m unittest backend.tests.test_ticketmaster_events_unit backend.tests.test_featured_live_music_unit backend.tests.test_tonight_move_sponsorship_unit backend.tests.test_city_events_filtering_contract backend.tests.test_tonight_page_contract backend.tests.test_itinerary_buckets_unit backend.tests.test_admin_dashboard_contract` is the required rerun target
+- after the Ticketmaster cron rate-limit hardening update, `python3 -m unittest backend.tests.test_ticketmaster_events_unit backend.tests.test_ticketmaster_sync_job_unit backend.tests.test_ticketmaster_sync_endpoint_unit` passed (`72` tests)
+- `python3 backend/discover_ynd_candidates.py --report-template` passed locally and a full dry-run report was generated via Google Places without writing to Mongo
+- `python3 backend/curate_ynd_candidates.py --allow-refresh` rebuilt the full candidate pool from Google Places and generated the balanced curation review files without writing to Mongo
 
 Unverified in this local patching session:
 - frontend Jest was not runnable locally because workspace JS dependencies are not installed and `craco` is unavailable on PATH
 - frontend build/lint was not runnable locally because `frontend/node_modules` is missing and neither `craco` nor `react-scripts` is available in the workspace
 - no browser/manual QA was run here
 - no production changes were made
+- `python3 -m py_compile backend/ticketmaster_events.py backend/ticketmaster_sync_job.py` was not a useful validation signal locally because macOS Python cache writes are blocked in this sandbox (`PermissionError` under `~/Library/Caches/com.apple.python`)

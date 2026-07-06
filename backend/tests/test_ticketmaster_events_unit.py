@@ -16,6 +16,7 @@ sys.path.insert(0, str(BACKEND_DIR))
 
 from ticketmaster_events import (  # noqa: E402
     TicketmasterClient,
+    TicketmasterRateLimitError,
     api_sync_response,
     apply_event_sync,
     attach_events_to_businesses,
@@ -38,6 +39,7 @@ from ticketmaster_events import (  # noqa: E402
     match_business_for_venue,
     normalize_venue_name,
     require_apply_approval,
+    retry_after_delay_seconds,
     supported_city_config,
     ticketmaster_event_document,
     utc_city_day_window,
@@ -458,6 +460,33 @@ class TestClient(unittest.TestCase):
         with self.assertRaises(socket.timeout):
             client.events_for_date("nashville", "2026-06-01")
         self.assertEqual(opener.calls, 3)
+
+    def test_retries_rate_limit_once_then_returns_events(self):
+        error = HTTPError("https://example.com", 429, "Too Many Requests", {"Retry-After": "1"}, None)
+        opener = SequenceOpener([error, {"_embedded": {"events": [event()]}}])
+        sleeps = []
+        client = TicketmasterClient(api_key="backend-secret", opener=opener, sleeper=sleeps.append)
+        self.assertEqual(len(client.events_for_date("nashville", "2026-06-01")), 1)
+        self.assertEqual(opener.calls, 2)
+        self.assertEqual(sleeps, [1.0])
+
+    def test_raises_rate_limit_error_after_bounded_retry(self):
+        error = HTTPError("https://example.com", 429, "Too Many Requests", {"Retry-After": "12"}, None)
+        opener = SequenceOpener([error, error])
+        sleeps = []
+        client = TicketmasterClient(api_key="backend-secret", opener=opener, sleeper=sleeps.append, max_attempts=2)
+        with self.assertRaises(TicketmasterRateLimitError) as ctx:
+            client.events_for_date("nashville", "2026-06-01")
+        self.assertEqual(ctx.exception.retry_after, "12")
+        self.assertEqual(sleeps, [5.0])
+
+    def test_retry_after_delay_parses_seconds_and_http_dates(self):
+        self.assertEqual(retry_after_delay_seconds("7"), 7.0)
+        delay = retry_after_delay_seconds(
+            "Wed, 01 Jul 2026 12:00:10 GMT",
+            now=datetime(2026, 7, 1, 12, 0, 0, tzinfo=timezone.utc),
+        )
+        self.assertEqual(delay, 10.0)
 
     def test_frontend_source_does_not_reference_ticketmaster_api_key(self):
         frontend_source = "\n".join(
