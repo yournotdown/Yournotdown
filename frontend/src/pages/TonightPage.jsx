@@ -54,6 +54,7 @@ export default function TonightPage() {
       excludeEventIds = [],
       liveMusicEventMode = "normal",
       lockedStepsBySlot = {},
+      scrollToTopOnSuccess = false,
     } = {}) => {
       setError(null);
       try {
@@ -88,6 +89,11 @@ export default function TonightPage() {
           setLastTicketmasterEventIds([liveMusicEventId]);
         } else if (!entertainmentLocked && liveMusicEventMode === "ticketmaster") {
           setLastTicketmasterEventIds([]);
+        }
+        if (scrollToTopOnSuccess && typeof window !== "undefined") {
+          window.requestAnimationFrame(() => {
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          });
         }
       } catch (e) {
         setError(e?.response?.data?.detail || "Couldn't plan tonight. Try again.");
@@ -141,6 +147,7 @@ export default function TonightPage() {
       excludeEventIds: liveMusicEventMode === "ticketmaster" ? lastTicketmasterEventIds : [],
       liveMusicEventMode,
       lockedStepsBySlot: lockedSteps,
+      scrollToTopOnSuccess: true,
     });
   };
 

@@ -8,6 +8,7 @@
    - confirm it auto-opens only after all 4 steps are locked
    - confirm `Keep editing` closes it without unlocking cards
    - confirm unlocking any step prevents immediate reopen until all 4 are locked again
+   - confirm clicking `Another Night` from the bottom of the page scrolls smoothly back to the top only after the refreshed itinerary is visible
    - confirm valid email submission shows `Sent — check your email.` when Resend env vars are configured
    - confirm valid email submission shows the honest `provider_unconfigured` message when Resend env vars are absent
    - confirm a forced provider failure path shows `Saved, but the email could not be sent. Try again.`
@@ -70,6 +71,7 @@
    - Tonight’s Move Sponsorship save/activate/clear flow works
    - active sponsor name/link/tagline render cleanly on `/:citySlug/tonight?vibe=...`
 13. Manually QA the desktop and tablet layouts for `/:citySlug` and `/:citySlug/vibe` at 1440px, 1728px, tablet, and mobile widths to confirm the landing hero and 2x2 vibe grid now feel intentional without regressing mobile.
+   - specifically confirm `/nashville/vibe` shows all 4 vibe cards above the fold on a standard desktop viewport without feeling cramped
 14. Define and implement a schema/data cleanup for event-like catalog rows so future public suppression can be generic and data-driven instead of name-based.
 15. If frontend regression testing is needed locally, install the frontend JS dependencies first so `craco test` and `craco build` can run; current workspace does not have `craco` or `react-scripts` available.
 16. Keep `First Horizon Park` and `Grand Ole Opry House` intentionally unmatched unless approved business records or explicit mapping rules change.
