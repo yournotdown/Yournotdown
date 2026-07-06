@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title>YND</title>
+  <rect width="64" height="64" rx="14" fill="#050505"/>
+  <rect x="8" y="8" width="48" height="48" rx="10" fill="#0E0E12" stroke="rgba(255,255,255,0.08)"/>
+  <path d="M17 18h8.2l6.6 12 6.4-12H46l-10.1 18.4V46h-8.1v-9.4L17 18Zm31.2 0H55v28h-5.4L37.8 28.2V46H31V18h5.8l11.4 18V18Z" fill="#C6FF00"/>
+</svg>

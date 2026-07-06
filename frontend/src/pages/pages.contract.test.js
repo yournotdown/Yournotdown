@@ -7,6 +7,7 @@ const adminDashboardSource = fs.readFileSync(path.join(__dirname, "AdminDashboar
 const businessClaimSource = fs.readFileSync(path.join(__dirname, "BusinessClaimPage.jsx"), "utf8");
 const businessDashboardSource = fs.readFileSync(path.join(__dirname, "BusinessDashboardPage.jsx"), "utf8");
 const appSource = fs.readFileSync(path.join(__dirname, "..", "App.js"), "utf8");
+const indexHtmlSource = fs.readFileSync(path.join(__dirname, "..", "..", "public", "index.html"), "utf8");
 
 describe("TonightPage source contract", () => {
   test("Another Night scrolls to the top after a successful reroll", () => {
@@ -24,6 +25,13 @@ describe("TonightPage source contract", () => {
     expect(tonightPageSource).toContain('onAction("ticket_click", b, step, {');
     expect(tonightPageSource).toContain("event_id: event.external_event_id || event.id");
     expect(tonightPageSource).toContain("event_source: event.source");
+  });
+
+  test("headline keeps sponsorship near MOVE instead of above the title", () => {
+    expect(tonightPageSource).toContain('<span className="block">Tonight\'s</span>');
+    expect(tonightPageSource).toContain('mt-2 flex flex-col items-start gap-3 sm:flex-row sm:items-end sm:gap-4');
+    expect(tonightPageSource).toContain('data-testid="tonight-sponsorship"');
+    expect(tonightPageSource).toContain("Sponsored by");
   });
 });
 
@@ -82,5 +90,12 @@ describe("Business owner routes source contract", () => {
     expect(businessDashboardSource).toContain("Sponsor tier:");
     expect(businessDashboardSource).not.toContain("MVP");
     expect(businessDashboardSource).not.toContain("being prepared");
+  });
+});
+
+describe("Brand assets contract", () => {
+  test("index.html prefers the local YND SVG favicon", () => {
+    expect(indexHtmlSource).toContain('rel="icon" type="image/svg+xml" href="%PUBLIC_URL%/favicon.svg"');
+    expect(indexHtmlSource).toContain('rel="alternate icon" href="%PUBLIC_URL%/favicon.svg"');
   });
 });

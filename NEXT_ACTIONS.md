@@ -6,6 +6,10 @@
    - `/business/dashboard` loads with the owner session instead of `Not authenticated`
    - reopening the consumed invite fails cleanly
    - revoking owner access kills `/api/business/me` and `/business/dashboard`
+0. Manually QA the latest frontend polish before any deploy approval:
+   - confirm the browser tab favicon is the new YND lime-on-black mark instead of the generic globe
+   - confirm Tonight's Move sponsorship no longer renders above the headline
+   - confirm the sponsor badge now sits beside or directly under `MOVE`, reads clearly, and feels larger/premium on desktop and mobile
 0. Manually QA the new business-owner invite flow before any deploy approval:
    - open an existing business in the admin edit modal and confirm the Business Owner Access section loads
    - send an invite with Resend configured and confirm the email arrives with the claim link

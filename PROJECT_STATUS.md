@@ -23,6 +23,16 @@ Latest local business-owner hotfix update:
   - `cd frontend && npm run build` passed
   - `cd frontend && CI=true npm test -- --watchAll=false` passed
 
+Latest local frontend polish update:
+- replaced the generic browser-tab icon with a local branded SVG favicon in `frontend/public/favicon.svg`
+- `frontend/public/index.html` now explicitly prefers `%PUBLIC_URL%/favicon.svg`, so the YND lime-on-black mark takes precedence over the default browser globe
+- moved Tonight's Move sponsorship placement out of the pre-headline area and into the `MOVE` line itself in `frontend/src/pages/TonightPage.jsx`
+- the sponsor treatment is now a larger lime-accent pill with optional logo, `Sponsored by` label, sponsor name link, and optional tagline
+- mobile behavior remains safe because the sponsor badge stacks under the `MOVE` line on small screens and shifts inline to the right on larger screens
+- local verification for this polish pass:
+  - `cd frontend && npm run build` passed
+  - `cd frontend && CI=true npm test -- --watchAll=false` passed (`3` suites, `21` tests)
+
 The immediate production issue is no longer cron execution. Ticketmaster sync and the Railway cron are verified working in production, and the current local follow-up is correcting how today/tonight event data is filtered and rendered in the customer-facing product.
 
 Latest local analytics foundation update:

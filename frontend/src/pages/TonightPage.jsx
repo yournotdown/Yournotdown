@@ -266,40 +266,6 @@ export default function TonightPage() {
         <div className="text-[10px] uppercase tracking-[0.3em] text-white/40 mb-3">
           Curated for {vibeMeta.emoji} {vibeMeta.label}
         </div>
-        {sponsorship?.sponsor_name && (
-          <div className="mb-4 flex items-center gap-3 text-white/70" data-testid="tonight-sponsorship">
-            {sponsorship.sponsor_logo_url ? (
-              <img
-                src={sponsorship.sponsor_logo_url}
-                alt=""
-                className="h-8 w-8 rounded-md object-cover border border-white/10"
-              />
-            ) : null}
-            <div className="min-w-0">
-              <div className="text-[10px] uppercase tracking-[0.28em] text-white/40">Sponsored by</div>
-              {sponsorship.sponsor_url ? (
-                <a
-                  href={sponsorship.sponsor_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-display text-sm text-white hover:text-[#C6FF00] transition-colors"
-                  data-testid="tonight-sponsorship-link"
-                >
-                  {sponsorship.sponsor_name}
-                </a>
-              ) : (
-                <div className="font-display text-sm text-white" data-testid="tonight-sponsorship-name">
-                  {sponsorship.sponsor_name}
-                </div>
-              )}
-              {sponsorship.tagline ? (
-                <div className="text-xs text-white/45" data-testid="tonight-sponsorship-tagline">
-                  {sponsorship.tagline}
-                </div>
-              ) : null}
-            </div>
-          </div>
-        )}
         <motion.h1
           className="font-flyer text-white uppercase"
           style={{
@@ -313,7 +279,54 @@ export default function TonightPage() {
           transition={{ duration: 0.55 }}
           data-testid="tonight-headline"
         >
-          Tonight's<br />Move<span className="lime-dot">.</span>
+          <span className="block">Tonight's</span>
+          <span className="mt-2 flex flex-col items-start gap-3 sm:flex-row sm:items-end sm:gap-4">
+            <span>
+              Move<span className="lime-dot">.</span>
+            </span>
+            {sponsorship?.sponsor_name ? (
+              <span
+                className="notranslate inline-flex max-w-full items-center gap-3 rounded-full border border-[#C6FF00]/35 bg-[#0E0E12] px-4 py-3 text-left align-middle text-[0.9rem] normal-case tracking-normal text-white shadow-[0_0_24px_rgba(198,255,0,0.12)] sm:mb-2 sm:px-5 sm:py-3 sm:text-[1rem]"
+                data-testid="tonight-sponsorship"
+              >
+                {sponsorship.sponsor_logo_url ? (
+                  <img
+                    src={sponsorship.sponsor_logo_url}
+                    alt=""
+                    className="h-10 w-10 rounded-xl object-cover border border-[#C6FF00]/20"
+                  />
+                ) : null}
+                <span className="min-w-0">
+                  <span className="block text-[10px] uppercase tracking-[0.28em] text-[#C6FF00]/78">
+                    Sponsored by
+                  </span>
+                  {sponsorship.sponsor_url ? (
+                    <a
+                      href={sponsorship.sponsor_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block truncate font-display text-lg leading-none text-white hover:text-[#C6FF00] transition-colors"
+                      data-testid="tonight-sponsorship-link"
+                    >
+                      {sponsorship.sponsor_name}
+                    </a>
+                  ) : (
+                    <span
+                      className="block truncate font-display text-lg leading-none text-white"
+                      data-testid="tonight-sponsorship-name"
+                    >
+                      {sponsorship.sponsor_name}
+                    </span>
+                  )}
+                  {sponsorship.tagline ? (
+                    <span className="mt-1 block text-[11px] normal-case text-white/52" data-testid="tonight-sponsorship-tagline">
+                      {sponsorship.tagline}
+                    </span>
+                  ) : null}
+                </span>
+              </span>
+            ) : null}
+          </span>
         </motion.h1>
       </div>
 
