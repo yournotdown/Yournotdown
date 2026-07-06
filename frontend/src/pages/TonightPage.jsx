@@ -184,6 +184,8 @@ export default function TonightPage() {
         setSaveSuccess("Sent — check your email.");
       } else if (r.data?.delivery_status === "provider_unconfigured") {
         setSaveSuccess("Your move is saved. Email sending is not configured yet.");
+      } else if (r.data?.delivery_status === "failed") {
+        setSaveSuccess("Saved, but the email could not be sent. Try again.");
       } else {
         setSaveSuccess("Your move is saved. Email sending is not configured yet.");
       }

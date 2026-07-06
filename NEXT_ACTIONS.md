@@ -8,10 +8,17 @@
    - confirm it auto-opens only after all 4 steps are locked
    - confirm `Keep editing` closes it without unlocking cards
    - confirm unlocking any step prevents immediate reopen until all 4 are locked again
-   - confirm valid email submission shows the honest `provider_unconfigured` message in the current environment
+   - confirm valid email submission shows `Sent — check your email.` when Resend env vars are configured
+   - confirm valid email submission shows the honest `provider_unconfigured` message when Resend env vars are absent
+   - confirm a forced provider failure path shows `Saved, but the email could not be sent. Try again.`
    - confirm invalid email shows `Enter a valid email.`
-3. If Blake approves the next chunk, wire a real email provider into the existing `/api/itinerary/save` scaffold instead of changing the saved-itinerary document semantics.
-4. Treat `frontend/package-lock.json` as the intended install baseline going forward; use `cd frontend && npm install` for reproducible local/frontend CI setup and avoid falling back to ad hoc AJV patching.
+3. If Blake wants this live in Railway, configure:
+   - `RESEND_API_KEY`
+   - `RESEND_FROM_EMAIL`
+   - optional `RESEND_REPLY_TO`
+   - optional `PUBLIC_SITE_URL` or `FRONTEND_PUBLIC_URL`
+4. After Railway env vars are configured, manually verify a real end-to-end transactional email from `/api/itinerary/save` before any deploy approval.
+5. Treat `frontend/package-lock.json` as the intended install baseline going forward; use `cd frontend && npm install` for reproducible local/frontend CI setup and avoid falling back to ad hoc AJV patching.
 
 ## Top 5 Next Tasks
 

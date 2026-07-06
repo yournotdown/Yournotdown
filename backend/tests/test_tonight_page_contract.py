@@ -51,7 +51,9 @@ class TestTonightPageContract(unittest.TestCase):
         self.assertIn('const closeSaveOverlay = () => {', TONIGHT_PAGE_SOURCE)
         self.assertIn('const handleSaveItinerary = async () => {', TONIGHT_PAGE_SOURCE)
         self.assertIn('const r = await api.post("/itinerary/save", {', TONIGHT_PAGE_SOURCE)
+        self.assertIn('delivery_status === "sent"', TONIGHT_PAGE_SOURCE)
         self.assertIn('delivery_status === "provider_unconfigured"', TONIGHT_PAGE_SOURCE)
+        self.assertIn('delivery_status === "failed"', TONIGHT_PAGE_SOURCE)
 
     def test_live_music_step_renders_event_details_inline(self):
         self.assertIn("Tonight: {event.title}", TONIGHT_PAGE_SOURCE)
