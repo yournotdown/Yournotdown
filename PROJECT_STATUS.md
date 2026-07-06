@@ -61,6 +61,8 @@ Operational constraints preserved in this session:
 - no local or production apply sync execution from the new cron entrypoint
 
 Latest local patch state:
+- fixed a frontend runtime crash on `/:citySlug/tonight` and `/:citySlug/vibe` follow-throughs by moving the derived `sponsorship` binding below the `itinerary` state declaration in `frontend/src/pages/TonightPage.jsx`, eliminating the `Cannot access 'c' before initialization` temporal-dead-zone failure reported from the production bundle
+- added a focused source contract assertion in `backend/tests/test_tonight_page_contract.py` to keep `const sponsorship = itinerary?.tonight_move_sponsorship;` ordered after `const [itinerary, setItinerary] = useState(null);`
 - added shared city-event eligibility logic for public event reads and itinerary event attachment
 - excluded `cancelled`, `canceled`, and `offsale` event statuses from public/today eligibility
 - added same-day stale filtering with a configurable grace window via `EVENT_START_GRACE_MINUTES` defaulting to 60
@@ -97,6 +99,13 @@ Latest local patch state:
 - generated a Nashville discovery report at `backend/discovery_reports/nashville_next_candidates.json` and `.csv` covering ZIP codes `37201`, `37203`, `37204`, `37205`, `37206`, `37207`, `37208`, `37209`, `37210`, `37211`, and `37212`
 - added a second-stage curation script at `backend/curate_ynd_candidates.py` that rebuilds the full dry-run candidate pool when needed, applies stronger YND taste filters, assigns curation metadata, and writes balanced `top60`, `maybe`, and `rejected` review files without importing anything
 - generated balanced curation outputs at `backend/discovery_reports/nashville_next_candidates_balanced_top60.json`, `.csv`, `..._maybe.csv`, and `..._rejected.csv`; current balanced result lands at `56` candidates with a remaining live-music shortfall of `4`
+- hard-rejected `Dee's Country Cocktail Lounge` across the Nashville discovery workflow so it is excluded from supplement/import-ready outputs and retained only in `nashville_next_candidates_rejected.csv` with `user_rejected; outside_target_zip; not_ynd_fit`
+- added `backend/build_nashville_import_ready.py` and generated `backend/discovery_reports/nashville_import_ready_approved_55.json` plus `.csv`, containing the current 54 approved balanced candidates plus `Jane's Hideaway`; validation is clean for duplicates/place IDs/addresses, with 6 missing-website rows and 2 mild concern rows (`3rd & Lindsley Bar & Grill`, `The Row Kitchen & Pub`)
+- hard-rejected `Jane's Hideaway` as `user_rejected; closed`, removed it from the balanced selected set, human-review approved rows, live-music supplement approved rows, and import-ready outputs, and regenerated the import-ready set as `backend/discovery_reports/nashville_import_ready_approved_54.json` plus `.csv`
+- added `backend/validate_nashville_import_ready.py` and generated `backend/discovery_reports/nashville_import_ready_approved_54_validated.json` plus `..._validation_report.txt`; the dry-run transform now maps the 54 approved candidates into the current `Business` schema, confirms JSON/CSV source consistency, finds zero duplicate/schema errors, flags 6 rows missing websites, and keeps 2 mild-concern live-music rows
+- added `backend/enrich_nashville_import_ready_photos.py` and used the existing `google_place_id` values to fetch Google Place Details for only `Pelato - Nashville`, `iggy’s`, `The Amsterdamian`, and `BigShotz`; all 4 now have 10 `photo_references` in the import-ready payload and 10 `google_photo_names` in the validated payload, reducing `missing_photo_rows` from 4 to 0 without writing to Mongo or applying any import
+- regenerated `backend/discovery_reports/nashville_import_ready_approved_54.json`, `.csv`, `..._validated.json`, and `..._validation_report.txt` after the photo enrichment pass; local validation stayed clean, and the importer dry-run was not attempted because `MONGO_URL` was not available in the runtime environment used for the script
+- added `backend/import_nashville_approved_candidates.py`, a production-safe importer for the approved Nashville 54 that defaults to dry-run, requires `--apply --confirm IMPORT_NASHVILLE_APPROVED_54` for real writes, inserts only non-duplicates into `db.businesses`, never updates or deletes rows, and is covered by focused unit tests
 - kept the safe Ticketmaster alias `Ole Red - Nashville` -> `Ole Red`
 - did not add First Horizon Park itinerary matching
 - did not add broad aliases for venues missing approved business records
@@ -122,6 +131,7 @@ Before this cron-entrypoint update, the repo had local-only tooling prepared for
 - manual Ticketmaster apply sync in production is now verified successful
 
 Verification completed in this local patching session:
+- `python3 -m unittest backend.tests.test_tonight_page_contract` passed (`6` tests) after the Tonight page TDZ fix
 - `python3 -m unittest backend.tests.test_ticketmaster_events_unit backend.tests.test_city_events_filtering_contract` passed (`45` tests)
 - Python AST parse check passed for `backend/server.py` and `backend/ticketmaster_events.py`
 - after the Tonight-flow patch, `python3 -m unittest backend.tests.test_ticketmaster_events_unit backend.tests.test_city_events_filtering_contract` passed again (`49` tests)

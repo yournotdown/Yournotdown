@@ -28,7 +28,6 @@ export default function TonightPage() {
   const [searchParams] = useSearchParams();
   const vibe = searchParams.get("vibe") || "down";
   const vibeMeta = VIBE_LABELS[vibe] || { emoji: "✨", label: vibe };
-  const sponsorship = itinerary?.tonight_move_sponsorship;
 
   const [itinerary, setItinerary] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -37,6 +36,7 @@ export default function TonightPage() {
   const [refreshCount, setRefreshCount] = useState(0);
   const [lastTicketmasterEventIds, setLastTicketmasterEventIds] = useState([]);
   const [regenerating, setRegenerating] = useState(false);
+  const sponsorship = itinerary?.tonight_move_sponsorship;
 
   const generate = useCallback(
     async ({ excludeIds = [], excludeEventIds = [], liveMusicEventMode = "normal" } = {}) => {

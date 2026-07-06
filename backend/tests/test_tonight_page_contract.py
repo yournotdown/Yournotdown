@@ -40,6 +40,10 @@ class TestTonightPageContract(unittest.TestCase):
 
     def test_tonight_page_renders_active_sponsorship_when_present(self):
         self.assertIn("const sponsorship = itinerary?.tonight_move_sponsorship;", TONIGHT_PAGE_SOURCE)
+        self.assertLess(
+            TONIGHT_PAGE_SOURCE.index("const [itinerary, setItinerary] = useState(null);"),
+            TONIGHT_PAGE_SOURCE.index("const sponsorship = itinerary?.tonight_move_sponsorship;"),
+        )
         self.assertIn('data-testid="tonight-sponsorship"', TONIGHT_PAGE_SOURCE)
         self.assertIn("Sponsored by", TONIGHT_PAGE_SOURCE)
         self.assertIn('data-testid="tonight-sponsorship-link"', TONIGHT_PAGE_SOURCE)
