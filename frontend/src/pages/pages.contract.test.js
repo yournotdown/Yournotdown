@@ -81,6 +81,7 @@ describe("Business owner routes source contract", () => {
     expect(businessClaimSource).toContain('api.get("/business/me")');
     expect(businessClaimSource).toContain('window.location.replace("/business/dashboard")');
     expect(businessClaimSource).toContain("Create Account");
+    expect(businessClaimSource).not.toContain("MVP");
   });
 
   test("dashboard shell contains business and sponsor language", () => {
@@ -90,6 +91,11 @@ describe("Business owner routes source contract", () => {
     expect(businessDashboardSource).toContain("Sponsor tier:");
     expect(businessDashboardSource).not.toContain("MVP");
     expect(businessDashboardSource).not.toContain("being prepared");
+  });
+
+  test("admin revoke action is immediate and clears the local owner email field", () => {
+    expect(adminDashboardSource).toContain('.post(`/admin/businesses/${editing.id}/owner-access/revoke`)');
+    expect(adminDashboardSource).toContain('setOwnerInviteEmail("")');
   });
 });
 

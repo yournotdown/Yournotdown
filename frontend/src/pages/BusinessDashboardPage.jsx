@@ -1,6 +1,17 @@
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 
+const ownerSessionError = (err) => {
+  const detail = err?.response?.data?.detail || "";
+  if (detail === "Not authenticated" || detail === "Invalid session" || detail === "Session revoked") {
+    return "Your secure business session is not active in this browser. Please use the latest invite link again.";
+  }
+  if (detail === "Owner access revoked") {
+    return "Your business portal access is no longer active.";
+  }
+  return detail || "Business access is unavailable.";
+};
+
 const EMPTY_ANALYTICS = {
   appearances: 0,
   locked_in: 0,
@@ -26,7 +37,7 @@ export default function BusinessDashboardPage() {
         setOwner(ownerData);
         setAnalytics({ ...EMPTY_ANALYTICS, ...(analyticsData || {}) });
       })
-      .catch((err) => setError(err?.response?.data?.detail || "Business access is unavailable."));
+      .catch((err) => setError(ownerSessionError(err)));
   }, []);
 
   if (error) {

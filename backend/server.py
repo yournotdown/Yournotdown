@@ -786,10 +786,10 @@ def _owner_safe(owner: Optional[dict], business: Optional[dict] = None) -> Optio
 
 async def _owner_access_summary(business_id: str) -> dict:
     latest_invite = await db.business_owner_invites.find(
-        {"business_id": business_id},
+        {"business_id": business_id, "status": "pending"},
         {"_id": 0},
     ).sort([("created_at", -1)]).to_list(1)
-    owner = await db.business_owners.find_one({"business_id": business_id}, {"_id": 0})
+    owner = await db.business_owners.find_one({"business_id": business_id, "status": "active"}, {"_id": 0})
     invite = latest_invite[0] if latest_invite else None
     return {
         "business_id": business_id,
@@ -1786,7 +1786,7 @@ async def admin_revoke_business_owner_access(business_id: str, user=Depends(requ
     )
     await db.business_owners.update_many(
         {"business_id": business_id, "status": "active"},
-        {"$set": {"status": "revoked"}},
+        {"$set": {"status": "revoked", "revoked_at": revoked_at}},
     )
     await db.business_owner_sessions.update_many(
         {"business_id": business_id, "revoked_at": None},

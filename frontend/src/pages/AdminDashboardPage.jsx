@@ -378,6 +378,7 @@ export default function AdminDashboardPage() {
         email: ownerInviteEmail,
       });
       setOwnerAccess(response.data);
+      setOwnerInviteEmail(response.data?.invite?.email || response.data?.owner?.email || "");
       toast.success(
         response.data?.invite?.delivery_status === "provider_unconfigured"
           ? "Invite saved, but email sending is not configured."
@@ -396,6 +397,7 @@ export default function AdminDashboardPage() {
     try {
       const response = await api.post(`/admin/businesses/${editing.id}/owner-access/revoke`);
       setOwnerAccess(response.data);
+      setOwnerInviteEmail("");
       toast.success("Owner access revoked");
     } catch (e) {
       toast.error(e?.response?.data?.detail || "Failed to revoke owner access");

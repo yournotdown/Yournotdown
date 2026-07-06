@@ -2,6 +2,14 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api } from "../lib/api";
 
+const ownerSessionError = (err, fallback) => {
+  const detail = err?.response?.data?.detail || "";
+  if (detail === "Not authenticated" || detail === "Invalid session" || detail === "Session revoked") {
+    return "Your secure business access could not be completed in this browser. Please open the latest invite link again. If this keeps happening, support may need to finish the secure portal domain setup.";
+  }
+  return detail || fallback;
+};
+
 export default function BusinessClaimPage() {
   const { token } = useParams();
   const [error, setError] = useState("");
@@ -17,7 +25,7 @@ export default function BusinessClaimPage() {
         }
       } catch (err) {
         if (mounted) {
-          setError(err?.response?.data?.detail || "This invite link is not valid anymore.");
+          setError(ownerSessionError(err, "This invite link is not valid anymore."));
         }
       }
     })();

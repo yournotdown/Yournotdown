@@ -1,5 +1,10 @@
 ## Immediate Follow-Up
 
+0. Before expecting the business-owner portal to work reliably across Safari/mobile browsers, put the backend behind a same-site custom domain such as `api.yournotdown.com`, then point the frontend `REACT_APP_BACKEND_URL` at that domain and re-run the fresh invite QA for `lansingblake@gmail.com`.
+0. After the next owner-access deploy, send a fresh invite to `lansingblake@gmail.com` and confirm:
+   - the admin panel clears owner email / pending invite state immediately after revoke
+   - reopened invite links fail cleanly after revoke
+   - `/business/dashboard` loads on the intended browser after claim
 0. After the business-owner hotfix deploy, send a fresh invite to `lansingblake@gmail.com` for `The End` and manually verify:
    - invite email no longer contains `MVP`
    - claim link succeeds end to end

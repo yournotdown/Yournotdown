@@ -6,6 +6,23 @@ The repo is currently on branch `main`. The only known worktree changes outside 
 
 ## Latest Work Session
 
+Latest local owner-access follow-up update:
+- fixed a real revoke-state bug in the business-owner scaffold:
+  - `backend/server.py` `_owner_access_summary()` now only returns pending invites and active owners
+  - `POST /api/admin/businesses/{business_id}/owner-access/revoke` now stamps `revoked_at` on active owners in addition to revoking pending invites and active owner sessions
+  - `frontend/src/pages/AdminDashboardPage.jsx` now clears the local owner email field immediately after revoke instead of leaving stale invite text in the panel
+- improved owner-facing auth failure copy:
+  - `frontend/src/pages/BusinessClaimPage.jsx` no longer surfaces raw `Not authenticated` / `Invalid session` text directly to invited businesses
+  - `frontend/src/pages/BusinessDashboardPage.jsx` now maps missing/revoked owner-session failures to cleaner business-facing messages
+- important architecture finding remains:
+  - secure HTTP-only owner-cookie auth is still cross-site today because the frontend runs on `yournotdown.com` while the backend API is still on the Railway hostname
+  - that means owner-session cookies can still be unreliable or blocked in stricter browsers, especially Safari, even though the code path itself is now cleaner
+  - for reliable cross-browser owner access, the backend should move behind a same-site custom domain such as `api.yournotdown.com`, with the frontend `REACT_APP_BACKEND_URL` updated to that domain
+- local verification for this owner-access follow-up:
+  - `python3 -m unittest backend.tests.test_business_owner_contract backend.tests.test_analytics_contract backend.tests.test_saved_itinerary_contract backend.tests.test_locked_steps_contract backend.tests.test_tonight_page_contract backend.tests.test_city_events_filtering_contract backend.tests.test_ticketmaster_events_unit` passed (`99` tests)
+  - `cd frontend && npm run build` passed
+  - `cd frontend && CI=true npm test -- --watchAll=false` passed (`3` suites, `22` tests)
+
 Latest local business-owner hotfix update:
 - patched the owner invite / claim flow after real QA exposed two issues in Chunk C: business-facing copy said `MVP`, and a successful invite claim could still land on `/business/dashboard` with `Not authenticated`
 - removed internal product-development wording from business-facing owner surfaces:

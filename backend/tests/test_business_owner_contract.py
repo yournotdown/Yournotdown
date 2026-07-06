@@ -96,14 +96,34 @@ class TestBusinessOwnerContract(unittest.TestCase):
         self.assertIn('path="/"', source)
         self.assertIn('"status": "accepted"', source)
 
+    def test_claim_endpoint_reuses_invite_exactly_once(self):
+        source = ast.get_source_segment(SERVER_SOURCE, named_function("business_claim"))
+        self.assertIn('if invite.get("status") == "accepted":', source)
+        self.assertIn('raise HTTPException(status_code=400, detail="This invite has already been used.")', source)
+        self.assertIn('if invite.get("status") != "pending":', source)
+
     def test_owner_auth_and_me_endpoints_are_business_scoped(self):
         auth_source = ast.get_source_segment(SERVER_SOURCE, named_function("get_current_business_owner"))
         self.assertIn('business_owner_session: Optional[str] = Cookie(None)', auth_source)
+        self.assertIn('raise HTTPException(status_code=401, detail="Not authenticated")', auth_source)
         self.assertIn('await db.business_owner_sessions.find_one({"session_token_hash": token_hash}', auth_source)
         self.assertIn('await db.businesses.find_one({"id": owner["business_id"]}', auth_source)
         me_source = ast.get_source_segment(SERVER_SOURCE, named_function("business_me"))
         self.assertIn("Depends(get_current_business_owner)", me_source)
         self.assertIn('_owner_safe(owner_ctx["owner"], owner_ctx["business"])', me_source)
+
+    def test_owner_access_summary_only_returns_pending_invites_and_active_owner(self):
+        summary_source = ast.get_source_segment(SERVER_SOURCE, named_function("_owner_access_summary"))
+        self.assertIn('{"business_id": business_id, "status": "pending"}', summary_source)
+        self.assertIn('{"business_id": business_id, "status": "active"}', summary_source)
+
+    def test_revoke_endpoint_revokes_pending_invites_active_owner_and_sessions(self):
+        source = ast.get_source_segment(SERVER_SOURCE, named_function("admin_revoke_business_owner_access"))
+        self.assertIn('{"business_id": business_id, "status": "pending"}', source)
+        self.assertIn('{"business_id": business_id, "status": "active"}', source)
+        self.assertIn('{"business_id": business_id, "revoked_at": None}', source)
+        self.assertIn('"status": "revoked"', source)
+        self.assertIn('"revoked_at": revoked_at', source)
 
     def test_provider_unconfigured_when_resend_env_missing(self):
         previous = {
@@ -146,6 +166,17 @@ class TestBusinessOwnerContract(unittest.TestCase):
         self.assertIn("https://www.yournotdown.com/business/claim/test-token", text_body)
         self.assertNotIn("MVP", html_body)
         self.assertIn("No password required.", html_body)
+
+    def test_owner_business_facing_sources_do_not_use_internal_product_language(self):
+        frontend_root = Path(__file__).resolve().parents[2] / "frontend" / "src" / "pages"
+        claim_source = (frontend_root / "BusinessClaimPage.jsx").read_text()
+        dashboard_source = (frontend_root / "BusinessDashboardPage.jsx").read_text()
+        for source in (EMAIL_SOURCE, claim_source, dashboard_source):
+            self.assertNotIn("MVP", source)
+            self.assertNotIn("prototype", source)
+            self.assertNotIn("placeholder", source)
+            self.assertNotIn("being prepared", source)
+            self.assertNotIn("not ready", source)
 
     def test_owner_cors_uses_explicit_allowed_origins(self):
         self.assertIn("def _cors_allowed_origins()", SERVER_SOURCE)
