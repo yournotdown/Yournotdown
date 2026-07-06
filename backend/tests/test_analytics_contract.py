@@ -42,6 +42,30 @@ class TestAnalyticsContract(unittest.TestCase):
         self.assertIn('await db.analytics_events.insert_many(saved_step_events)', source)
         self.assertIn('logger.warning("saved_itinerary_business analytics write failed: %s", exc)', source)
 
+    def test_admin_summary_supports_filters_and_leaderboards(self):
+        source = ast.get_source_segment(SERVER_SOURCE, named_function("admin_analytics_summary"))
+        self.assertIn('days: str = "30"', source)
+        self.assertIn("city_slug: Optional[str] = None", source)
+        self.assertIn("vibe: Optional[str] = None", source)
+        self.assertIn("slot: Optional[str] = None", source)
+        self.assertIn('"slot_leaderboards": slot_leaderboards', source)
+        self.assertIn('"top_saved_in_final_move_businesses": top_saved_in_final_move_businesses', source)
+        self.assertIn('"top_website_click_businesses": top_website_click_businesses', source)
+        self.assertIn('"top_directions_click_businesses": top_directions_click_businesses', source)
+        self.assertIn('"top_phone_click_businesses": top_phone_click_businesses', source)
+        self.assertIn('"top_click_through_businesses": top_click_through_businesses', source)
+        self.assertIn('"top_sponsor_businesses": top_sponsor_businesses', source)
+        self.assertIn('"vibe_breakdown": vibe_breakdown', source)
+        self.assertIn('"totals": totals', source)
+
+    def test_metric_aliases_define_total_engagement_and_safe_rate(self):
+        source = ast.get_source_segment(SERVER_SOURCE, named_function("_metric_aliases"))
+        self.assertIn('"appearances": counts.get("business_appearance", 0)', source)
+        self.assertIn('"locked_in": counts.get("step_locked", 0)', source)
+        self.assertIn('"saved_in_final_move": counts.get("saved_itinerary_business", 0)', source)
+        self.assertIn('"ticket_clicks": counts.get("ticket_click", 0)', source)
+        self.assertIn('if counts.get("business_appearance", 0)', source)
+
 
 if __name__ == "__main__":
     unittest.main()

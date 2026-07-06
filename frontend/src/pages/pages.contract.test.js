@@ -3,6 +3,7 @@ import path from "path";
 
 const tonightPageSource = fs.readFileSync(path.join(__dirname, "TonightPage.jsx"), "utf8");
 const vibePageSource = fs.readFileSync(path.join(__dirname, "VibePage.jsx"), "utf8");
+const adminDashboardSource = fs.readFileSync(path.join(__dirname, "AdminDashboardPage.jsx"), "utf8");
 
 describe("TonightPage source contract", () => {
   test("Another Night scrolls to the top after a successful reroll", () => {
@@ -36,5 +37,17 @@ describe("VibePage source contract", () => {
     expect(vibePageSource).toContain("lg:max-h-[210px]");
     expect(vibePageSource).toContain("lg:gap-x-4 lg:gap-y-4");
     expect(vibePageSource).toContain("lg:pt-16 lg:pb-20");
+  });
+});
+
+describe("AdminDashboardPage source contract", () => {
+  test("admin analytics surfaces sponsor-grade leaderboard labels", () => {
+    expect(adminDashboardSource).toContain("Locked In");
+    expect(adminDashboardSource).toContain("Saved in Final Move");
+    expect(adminDashboardSource).toContain("Buy Tickets");
+    expect(adminDashboardSource).toContain("Sponsor Performance");
+    expect(adminDashboardSource).toContain("Dinner");
+    expect(adminDashboardSource).toContain("Drinks");
+    expect(adminDashboardSource).toContain("Late Night");
   });
 });

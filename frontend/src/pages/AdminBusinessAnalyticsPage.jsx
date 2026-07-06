@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  ArrowLeft, Eye, Globe, Phone, Navigation, Pencil, Flame,
+  ArrowLeft, Eye, Globe, Phone, Navigation, Pencil, Flame, Ticket, Lock, ClipboardCheck, TrendingUp,
 } from "lucide-react";
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, Legend,
@@ -11,9 +11,13 @@ import { api, resolveImageUrl } from "../lib/api";
 
 const METRICS = [
   { key: "business_appearance", label: "Appearances", icon: Eye, color: "#FFD166" },
+  { key: "step_locked", label: "Locked In", icon: Lock, color: "#C6FF00" },
+  { key: "saved_itinerary_business", label: "Saved in Final Move", icon: ClipboardCheck, color: "#60A5FA" },
   { key: "website_click", label: "Website clicks", icon: Globe, color: "#7C3AED" },
+  { key: "ticket_click", label: "Buy Tickets", icon: Ticket, color: "#FB923C" },
   { key: "phone_click", label: "Phone calls", icon: Phone, color: "#22D3EE" },
   { key: "directions_click", label: "Directions", icon: Navigation, color: "#A78BFA" },
+  { key: "total_engagement", label: "Total engagement", icon: TrendingUp, color: "#F8FAFC" },
 ];
 
 export default function AdminBusinessAnalyticsPage() {
@@ -58,7 +62,7 @@ export default function AdminBusinessAnalyticsPage() {
   const ctr =
     totals.business_appearance > 0
       ? (
-          ((totals.website_click + totals.phone_click + totals.directions_click) /
+          (totals.total_engagement /
             totals.business_appearance) *
           100
         ).toFixed(1)
@@ -135,8 +139,8 @@ export default function AdminBusinessAnalyticsPage() {
           <div>
             <h2 className="font-display text-2xl font-bold">Performance</h2>
             <p className="text-sm text-[#A1A1AA] mt-1">
-              Conversion rate: <span className="text-white font-bold">{ctr}%</span> (clicks per
-              impression)
+              Engagement rate: <span className="text-white font-bold">{ctr}%</span> (total engagement per
+              appearance)
             </p>
           </div>
           <div className="flex bg-[#121218] border border-white/10 rounded-full p-1">
@@ -250,9 +254,13 @@ export default function AdminBusinessAnalyticsPage() {
           >
 {`${b.name} — last ${days} days on You're Not Down
 ${totals.business_appearance.toLocaleString()} appearances in itineraries
+${totals.step_locked.toLocaleString()} locked in
+${totals.saved_itinerary_business.toLocaleString()} saved in final moves
 ${totals.website_click.toLocaleString()} website clicks
+${totals.ticket_click.toLocaleString()} ticket clicks
 ${totals.phone_click.toLocaleString()} phone calls
-${totals.directions_click.toLocaleString()} direction requests`}
+${totals.directions_click.toLocaleString()} direction requests
+${totals.total_engagement.toLocaleString()} total engagement`}
           </pre>
         </div>
       </div>

@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import {
   Plus, Pencil, Trash2, Star, ArrowUp, ArrowDown, Upload,
   LogOut, BarChart3, Store, LayoutGrid, Image as ImageIcon, TrendingUp,
-  ClipboardCheck, CheckCircle, XCircle, ExternalLink,
+  ClipboardCheck, CheckCircle, XCircle, ExternalLink, Globe, Phone, Navigation, Ticket, Lock,
 } from "lucide-react";
 import { api, resolveImageUrl } from "../lib/api";
 import { Button } from "@/components/ui/button";
@@ -88,6 +88,12 @@ export default function AdminDashboardPage() {
   const [categories, setCategories] = useState([]);
   const [allTags, setAllTags] = useState([]);
   const [analytics, setAnalytics] = useState(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsFilters, setAnalyticsFilters] = useState({
+    days: "30",
+    vibe: "all",
+    slot: "all",
+  });
   const [importSummary, setImportSummary] = useState(null);
   const [featuredLiveMusic, setFeaturedLiveMusic] = useState(emptyFeaturedLiveMusic);
   const [tonightMoveSponsorship, setTonightMoveSponsorship] = useState(emptyTonightMoveSponsorship);
@@ -122,11 +128,10 @@ export default function AdminDashboardPage() {
 
   const loadAll = useCallback(async () => {
     try {
-      const [biz, cats, tagsRes, analytics, importSummary, featured, sponsorship] = await Promise.all([
+      const [biz, cats, tagsRes, importSummary, featured, sponsorship] = await Promise.all([
         api.get("/admin/businesses").then((r) => r.data),
         api.get("/admin/categories").then((r) => r.data),
         api.get("/admin/tags").then((r) => r.data),
-        api.get("/admin/analytics/summary").then((r) => r.data),
         api.get("/admin/businesses/import-summary").then((r) => r.data),
         api.get("/admin/featured-events/live-music").then((r) => r.data),
         api.get("/admin/sponsorships/tonight-move").then((r) => r.data),
@@ -134,7 +139,6 @@ export default function AdminDashboardPage() {
       setBusinesses(biz);
       setCategories(cats);
       setAllTags(tagsRes.tags || []);
-      setAnalytics(analytics);
       setImportSummary(importSummary);
       setFeaturedLiveMusic({ ...emptyFeaturedLiveMusic, ...(featured || {}) });
       setTonightMoveSponsorship({ ...emptyTonightMoveSponsorship, ...(sponsorship || {}) });
@@ -143,9 +147,29 @@ export default function AdminDashboardPage() {
     }
   }, []);
 
+  const loadAnalytics = useCallback(async () => {
+    if (!user) return;
+    setAnalyticsLoading(true);
+    try {
+      const params = { days: analyticsFilters.days };
+      if (analyticsFilters.vibe !== "all") params.vibe = analyticsFilters.vibe;
+      if (analyticsFilters.slot !== "all") params.slot = analyticsFilters.slot;
+      const response = await api.get("/admin/analytics/summary", { params });
+      setAnalytics(response.data);
+    } catch (e) {
+      toast.error("Failed to load analytics");
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  }, [analyticsFilters.days, analyticsFilters.slot, analyticsFilters.vibe, user]);
+
   useEffect(() => {
     if (user) loadAll();
   }, [user, loadAll]);
+
+  useEffect(() => {
+    if (user) loadAnalytics();
+  }, [user, loadAnalytics]);
 
   const openCreate = () => {
     setEditing(null);
@@ -422,7 +446,16 @@ export default function AdminDashboardPage() {
             savingTonightMoveSponsorship={savingTonightMoveSponsorship}
           />
         )}
-        {tab === "analytics" && <AnalyticsPanel analytics={analytics} categories={categories} onOpenBusiness={(bid) => navigate(`/admin/business/${bid}`)} />}
+        {tab === "analytics" && (
+          <AnalyticsPanel
+            analytics={analytics}
+            analyticsLoading={analyticsLoading}
+            filters={analyticsFilters}
+            onFiltersChange={setAnalyticsFilters}
+            categories={categories}
+            onOpenBusiness={(bid) => navigate(`/admin/business/${bid}`)}
+          />
+        )}
         {tab === "imports" && (
           <ImportReviewPanel
             businesses={businesses}
@@ -1370,48 +1403,207 @@ function ItineraryBucketBadge({ bucket }) {
   );
 }
 
-function AnalyticsPanel({ analytics, categories, onOpenBusiness }) {
+function MetricCell({ row, field }) {
+  return <span className="text-[#A1A1AA]">{(row?.[field] || 0).toLocaleString()}</span>;
+}
+
+function AnalyticsStatCard({ label, value, icon: Icon, accent = "text-[#C6FF00]" }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-[#121218] border border-white/10 rounded-3xl p-5 sm:p-6"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="text-xs uppercase tracking-[0.22em] text-[#A1A1AA] font-bold">{label}</div>
+        <Icon className={`w-4 h-4 ${accent}`} />
+      </div>
+      <div className="font-display text-4xl font-black mt-4 tracking-tight">
+        {(value || 0).toLocaleString()}
+      </div>
+    </motion.div>
+  );
+}
+
+function LeaderboardTable({ title, rows, metricLabel, metricField, onOpenBusiness, emptyCopy = "No data yet." }) {
+  return (
+    <div className="bg-[#121218] border border-white/10 rounded-3xl overflow-hidden">
+      <div className="px-5 py-4 border-b border-white/5 flex items-center justify-between gap-3">
+        <h4 className="font-display text-lg font-bold">{title}</h4>
+        <span className="text-[10px] uppercase tracking-[0.22em] text-white/35">{metricLabel}</span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-[10px] uppercase tracking-[0.22em] text-[#A1A1AA]">
+              <th className="px-5 py-3">Business</th>
+              <th className="px-3 py-3">Tier</th>
+              <th className="px-3 py-3">{metricLabel}</th>
+              <th className="px-3 py-3">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows?.length ? (
+              rows.slice(0, 8).map((row) => (
+                <tr
+                  key={`${title}-${row.business_id}`}
+                  className="border-t border-white/5 hover:bg-white/[0.03] cursor-pointer"
+                  onClick={() => onOpenBusiness(row.business_id)}
+                >
+                  <td className="px-5 py-3 font-medium">{row.name}</td>
+                  <td className="px-3 py-3"><SponsorBadge tier={row.sponsor_tier || "none"} /></td>
+                  <td className="px-3 py-3 text-[#A1A1AA]">{(row?.[metricField] || 0).toLocaleString()}</td>
+                  <td className="px-3 py-3 text-white">{(row?.total_engagement || 0).toLocaleString()}</td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={4} className="px-5 py-8 text-center text-[#A1A1AA]">
+                  {emptyCopy}
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function SponsorPerformanceTable({ rows }) {
+  return (
+    <div className="bg-[#121218] border border-white/10 rounded-3xl overflow-x-auto" data-testid="admin-sponsor-performance">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-left text-[10px] uppercase tracking-[0.22em] text-[#A1A1AA]">
+            <th className="px-5 py-4">Tier</th>
+            <th className="px-3 py-4">Appearances</th>
+            <th className="px-3 py-4">Locked In</th>
+            <th className="px-3 py-4">Saved</th>
+            <th className="px-3 py-4">Website</th>
+            <th className="px-3 py-4">Directions</th>
+            <th className="px-3 py-4">Buy Tickets</th>
+            <th className="px-3 py-4">Phone</th>
+            <th className="px-3 py-4">Total</th>
+            <th className="px-3 py-4">Rate</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows?.length ? (
+            rows.map((row) => (
+              <tr key={row.tier} className="border-t border-white/5">
+                <td className="px-5 py-3"><SponsorBadge tier={row.tier} testid={`sponsor-row-tier-${row.tier}`} /></td>
+                <td className="px-3 py-3 text-[#A1A1AA]">{(row.appearances || 0).toLocaleString()}</td>
+                <td className="px-3 py-3 text-[#A1A1AA]">{(row.locked_in || 0).toLocaleString()}</td>
+                <td className="px-3 py-3 text-[#A1A1AA]">{(row.saved_in_final_move || 0).toLocaleString()}</td>
+                <td className="px-3 py-3 text-[#A1A1AA]">{(row.website_clicks || 0).toLocaleString()}</td>
+                <td className="px-3 py-3 text-[#A1A1AA]">{(row.directions_clicks || 0).toLocaleString()}</td>
+                <td className="px-3 py-3 text-[#A1A1AA]">{(row.ticket_clicks || 0).toLocaleString()}</td>
+                <td className="px-3 py-3 text-[#A1A1AA]">{(row.phone_clicks || 0).toLocaleString()}</td>
+                <td className="px-3 py-3 text-white">{(row.total_engagement || 0).toLocaleString()}</td>
+                <td className="px-3 py-3 text-[#A1A1AA]">{`${((row.engagement_rate || 0) * 100).toFixed(1)}%`}</td>
+              </tr>
+            ))
+          ) : (
+            <tr>
+              <td colSpan={10} className="px-5 py-8 text-center text-[#A1A1AA]">
+                No sponsor activity yet.
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function AnalyticsPanel({ analytics, analyticsLoading, filters, onFiltersChange, categories, onOpenBusiness }) {
+  if (analyticsLoading && !analytics) {
+    return <div className="text-[#A1A1AA]" data-testid="admin-analytics-loading">Loading analytics…</div>;
+  }
   if (!analytics) {
     return <div className="text-[#A1A1AA]" data-testid="admin-analytics-loading">Loading analytics…</div>;
   }
   const ev = analytics.by_event_type || {};
+  const totals = analytics.totals || {};
   const cards = [
-    { label: "Homepage visits", value: ev.homepage_visit || 0, icon: LayoutGrid },
-    { label: "I'm Down clicks", value: ev.im_down_click || 0, icon: Star },
-    { label: "Vibe selections", value: ev.vibe_click || 0, icon: BarChart3 },
-    { label: "Itinerary views", value: ev.itinerary_view || 0, icon: TrendingUp },
-    { label: "Another Night clicks", value: ev.another_night_click || 0, icon: BarChart3 },
-    { label: "Business appearances", value: ev.business_appearance || 0, icon: Store },
-    { label: "Website clicks", value: ev.website_click || 0, icon: ImageIcon },
-    { label: "Phone clicks", value: ev.phone_click || 0, icon: ImageIcon },
-    { label: "Directions clicks", value: ev.directions_click || 0, icon: ImageIcon },
+    { label: "Appearances", value: totals.appearances || 0, icon: Store, accent: "text-[#C6FF00]" },
+    { label: "Locked In", value: totals.locked_in || 0, icon: Lock, accent: "text-[#FFD166]" },
+    { label: "Saved in Final Move", value: totals.saved_in_final_move || 0, icon: ClipboardCheck, accent: "text-sky-300" },
+    { label: "Website Clicks", value: totals.website_clicks || 0, icon: Globe, accent: "text-fuchsia-300" },
+    { label: "Directions Clicks", value: totals.directions_clicks || 0, icon: Navigation, accent: "text-cyan-300" },
+    { label: "Buy Tickets", value: totals.ticket_clicks || 0, icon: Ticket, accent: "text-orange-300" },
+    { label: "Phone Clicks", value: totals.phone_clicks || 0, icon: Phone, accent: "text-emerald-300" },
+    { label: "Total Engagement", value: totals.total_engagement || 0, icon: TrendingUp, accent: "text-white" },
   ];
   const catName = (slug) => categories.find((c) => c.slug === slug)?.name || slug;
   const sponsorPerf = analytics.sponsor_performance || [];
+  const vibeBreakdown = analytics.vibe_breakdown || [];
+  const slotBoards = analytics.slot_leaderboards || {};
 
   return (
     <div className="space-y-10" data-testid="admin-analytics">
-      <div>
-        <h2 className="font-display text-3xl font-bold">Analytics</h2>
-        <p className="text-sm text-[#A1A1AA] mt-1">Live engagement, no fluff.</p>
+      <div className="flex items-end justify-between gap-4 flex-wrap">
+        <div>
+          <h2 className="font-display text-3xl font-bold">Analytics</h2>
+          <p className="text-sm text-[#A1A1AA] mt-1">Live engagement, no fluff.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex bg-[#121218] border border-white/10 rounded-full p-1">
+            {["7", "30", "90", "all"].map((days) => (
+              <button
+                key={days}
+                onClick={() => onFiltersChange((prev) => ({ ...prev, days }))}
+                className={`px-4 py-1.5 text-xs font-bold rounded-full transition-colors ${
+                  filters.days === days ? "bg-[#7C3AED] text-white" : "text-[#A1A1AA] hover:text-white"
+                }`}
+                data-testid={`admin-analytics-range-${days}`}
+              >
+                {days === "all" ? "All time" : `${days}d`}
+              </button>
+            ))}
+          </div>
+          <Select
+            value={filters.vibe}
+            onValueChange={(value) => onFiltersChange((prev) => ({ ...prev, vibe: value }))}
+          >
+            <SelectTrigger className="w-56 bg-[#121218] border-white/10 text-white" data-testid="admin-analytics-filter-vibe">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="bg-[#121218] border-white/10 text-white">
+              <SelectItem value="all" className="focus:bg-white/10 focus:text-white">All vibes</SelectItem>
+              <SelectItem value="just-vibing" className="focus:bg-white/10 focus:text-white">Take It Easy</SelectItem>
+              <SelectItem value="down" className="focus:bg-white/10 focus:text-white">Let&apos;s See Where This Goes</SelectItem>
+              <SelectItem value="very-down" className="focus:bg-white/10 focus:text-white">Let&apos;s Make It Count</SelectItem>
+              <SelectItem value="send-it" className="focus:bg-white/10 focus:text-white">No Regrets</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select
+            value={filters.slot}
+            onValueChange={(value) => onFiltersChange((prev) => ({ ...prev, slot: value }))}
+          >
+            <SelectTrigger className="w-52 bg-[#121218] border-white/10 text-white" data-testid="admin-analytics-filter-slot">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="bg-[#121218] border-white/10 text-white">
+              <SelectItem value="all" className="focus:bg-white/10 focus:text-white">All slots</SelectItem>
+              <SelectItem value="dinner" className="focus:bg-white/10 focus:text-white">Dinner</SelectItem>
+              <SelectItem value="drinks" className="focus:bg-white/10 focus:text-white">Drinks</SelectItem>
+              <SelectItem value="entertainment" className="focus:bg-white/10 focus:text-white">Entertainment / Live Music</SelectItem>
+              <SelectItem value="late-night" className="focus:bg-white/10 focus:text-white">Late Night</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         {cards.map((c) => (
-          <motion.div
-            key={c.label}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-[#121218] border border-white/10 rounded-2xl p-5"
-          >
-            <div className="text-xs uppercase tracking-wide text-[#A1A1AA] font-bold">{c.label}</div>
-            <div className="font-display text-3xl font-black mt-2">{c.value.toLocaleString()}</div>
-          </motion.div>
+          <AnalyticsStatCard key={c.label} {...c} />
         ))}
       </div>
 
       <div>
-        <h3 className="font-display text-xl font-bold mb-4">By category</h3>
+        <h3 className="font-display text-xl font-bold mb-4">Category click heat</h3>
         <div className="bg-[#121218] border border-white/10 rounded-2xl divide-y divide-white/5">
           {analytics.by_category.length === 0 ? (
             <div className="p-5 text-sm text-[#A1A1AA]">No category clicks yet.</div>
@@ -1427,35 +1619,84 @@ function AnalyticsPanel({ analytics, categories, onOpenBusiness }) {
       </div>
 
       <div>
-        <h3 className="font-display text-xl font-bold mb-4">Sponsor performance</h3>
-        <div className="bg-[#121218] border border-white/10 rounded-2xl overflow-x-auto" data-testid="admin-sponsor-performance">
+        <h3 className="font-display text-xl font-bold mb-4">Category Winners</h3>
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          <LeaderboardTable title="Dinner" rows={slotBoards.dinner || []} metricLabel="Total" metricField="total_engagement" onOpenBusiness={onOpenBusiness} />
+          <LeaderboardTable title="Drinks" rows={slotBoards.drinks || []} metricLabel="Total" metricField="total_engagement" onOpenBusiness={onOpenBusiness} />
+          <LeaderboardTable title="Entertainment / Live Music" rows={slotBoards.entertainment || []} metricLabel="Total" metricField="total_engagement" onOpenBusiness={onOpenBusiness} />
+          <LeaderboardTable title="Late Night" rows={slotBoards["late-night"] || []} metricLabel="Total" metricField="total_engagement" onOpenBusiness={onOpenBusiness} />
+        </div>
+      </div>
+
+      <div>
+        <h3 className="font-display text-xl font-bold mb-4">Winners</h3>
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          <LeaderboardTable title="Most Locked In" rows={analytics.top_locked_in_businesses || []} metricLabel="Locked In" metricField="locked_in" onOpenBusiness={onOpenBusiness} />
+          <LeaderboardTable title="Most Saved in Final Move" rows={analytics.top_saved_in_final_move_businesses || []} metricLabel="Saved" metricField="saved_in_final_move" onOpenBusiness={onOpenBusiness} />
+          <LeaderboardTable title="Top Click-Through Businesses" rows={analytics.top_click_through_businesses || []} metricLabel="Clicks" metricField="total_click_through" onOpenBusiness={onOpenBusiness} />
+          <LeaderboardTable title="Top Businesses by Total Engagement" rows={analytics.top_businesses_by_total_engagement || []} metricLabel="Total" metricField="total_engagement" onOpenBusiness={onOpenBusiness} />
+        </div>
+      </div>
+
+      <div>
+        <h3 className="font-display text-xl font-bold mb-4">Click Leaders</h3>
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          <LeaderboardTable title="Top Website Click Businesses" rows={analytics.top_website_click_businesses || []} metricLabel="Website" metricField="website_clicks" onOpenBusiness={onOpenBusiness} />
+          <LeaderboardTable title="Top Directions Click Businesses" rows={analytics.top_directions_click_businesses || []} metricLabel="Directions" metricField="directions_clicks" onOpenBusiness={onOpenBusiness} />
+          <LeaderboardTable title="Top Buy Tickets Click Businesses" rows={analytics.top_ticket_click_businesses || []} metricLabel="Buy Tickets" metricField="ticket_clicks" onOpenBusiness={onOpenBusiness} />
+          <LeaderboardTable title="Top Phone Click Businesses" rows={analytics.top_phone_click_businesses || []} metricLabel="Phone" metricField="phone_clicks" onOpenBusiness={onOpenBusiness} />
+        </div>
+      </div>
+
+      <div>
+        <h3 className="font-display text-xl font-bold mb-4">Sponsor Performance</h3>
+        <SponsorPerformanceTable rows={sponsorPerf} />
+      </div>
+
+      <div>
+        <h3 className="font-display text-xl font-bold mb-4">Top sponsor performers</h3>
+        <div className="bg-[#121218] border border-white/10 rounded-2xl overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-xs uppercase tracking-wide text-[#A1A1AA]">
-                <th className="px-5 py-4">Tier</th>
+                <th className="px-5 py-4">Business</th>
+                <th className="px-3 py-4">Tier</th>
                 <th className="px-3 py-4">Appearances</th>
+                <th className="px-3 py-4">Locked In</th>
+                <th className="px-3 py-4">Saved</th>
                 <th className="px-3 py-4">Website</th>
-                <th className="px-3 py-4">Phone</th>
                 <th className="px-3 py-4">Directions</th>
+                <th className="px-3 py-4">Buy Tickets</th>
+                <th className="px-3 py-4">Phone</th>
+                <th className="px-3 py-4">Total</th>
+                <th className="px-3 py-4">Rate</th>
               </tr>
             </thead>
             <tbody>
-              {sponsorPerf.length === 0 ? (
+              {(analytics.top_sponsor_businesses || []).length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-5 py-8 text-center text-[#A1A1AA]">
-                    No sponsor activity yet.
+                  <td colSpan={10} className="px-5 py-8 text-center text-[#A1A1AA]">
+                    No sponsor businesses yet.
                   </td>
                 </tr>
               ) : (
-                sponsorPerf.map((row) => (
-                  <tr key={row.tier} className="border-t border-white/5">
-                    <td className="px-5 py-3">
-                      <SponsorBadge tier={row.tier} testid={`sponsor-row-tier-${row.tier}`} />
-                    </td>
-                    <td className="px-3 py-3 text-[#A1A1AA]">{row.business_appearance || 0}</td>
-                    <td className="px-3 py-3 text-[#A1A1AA]">{row.website_click || 0}</td>
-                    <td className="px-3 py-3 text-[#A1A1AA]">{row.phone_click || 0}</td>
-                    <td className="px-3 py-3 text-[#A1A1AA]">{row.directions_click || 0}</td>
+                (analytics.top_sponsor_businesses || []).map((row) => (
+                  <tr
+                    key={row.business_id}
+                    className="border-t border-white/5 hover:bg-white/[0.03] cursor-pointer"
+                    onClick={() => onOpenBusiness(row.business_id)}
+                  >
+                    <td className="px-5 py-3 font-medium">{row.name}</td>
+                    <td className="px-3 py-3"><SponsorBadge tier={row.sponsor_tier || "none"} /></td>
+                    <td className="px-3 py-3 text-[#A1A1AA]">{(row.appearances || 0).toLocaleString()}</td>
+                    <td className="px-3 py-3 text-[#A1A1AA]">{(row.locked_in || 0).toLocaleString()}</td>
+                    <td className="px-3 py-3 text-[#A1A1AA]">{(row.saved_in_final_move || 0).toLocaleString()}</td>
+                    <td className="px-3 py-3 text-[#A1A1AA]">{(row.website_clicks || 0).toLocaleString()}</td>
+                    <td className="px-3 py-3 text-[#A1A1AA]">{(row.directions_clicks || 0).toLocaleString()}</td>
+                    <td className="px-3 py-3 text-[#A1A1AA]">{(row.ticket_clicks || 0).toLocaleString()}</td>
+                    <td className="px-3 py-3 text-[#A1A1AA]">{(row.phone_clicks || 0).toLocaleString()}</td>
+                    <td className="px-3 py-3 text-white">{(row.total_engagement || 0).toLocaleString()}</td>
+                    <td className="px-3 py-3 text-[#A1A1AA]">{`${((row.engagement_rate || 0) * 100).toFixed(1)}%`}</td>
                   </tr>
                 ))
               )}
@@ -1465,7 +1706,45 @@ function AnalyticsPanel({ analytics, categories, onOpenBusiness }) {
       </div>
 
       <div>
-        <h3 className="font-display text-xl font-bold mb-4">By business</h3>
+        <h3 className="font-display text-xl font-bold mb-4">Stats by vibe</h3>
+        <div className="bg-[#121218] border border-white/10 rounded-2xl overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs uppercase tracking-wide text-[#A1A1AA]">
+                <th className="px-5 py-4">Vibe</th>
+                <th className="px-3 py-4">Appearances</th>
+                <th className="px-3 py-4">Locked In</th>
+                <th className="px-3 py-4">Saved</th>
+                <th className="px-3 py-4">Buy Tickets</th>
+                <th className="px-3 py-4">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {vibeBreakdown.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-5 py-8 text-center text-[#A1A1AA]">
+                    No vibe analytics yet.
+                  </td>
+                </tr>
+              ) : (
+                vibeBreakdown.map((row) => (
+                  <tr key={row.vibe} className="border-t border-white/5">
+                    <td className="px-5 py-3 font-medium">{row.vibe}</td>
+                    <td className="px-3 py-3 text-[#A1A1AA]">{(row.appearances || 0).toLocaleString()}</td>
+                    <td className="px-3 py-3 text-[#A1A1AA]">{(row.locked_in || 0).toLocaleString()}</td>
+                    <td className="px-3 py-3 text-[#A1A1AA]">{(row.saved_in_final_move || 0).toLocaleString()}</td>
+                    <td className="px-3 py-3 text-[#A1A1AA]">{(row.ticket_clicks || 0).toLocaleString()}</td>
+                    <td className="px-3 py-3 text-white">{(row.total_engagement || 0).toLocaleString()}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div>
+        <h3 className="font-display text-xl font-bold mb-4">All business performance</h3>
         <div className="bg-[#121218] border border-white/10 rounded-2xl overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -1473,15 +1752,19 @@ function AnalyticsPanel({ analytics, categories, onOpenBusiness }) {
                 <th className="px-5 py-4">Business</th>
                 <th className="px-3 py-4">Tier</th>
                 <th className="px-3 py-4">Appearances</th>
+                <th className="px-3 py-4">Locked In</th>
+                <th className="px-3 py-4">Saved</th>
                 <th className="px-3 py-4">Website</th>
-                <th className="px-3 py-4">Phone</th>
                 <th className="px-3 py-4">Directions</th>
+                <th className="px-3 py-4">Buy Tickets</th>
+                <th className="px-3 py-4">Phone</th>
+                <th className="px-3 py-4">Total</th>
               </tr>
             </thead>
             <tbody>
               {analytics.by_business.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-5 py-8 text-center text-[#A1A1AA]">
+                  <td colSpan={10} className="px-5 py-8 text-center text-[#A1A1AA]">
                     No business events yet.
                   </td>
                 </tr>
@@ -1495,10 +1778,14 @@ function AnalyticsPanel({ analytics, categories, onOpenBusiness }) {
                   >
                     <td className="px-5 py-3 font-medium">{row.name}</td>
                     <td className="px-3 py-3"><SponsorBadge tier={row.sponsor_tier || "none"} /></td>
-                    <td className="px-3 py-3 text-[#A1A1AA]">{row.business_appearance || 0}</td>
-                    <td className="px-3 py-3 text-[#A1A1AA]">{row.website_click || 0}</td>
-                    <td className="px-3 py-3 text-[#A1A1AA]">{row.phone_click || 0}</td>
-                    <td className="px-3 py-3 text-[#A1A1AA]">{row.directions_click || 0}</td>
+                    <td className="px-3 py-3 text-[#A1A1AA]">{row.appearances || 0}</td>
+                    <td className="px-3 py-3 text-[#A1A1AA]">{row.locked_in || 0}</td>
+                    <td className="px-3 py-3 text-[#A1A1AA]">{row.saved_in_final_move || 0}</td>
+                    <td className="px-3 py-3 text-[#A1A1AA]">{row.website_clicks || 0}</td>
+                    <td className="px-3 py-3 text-[#A1A1AA]">{row.directions_clicks || 0}</td>
+                    <td className="px-3 py-3 text-[#A1A1AA]">{row.ticket_clicks || 0}</td>
+                    <td className="px-3 py-3 text-[#A1A1AA]">{row.phone_clicks || 0}</td>
+                    <td className="px-3 py-3 text-white">{row.total_engagement || 0}</td>
                   </tr>
                 ))
               )}

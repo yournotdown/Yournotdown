@@ -645,6 +645,83 @@ BUSINESS_SCOPED_EVENT_TYPES = {
     "saved_itinerary_business",
 }
 
+LEADERBOARD_METRIC_EVENT_KEYS = [
+    "business_appearance",
+    "business_view",
+    "step_locked",
+    "saved_itinerary_business",
+    "website_click",
+    "directions_click",
+    "ticket_click",
+    "phone_click",
+]
+
+LEADERBOARD_SLOTS = ["dinner", "drinks", "entertainment", "late-night"]
+
+
+def _normalize_analytics_days(days: str) -> Optional[int]:
+    value = (days or "30").strip().lower()
+    if value == "all":
+        return None
+    if value not in {"7", "30", "90"}:
+        raise HTTPException(status_code=400, detail="days must be one of 7, 30, 90, all")
+    return int(value)
+
+
+def _analytics_since(days: str) -> Optional[str]:
+    normalized_days = _normalize_analytics_days(days)
+    if normalized_days is None:
+        return None
+    return (datetime.now(timezone.utc) - timedelta(days=normalized_days)).isoformat()
+
+
+def _analytics_match_query(*, days: str = "30", city_slug: Optional[str] = None,
+                           vibe: Optional[str] = None) -> dict:
+    query = {}
+    since = _analytics_since(days)
+    if since:
+        query["timestamp"] = {"$gte": since}
+    if city_slug:
+        query["city_slug"] = city_slug
+    if vibe:
+        query["vibe"] = vibe
+    return query
+
+
+def _metric_aliases(counts: dict) -> dict:
+    total_click_through = (
+        counts.get("website_click", 0)
+        + counts.get("directions_click", 0)
+        + counts.get("ticket_click", 0)
+        + counts.get("phone_click", 0)
+    )
+    total_engagement = sum(counts.get(key, 0) for key in LEADERBOARD_METRIC_EVENT_KEYS)
+    return {
+        "appearances": counts.get("business_appearance", 0),
+        "business_views": counts.get("business_view", 0),
+        "locked_in": counts.get("step_locked", 0),
+        "saved_in_final_move": counts.get("saved_itinerary_business", 0),
+        "website_clicks": counts.get("website_click", 0),
+        "directions_clicks": counts.get("directions_click", 0),
+        "ticket_clicks": counts.get("ticket_click", 0),
+        "phone_clicks": counts.get("phone_click", 0),
+        "total_click_through": total_click_through,
+        "total_engagement": total_engagement,
+        "engagement_rate": round(total_engagement / counts.get("business_appearance", 0), 4)
+        if counts.get("business_appearance", 0)
+        else 0,
+    }
+
+
+def _leaderboard_row(business_id: str, counts: dict, *, name: str, sponsor_tier: str) -> dict:
+    return {
+        "business_id": business_id,
+        "name": name or business_id or "(unknown)",
+        "sponsor_tier": sponsor_tier or "none",
+        **counts,
+        **_metric_aliases(counts),
+    }
+
 
 def _business_event_doc(
     event_type: str,
@@ -1581,24 +1658,9 @@ async def admin_business_analytics(business_id: str, days: int = 30, user=Depend
             "phone_click": row.get("phone_click", 0),
             "directions_click": row.get("directions_click", 0),
             "ticket_click": row.get("ticket_click", 0),
-            "total_engagement": (
-                row.get("step_locked", 0)
-                + row.get("saved_itinerary_business", 0)
-                + row.get("website_click", 0)
-                + row.get("phone_click", 0)
-                + row.get("directions_click", 0)
-                + row.get("ticket_click", 0)
-            ),
+            "total_engagement": _metric_aliases(row)["total_engagement"],
         })
-
-    total_engagement = (
-        totals.get("step_locked", 0)
-        + totals.get("saved_itinerary_business", 0)
-        + totals.get("website_click", 0)
-        + totals.get("phone_click", 0)
-        + totals.get("directions_click", 0)
-        + totals.get("ticket_click", 0)
-    )
+    metric_totals = _metric_aliases(totals)
 
     return {
         "business": biz,
@@ -1611,22 +1673,44 @@ async def admin_business_analytics(business_id: str, days: int = 30, user=Depend
             "phone_click": totals.get("phone_click", 0),
             "directions_click": totals.get("directions_click", 0),
             "ticket_click": totals.get("ticket_click", 0),
-            "total_engagement": total_engagement,
+            **metric_totals,
         },
         "timeline": timeline,
     }
 
 
 @api_router.get("/admin/analytics/summary")
-async def admin_analytics_summary(user=Depends(require_admin)):
-    pipeline = [
+async def admin_analytics_summary(
+    days: str = "30",
+    city_slug: Optional[str] = None,
+    vibe: Optional[str] = None,
+    slot: Optional[str] = None,
+    user=Depends(require_admin),
+):
+    slot_filter = (slot or "").strip().lower() or None
+    if slot_filter == "all":
+        slot_filter = None
+    if slot_filter and slot_filter not in LEADERBOARD_SLOTS:
+        raise HTTPException(status_code=400, detail="slot must be one of dinner, drinks, entertainment, late-night")
+    vibe_filter = (vibe or "").strip() or None
+    if vibe_filter == "all":
+        vibe_filter = None
+    base_match = _analytics_match_query(days=days, city_slug=city_slug, vibe=vibe_filter)
+
+    pipeline = []
+    if base_match:
+        pipeline.append({"$match": base_match})
+    pipeline += [
         {"$group": {"_id": "$event_type", "count": {"$sum": 1}}},
     ]
     rows = await db.analytics_events.aggregate(pipeline).to_list(100)
     summary = {r["_id"]: r["count"] for r in rows}
 
     # per-category
-    cat_pipeline = [
+    cat_pipeline = []
+    if base_match:
+        cat_pipeline.append({"$match": base_match})
+    cat_pipeline += [
         {"$match": {"event_type": "category_click"}},
         {"$group": {"_id": "$category_slug", "count": {"$sum": 1}}},
         {"$sort": {"count": -1}},
@@ -1634,16 +1718,42 @@ async def admin_analytics_summary(user=Depends(require_admin)):
     cat_rows = await db.analytics_events.aggregate(cat_pipeline).to_list(100)
 
     # per-business
+    biz_match = {**base_match, "business_id": {"$ne": None}}
+    if slot_filter:
+        biz_match["slot"] = slot_filter
     biz_pipeline = [
-        {"$match": {"business_id": {"$ne": None}}},
+        {"$match": biz_match},
         {"$group": {"_id": {"business_id": "$business_id", "event_type": "$event_type"}, "count": {"$sum": 1}}},
     ]
     biz_rows = await db.analytics_events.aggregate(biz_pipeline).to_list(5000)
+    slot_pipeline = [
+        {"$match": {**base_match, "business_id": {"$ne": None}, "slot": {"$in": LEADERBOARD_SLOTS}}},
+        {"$group": {"_id": {"business_id": "$business_id", "event_type": "$event_type", "slot": "$slot"}, "count": {"$sum": 1}}},
+    ]
+    slot_rows = await db.analytics_events.aggregate(slot_pipeline).to_list(10000)
+    vibe_pipeline = [
+        {"$match": {**base_match, "business_id": {"$ne": None}, "vibe": {"$nin": [None, ""]}}},
+        {"$group": {"_id": {"vibe": "$vibe", "event_type": "$event_type"}, "count": {"$sum": 1}}},
+    ]
+    vibe_rows = await db.analytics_events.aggregate(vibe_pipeline).to_list(2000)
     by_biz = {}
     for r in biz_rows:
         bid = r["_id"]["business_id"]
         et = r["_id"]["event_type"]
         by_biz.setdefault(bid, {})[et] = r["count"]
+    by_slot_business: dict = {slot_name: {} for slot_name in LEADERBOARD_SLOTS}
+    for r in slot_rows:
+        bid = r["_id"]["business_id"]
+        et = r["_id"]["event_type"]
+        slot_name = r["_id"].get("slot")
+        if slot_name not in by_slot_business:
+            continue
+        by_slot_business[slot_name].setdefault(bid, {})[et] = r["count"]
+    by_vibe: dict = {}
+    for r in vibe_rows:
+        vibe_name = r["_id"]["vibe"] or "unknown"
+        et = r["_id"]["event_type"]
+        by_vibe.setdefault(vibe_name, {})[et] = r["count"]
 
     # attach business names + sponsor tier
     biz_ids = list(by_biz.keys())
@@ -1653,68 +1763,121 @@ async def admin_analytics_summary(user=Depends(require_admin)):
     name_map = {b["id"]: b["name"] for b in businesses}
     tier_map = {b["id"]: b.get("sponsor_tier", "none") for b in businesses}
     business_breakdown = [
-        {
-            "business_id": bid,
-            "name": name_map.get(bid, "(deleted)"),
-            "sponsor_tier": tier_map.get(bid, "none"),
-            "total_engagement": (
-                counts.get("step_locked", 0)
-                + counts.get("saved_itinerary_business", 0)
-                + counts.get("website_click", 0)
-                + counts.get("phone_click", 0)
-                + counts.get("directions_click", 0)
-                + counts.get("ticket_click", 0)
-            ),
-            **counts,
-        }
+        _leaderboard_row(
+            bid,
+            counts,
+            name=name_map.get(bid, bid or "(deleted)"),
+            sponsor_tier=tier_map.get(bid, "none"),
+        )
         for bid, counts in by_biz.items()
     ]
-    business_breakdown.sort(
-        key=lambda x: -(x.get("business_appearance", 0) + x.get("business_view", 0))
-    )
+    business_breakdown.sort(key=lambda row: (-row.get("total_engagement", 0), -row.get("appearances", 0), row.get("name", "")))
+    totals_source = {}
+    for row in business_breakdown:
+        for key in LEADERBOARD_METRIC_EVENT_KEYS:
+            totals_source[key] = totals_source.get(key, 0) + row.get(key, 0)
+    totals = _metric_aliases(totals_source)
 
-    # Sponsor performance: aggregate appearances + clicks by tier
-    sponsor_pipeline = [
-        {"$match": {"sponsor_tier": {"$ne": None}}},
-        {"$group": {
-            "_id": {"tier": "$sponsor_tier", "event_type": "$event_type"},
-            "count": {"$sum": 1},
-        }},
-    ]
-    sp_rows = await db.analytics_events.aggregate(sponsor_pipeline).to_list(1000)
-    by_tier: dict = {}
-    for r in sp_rows:
-        tier = r["_id"]["tier"] or "none"
-        et = r["_id"]["event_type"]
-        by_tier.setdefault(tier, {})[et] = r["count"]
+    sponsor_rollup: dict = {}
+    for row in business_breakdown:
+        tier = row.get("sponsor_tier") or "none"
+        counts = sponsor_rollup.setdefault(tier, {})
+        for key in LEADERBOARD_METRIC_EVENT_KEYS:
+            counts[key] = counts.get(key, 0) + row.get(key, 0)
     sponsor_performance = []
     for tier in ["platinum", "gold", "silver", "none"]:
-        if tier in by_tier:
-            sponsor_performance.append({"tier": tier, **by_tier[tier]})
+        if tier in sponsor_rollup:
+            sponsor_performance.append({
+                "tier": tier,
+                **sponsor_rollup[tier],
+                **_metric_aliases(sponsor_rollup[tier]),
+            })
 
-    total_events = await db.analytics_events.count_documents({})
+    total_events = await db.analytics_events.count_documents(base_match)
+    slot_leaderboards = {
+        slot_name: sorted(
+            [
+                _leaderboard_row(
+                    bid,
+                    counts,
+                    name=name_map.get(bid, bid or "(deleted)"),
+                    sponsor_tier=tier_map.get(bid, "none"),
+                )
+                for bid, counts in slot_counts.items()
+            ],
+            key=lambda row: (-row.get("total_engagement", 0), -row.get("appearances", 0), row.get("name", "")),
+        )[:10]
+        for slot_name, slot_counts in by_slot_business.items()
+    }
+    vibe_breakdown = sorted(
+        [
+            {
+                "vibe": vibe_name,
+                **counts,
+                **_metric_aliases(counts),
+            }
+            for vibe_name, counts in by_vibe.items()
+        ],
+        key=lambda row: (-row.get("total_engagement", 0), row.get("vibe", "")),
+    )
     top_businesses_by_total_engagement = sorted(
         business_breakdown,
         key=lambda row: (-row.get("total_engagement", 0), -row.get("business_appearance", 0), row.get("name", "")),
     )[:25]
     top_locked_in_businesses = sorted(
         business_breakdown,
-        key=lambda row: (-row.get("step_locked", 0), -row.get("total_engagement", 0), row.get("name", "")),
+        key=lambda row: (-row.get("locked_in", 0), -row.get("total_engagement", 0), row.get("name", "")),
+    )[:25]
+    top_saved_in_final_move_businesses = sorted(
+        business_breakdown,
+        key=lambda row: (-row.get("saved_in_final_move", 0), -row.get("total_engagement", 0), row.get("name", "")),
+    )[:25]
+    top_website_click_businesses = sorted(
+        business_breakdown,
+        key=lambda row: (-row.get("website_clicks", 0), -row.get("total_engagement", 0), row.get("name", "")),
+    )[:25]
+    top_directions_click_businesses = sorted(
+        business_breakdown,
+        key=lambda row: (-row.get("directions_clicks", 0), -row.get("total_engagement", 0), row.get("name", "")),
     )[:25]
     top_ticket_click_businesses = sorted(
         business_breakdown,
-        key=lambda row: (-row.get("ticket_click", 0), -row.get("total_engagement", 0), row.get("name", "")),
+        key=lambda row: (-row.get("ticket_clicks", 0), -row.get("total_engagement", 0), row.get("name", "")),
     )[:25]
+    top_phone_click_businesses = sorted(
+        business_breakdown,
+        key=lambda row: (-row.get("phone_clicks", 0), -row.get("total_engagement", 0), row.get("name", "")),
+    )[:25]
+    top_click_through_businesses = sorted(
+        business_breakdown,
+        key=lambda row: (-row.get("total_click_through", 0), -row.get("total_engagement", 0), row.get("name", "")),
+    )[:25]
+    top_sponsor_businesses = [row for row in top_businesses_by_total_engagement if row.get("sponsor_tier") != "none"][:25]
 
     return {
         "total_events": total_events,
+        "filters": {
+            "days": "all" if _normalize_analytics_days(days) is None else str(_normalize_analytics_days(days)),
+            "city_slug": city_slug or "",
+            "vibe": vibe_filter or "",
+            "slot": slot_filter or "",
+        },
         "by_event_type": summary,
+        "totals": totals,
         "by_category": [{"category_slug": r["_id"], "count": r["count"]} for r in cat_rows],
         "by_business": business_breakdown,
         "sponsor_performance": sponsor_performance,
+        "slot_leaderboards": slot_leaderboards,
+        "vibe_breakdown": vibe_breakdown,
         "top_businesses_by_total_engagement": top_businesses_by_total_engagement,
         "top_locked_in_businesses": top_locked_in_businesses,
+        "top_saved_in_final_move_businesses": top_saved_in_final_move_businesses,
+        "top_website_click_businesses": top_website_click_businesses,
+        "top_directions_click_businesses": top_directions_click_businesses,
         "top_ticket_click_businesses": top_ticket_click_businesses,
+        "top_phone_click_businesses": top_phone_click_businesses,
+        "top_click_through_businesses": top_click_through_businesses,
+        "top_sponsor_businesses": top_sponsor_businesses,
     }
 
 

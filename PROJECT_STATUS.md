@@ -21,6 +21,36 @@ Latest local analytics foundation update:
   - `cd frontend && CI=true npm test -- --watchAll=false` passed (`3` suites, `14` tests)
 - attempted to run existing pytest-based backend analytics integration tests, but the active local Python environment does not have `pytest` installed, so those remain unverified in this workspace until pytest is available
 
+Latest local admin analytics update:
+- implemented Chunk B of sponsor-grade admin analytics on top of the Chunk A event model without changing sponsorship weighting, business-owner auth, billing, or public-site behavior
+- `/api/admin/analytics/summary` now stays backward compatible while adding filtered leaderboard support with `days=7|30|90|all` plus optional `vibe` and `slot` filters
+- admin analytics summary now returns additive `totals`, `filters`, `slot_leaderboards`, `vibe_breakdown`, `top_locked_in_businesses`, `top_saved_in_final_move_businesses`, `top_website_click_businesses`, `top_directions_click_businesses`, `top_ticket_click_businesses`, `top_phone_click_businesses`, `top_click_through_businesses`, and `top_sponsor_businesses`
+- total engagement is now computed consistently across admin analytics as:
+  - `business_appearance`
+  - `business_view`
+  - `step_locked`
+  - `saved_itinerary_business`
+  - `website_click`
+  - `directions_click`
+  - `ticket_click`
+  - `phone_click`
+- sponsor performance tier rows now include appearances, locked-in, saved-in-final-move, click metrics, total engagement, and a safe `engagement_rate`
+- `frontend/src/pages/AdminDashboardPage.jsx` now has a richer admin-only analytics tab with:
+  - top stat cards
+  - date-range selector
+  - vibe filter
+  - slot filter
+  - category-winner tables for Dinner / Drinks / Entertainment / Late Night
+  - winner tables for Locked In, Saved in Final Move, Click-Through, Total Engagement
+  - separate click-leader tables for Website / Directions / Buy Tickets / Phone
+  - sponsor performance and sponsor leader tables
+  - vibe breakdown table
+- `frontend/src/pages/AdminBusinessAnalyticsPage.jsx` now exposes the new metrics per business: Locked In, Saved in Final Move, Buy Tickets, and Total Engagement
+- local regression results for Chunk B:
+  - `python3 -m unittest backend.tests.test_analytics_contract backend.tests.test_saved_itinerary_contract backend.tests.test_locked_steps_contract backend.tests.test_tonight_page_contract backend.tests.test_city_events_filtering_contract backend.tests.test_ticketmaster_events_unit` passed (`88` tests)
+  - `cd frontend && npm run build` passed
+  - `cd frontend && CI=true npm test -- --watchAll=false` passed (`3` suites, `15` tests)
+
 Verified production Ticketmaster cron/apply summary:
 - `status=ok`
 - `mode=apply`
