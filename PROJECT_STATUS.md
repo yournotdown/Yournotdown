@@ -8,6 +8,19 @@ The repo is currently on branch `main`. The only known worktree changes outside 
 
 The immediate production issue is no longer cron execution. Ticketmaster sync and the Railway cron are verified working in production, and the current local follow-up is correcting how today/tonight event data is filtered and rendered in the customer-facing product.
 
+Latest local analytics foundation update:
+- implemented Chunk A of sponsor-grade analytics tracking without changing itinerary selection, auth, billing, or owner-account behavior
+- `backend/server.py` now treats `ticket_click`, `step_locked`, and `saved_itinerary_business` as business-scoped analytics events, stamps `slot` plus `sponsor_tier` for new business-scoped events going forward, and preserves backward compatibility for older analytics rows that lack `slot`
+- `/api/itinerary/generate` now writes `business_appearance` events with `slot`, `category_slug`, and `source_surface="tonight_page"`
+- `/api/itinerary/save` now writes one `saved_itinerary_business` analytics event per saved step/business, but does not let analytics write failures break the save-email flow
+- `frontend/src/pages/TonightPage.jsx` now fires `step_locked` exactly on lock clicks and includes richer `ticket_click` payload fields (`slot`, `category_slug`, `event_id`, `event_source`, `source_surface`)
+- admin/business analytics backend responses now include `step_locked`, `saved_itinerary_business`, `ticket_click`, and computed `total_engagement`; admin summary also exposes additive top-business arrays for total engagement, locked-in, and ticket-click performance
+- local regression results for this chunk:
+  - `python3 -m unittest backend.tests.test_analytics_contract backend.tests.test_saved_itinerary_contract backend.tests.test_locked_steps_contract backend.tests.test_tonight_page_contract backend.tests.test_city_events_filtering_contract backend.tests.test_ticketmaster_events_unit` passed (`86` tests)
+  - `cd frontend && npm run build` passed
+  - `cd frontend && CI=true npm test -- --watchAll=false` passed (`3` suites, `14` tests)
+- attempted to run existing pytest-based backend analytics integration tests, but the active local Python environment does not have `pytest` installed, so those remain unverified in this workspace until pytest is available
+
 Verified production Ticketmaster cron/apply summary:
 - `status=ok`
 - `mode=apply`

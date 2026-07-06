@@ -38,6 +38,9 @@ class TestTonightPageContract(unittest.TestCase):
         self.assertIn("const [lockedSteps, setLockedSteps] = useState({});", TONIGHT_PAGE_SOURCE)
         self.assertIn("const handleLockStep = (step) => {", TONIGHT_PAGE_SOURCE)
         self.assertIn("const handleUnlockStep = (slot) => {", TONIGHT_PAGE_SOURCE)
+        self.assertIn('trackEvent("step_locked", {', TONIGHT_PAGE_SOURCE)
+        self.assertIn('source_surface: "tonight_page"', TONIGHT_PAGE_SOURCE)
+        self.assertIn("slot: step?.slot", TONIGHT_PAGE_SOURCE)
         self.assertIn("Lock this in", TONIGHT_PAGE_SOURCE)
         self.assertIn("Locked in", TONIGHT_PAGE_SOURCE)
         self.assertIn("Unlock", TONIGHT_PAGE_SOURCE)
@@ -60,6 +63,9 @@ class TestTonightPageContract(unittest.TestCase):
         self.assertIn('formatEventTime(event?.local_time)', TONIGHT_PAGE_SOURCE)
         self.assertIn('event.venue_name || b.name', TONIGHT_PAGE_SOURCE)
         self.assertIn('href={event.ticket_url}', TONIGHT_PAGE_SOURCE)
+        self.assertIn('onAction("ticket_click", b, step, {', TONIGHT_PAGE_SOURCE)
+        self.assertIn("event_id: event.external_event_id || event.id", TONIGHT_PAGE_SOURCE)
+        self.assertIn("event_source: event.source", TONIGHT_PAGE_SOURCE)
 
     def test_tonight_page_renders_active_sponsorship_when_present(self):
         self.assertIn("const sponsorship = itinerary?.tonight_move_sponsorship;", TONIGHT_PAGE_SOURCE)

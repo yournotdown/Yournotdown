@@ -191,6 +191,61 @@ class TestAnalytics:
         r2 = requests.post(f"{API}/analytics/track", json={"event_type": "business_view", "business_id": bid}, timeout=10)
         assert r2.status_code == 200
 
+    def test_ticket_click_and_step_locked_business_events_track(self, admin_headers):
+        r = requests.get(f"{API}/businesses", params={"category": "live-music"}, timeout=10)
+        items = r.json()
+        assert items, "Need at least one live-music business"
+        business = items[0]
+        bid = business["id"]
+
+        before = requests.get(
+            f"{API}/admin/analytics/business/{bid}",
+            headers=admin_headers,
+            timeout=10,
+        ).json()["totals"]
+
+        events = [
+            {
+                "event_type": "ticket_click",
+                "business_id": bid,
+                "category_slug": business.get("category_slug"),
+                "slot": "entertainment",
+                "city_slug": business.get("city_slug", "nashville"),
+                "vibe": "down",
+                "event_id": "tm_test_123",
+                "event_source": "ticketmaster",
+                "source_surface": "tonight_page",
+            },
+            {
+                "event_type": "step_locked",
+                "business_id": bid,
+                "category_slug": business.get("category_slug"),
+                "slot": "entertainment",
+                "city_slug": business.get("city_slug", "nashville"),
+                "vibe": "down",
+                "source_surface": "tonight_page",
+            },
+        ]
+        for event in events:
+            rr = requests.post(f"{API}/analytics/track", json=event, timeout=10)
+            assert rr.status_code == 200
+
+        after = requests.get(
+            f"{API}/admin/analytics/business/{bid}",
+            headers=admin_headers,
+            timeout=10,
+        ).json()["totals"]
+        assert after["ticket_click"] - before.get("ticket_click", 0) >= 1
+        assert after["step_locked"] - before.get("step_locked", 0) >= 1
+        assert after["total_engagement"] >= (
+            after["ticket_click"]
+            + after["step_locked"]
+            + after["saved_itinerary_business"]
+            + after["website_click"]
+            + after["phone_click"]
+            + after["directions_click"]
+        )
+
 
 # ---------------- Auth ----------------
 class TestAuth:
@@ -310,14 +365,35 @@ class TestAdminBusinessAnalytics:
         # Shape
         assert "business" in data and data["business"]["id"] == bid
         assert "totals" in data
-        for k in ("business_view", "website_click", "phone_click", "directions_click"):
+        for k in (
+            "business_view",
+            "business_appearance",
+            "step_locked",
+            "saved_itinerary_business",
+            "website_click",
+            "phone_click",
+            "directions_click",
+            "ticket_click",
+            "total_engagement",
+        ):
             assert k in data["totals"]
         # timeline length
         assert isinstance(data["timeline"], list)
         assert len(data["timeline"]) == 30
         # Each row has all 4 metrics + day
         for row in data["timeline"]:
-            for k in ("day", "business_view", "website_click", "phone_click", "directions_click"):
+            for k in (
+                "day",
+                "business_view",
+                "business_appearance",
+                "step_locked",
+                "saved_itinerary_business",
+                "website_click",
+                "phone_click",
+                "directions_click",
+                "ticket_click",
+                "total_engagement",
+            ):
                 assert k in row
 
     @pytest.mark.parametrize("days", [7, 30, 90])
@@ -347,6 +423,8 @@ class TestAdminBusinessAnalytics:
             {"event_type": "website_click", "business_id": bid},
             {"event_type": "phone_click", "business_id": bid},
             {"event_type": "directions_click", "business_id": bid},
+            {"event_type": "ticket_click", "business_id": bid},
+            {"event_type": "step_locked", "business_id": bid},
         ]
         for e in events:
             rr = requests.post(f"{API}/analytics/track", json=e, timeout=10)
@@ -360,6 +438,8 @@ class TestAdminBusinessAnalytics:
         assert totals["website_click"] - before["website_click"] >= 1
         assert totals["phone_click"] - before["phone_click"] >= 1
         assert totals["directions_click"] - before["directions_click"] >= 1
+        assert totals["ticket_click"] - before.get("ticket_click", 0) >= 1
+        assert totals["step_locked"] - before.get("step_locked", 0) >= 1
 
         # Today's row should reflect the events (last entry in timeline)
         today_row = after["timeline"][-1]
@@ -367,6 +447,47 @@ class TestAdminBusinessAnalytics:
         assert today_row["website_click"] >= 1
         assert today_row["phone_click"] >= 1
         assert today_row["directions_click"] >= 1
+        assert today_row["ticket_click"] >= 1
+        assert today_row["step_locked"] >= 1
+
+    def test_saved_itinerary_business_events_aggregate(self, admin_headers):
+        gen = requests.post(
+            f"{API}/itinerary/generate",
+            json={"vibe": "down", "city": "nashville"},
+            timeout=15,
+        )
+        assert gen.status_code == 200, gen.text
+        itinerary = gen.json()
+        first_step = itinerary["steps"][0]
+        bid = first_step["business"]["id"]
+
+        before = requests.get(
+            f"{API}/admin/analytics/business/{bid}",
+            headers=admin_headers,
+            timeout=10,
+        ).json()["totals"]
+
+        save = requests.post(
+            f"{API}/itinerary/save",
+            json={
+                "email": "analytics@example.com",
+                "city_slug": "nashville",
+                "vibe": "down",
+                "source_itinerary_id": itinerary["id"],
+                "steps": itinerary["steps"],
+                "locked_slots": [step["slot"] for step in itinerary["steps"]],
+            },
+            timeout=15,
+        )
+        assert save.status_code == 200, save.text
+
+        after = requests.get(
+            f"{API}/admin/analytics/business/{bid}",
+            headers=admin_headers,
+            timeout=10,
+        ).json()["totals"]
+        assert after["saved_itinerary_business"] - before.get("saved_itinerary_business", 0) >= 1
+        assert after["total_engagement"] >= after["saved_itinerary_business"]
 
 
 # ---------------- ADMIN_EMAILS allowlist enforcement ----------------

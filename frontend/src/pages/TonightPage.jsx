@@ -153,6 +153,15 @@ export default function TonightPage() {
 
   const handleLockStep = (step) => {
     setSaveError("");
+    trackEvent("step_locked", {
+      business_id: step?.business?.id,
+      category_slug: step?.business?.category_slug,
+      slot: step?.slot,
+      itinerary_id: itinerary?.id,
+      vibe,
+      city_slug: citySlug,
+      source_surface: "tonight_page",
+    });
     setLockedSteps((prev) => ({ ...prev, [step.slot]: step }));
   };
 
@@ -212,8 +221,17 @@ export default function TonightPage() {
     return `https://www.google.com/maps/search/?api=1&query=${q}`;
   };
 
-  const handleAction = (type, b) => {
-    trackEvent(type, { business_id: b.id, itinerary_id: itinerary?.id, vibe, city_slug: citySlug });
+  const handleAction = (type, b, step, extra = {}) => {
+    trackEvent(type, {
+      business_id: b.id,
+      category_slug: b.category_slug,
+      slot: step?.slot,
+      itinerary_id: itinerary?.id,
+      vibe,
+      city_slug: citySlug,
+      source_surface: "tonight_page",
+      ...extra,
+    });
   };
 
   return (
@@ -604,7 +622,7 @@ function StepCard({ step, idx, total, locked, onLock, onUnlock, onAction, direct
         {b.phone ? (
           <ActionBtn
             href={`tel:${b.phone}`}
-            onClick={() => onAction("phone_click", b)}
+            onClick={() => onAction("phone_click", b, step)}
             testid={`tonight-call-${b.id}`}
             icon={<Phone className="w-3.5 h-3.5" />}
           >
@@ -615,7 +633,7 @@ function StepCard({ step, idx, total, locked, onLock, onUnlock, onAction, direct
           <ActionBtn
             href={directionsUrl(b)}
             target="_blank"
-            onClick={() => onAction("directions_click", b)}
+            onClick={() => onAction("directions_click", b, step)}
             testid={`tonight-directions-${b.id}`}
             icon={<Navigation className="w-3.5 h-3.5" />}
           >
@@ -626,7 +644,7 @@ function StepCard({ step, idx, total, locked, onLock, onUnlock, onAction, direct
           <ActionBtn
             href={b.website}
             target="_blank"
-            onClick={() => onAction("website_click", b)}
+            onClick={() => onAction("website_click", b, step)}
             testid={`tonight-website-${b.id}`}
             icon={<Globe className="w-3.5 h-3.5" />}
             primary
@@ -638,7 +656,11 @@ function StepCard({ step, idx, total, locked, onLock, onUnlock, onAction, direct
           <ActionBtn
             href={event.ticket_url}
             target="_blank"
-            onClick={() => onAction("ticket_click", b)}
+            onClick={() =>
+              onAction("ticket_click", b, step, {
+                event_id: event.external_event_id || event.id,
+                event_source: event.source,
+              })}
             testid={`tonight-tickets-${b.id}`}
             icon={<ExternalLink className="w-3.5 h-3.5" />}
             primary

@@ -114,12 +114,14 @@ class TestSavedItineraryContract(unittest.TestCase):
     def test_valid_save_request_persists_saved_itinerary_document(self):
         source = ast.get_source_segment(SERVER_SOURCE, named_function("save_itinerary"))
         self.assertIn('await db.saved_itineraries.insert_one(doc)', source)
+        self.assertIn('await db.analytics_events.insert_many(saved_step_events)', source)
         self.assertIn('await db.saved_itineraries.update_one(', source)
         self.assertIn('"source_itinerary_id": payload.source_itinerary_id', source)
         self.assertIn('"locked_slots": safe_locked_slots', source)
         self.assertIn('"steps": safe_steps', source)
         self.assertIn('"delivery_channel": "email"', source)
         self.assertIn('"provider_message_id": delivery["provider_message_id"]', source)
+        self.assertIn('"saved_itinerary_business"', source)
 
     def test_invalid_email_is_rejected(self):
         self.assertTrue(VALID_EMAIL("traveler@example.com"))

@@ -239,9 +239,15 @@ class AnalyticsEvent(BaseModel):
     event_type: str
     business_id: Optional[str] = None
     category_slug: Optional[str] = None
+    slot: Optional[str] = None
     city_slug: Optional[str] = None
     vibe: Optional[str] = None
     itinerary_id: Optional[str] = None
+    saved_itinerary_id: Optional[str] = None
+    source_itinerary_id: Optional[str] = None
+    source_surface: Optional[str] = None
+    event_id: Optional[str] = None
+    event_source: Optional[str] = None
 
 
 class CityEvent(BaseModel):
@@ -627,6 +633,58 @@ def _safe_saved_itinerary_steps(steps: List[dict]) -> list[dict]:
     return safe_steps
 
 
+BUSINESS_SCOPED_EVENT_TYPES = {
+    "business_appearance",
+    "business_view",
+    "business_click",
+    "website_click",
+    "phone_click",
+    "directions_click",
+    "ticket_click",
+    "step_locked",
+    "saved_itinerary_business",
+}
+
+
+def _business_event_doc(
+    event_type: str,
+    business: Optional[dict],
+    *,
+    slot: str = "",
+    category_slug: str = "",
+    city_slug: str = "",
+    vibe: str = "",
+    itinerary_id: Optional[str] = None,
+    saved_itinerary_id: Optional[str] = None,
+    source_itinerary_id: Optional[str] = None,
+    source_surface: str = "",
+    event_id: str = "",
+    event_source: str = "",
+    ip: Optional[str] = None,
+    user_agent: Optional[str] = None,
+) -> dict:
+    payload_business = business if isinstance(business, dict) else {}
+    return {
+        "id": str(uuid.uuid4()),
+        "event_type": event_type,
+        "business_id": payload_business.get("id"),
+        "category_slug": category_slug or payload_business.get("category_slug"),
+        "slot": slot,
+        "city_slug": city_slug or payload_business.get("city_slug"),
+        "vibe": vibe,
+        "itinerary_id": itinerary_id,
+        "saved_itinerary_id": saved_itinerary_id,
+        "source_itinerary_id": source_itinerary_id,
+        "source_surface": source_surface or None,
+        "event_id": event_id or None,
+        "event_source": event_source or None,
+        "sponsor_tier": payload_business.get("sponsor_tier", "none"),
+        "ip": ip,
+        "user_agent": user_agent,
+        "timestamp": now_iso(),
+    }
+
+
 def _valid_email(value: str) -> bool:
     email = (value or "").strip()
     if not email or " " in email or "@" not in email:
@@ -858,18 +916,18 @@ async def generate_itinerary(req: ItineraryRequest, request: Request):
     appearance_docs = []
     for step in steps:
         b = step["business"]
-        appearance_docs.append({
-            "id": str(uuid.uuid4()),
-            "event_type": "business_appearance",
-            "business_id": b["id"],
-            "sponsor_tier": b.get("sponsor_tier", "none"),
-            "city_slug": req.city,
-            "vibe": req.vibe,
-            "itinerary_id": itin_id,
-            "ip": request.client.host if request.client else None,
-            "user_agent": request.headers.get("user-agent"),
-            "timestamp": now_iso(),
-        })
+        appearance_docs.append(_business_event_doc(
+            "business_appearance",
+            b,
+            slot=step.get("slot", ""),
+            category_slug=b.get("category_slug", ""),
+            city_slug=req.city,
+            vibe=req.vibe,
+            itinerary_id=itin_id,
+            source_surface="tonight_page",
+            ip=request.client.host if request.client else None,
+            user_agent=request.headers.get("user-agent"),
+        ))
     if appearance_docs:
         await db.analytics_events.insert_many(appearance_docs)
     await db.analytics_events.insert_one({
@@ -1030,17 +1088,20 @@ async def track_event(event: AnalyticsEvent, request: Request):
         "event_type": event.event_type,
         "business_id": event.business_id,
         "category_slug": event.category_slug,
+        "slot": event.slot,
         "city_slug": event.city_slug,
         "vibe": event.vibe,
         "itinerary_id": event.itinerary_id,
+        "saved_itinerary_id": event.saved_itinerary_id,
+        "source_itinerary_id": event.source_itinerary_id,
+        "source_surface": event.source_surface,
+        "event_id": event.event_id,
+        "event_source": event.event_source,
         "ip": request.client.host if request.client else None,
         "user_agent": request.headers.get("user-agent"),
         "timestamp": now_iso(),
     }
-    # Stamp sponsor tier on click events for easy reporting
-    if event.business_id and event.event_type in {
-        "business_click", "website_click", "phone_click", "directions_click",
-    }:
+    if event.business_id and event.event_type in BUSINESS_SCOPED_EVENT_TYPES:
         biz = await db.businesses.find_one({"id": event.business_id}, {"_id": 0, "sponsor_tier": 1})
         if biz:
             doc["sponsor_tier"] = biz.get("sponsor_tier", "none")
@@ -1059,7 +1120,7 @@ async def create_lead(lead: LeadCreate):
 
 
 @api_router.post("/itinerary/save")
-async def save_itinerary(payload: SaveItineraryRequest):
+async def save_itinerary(payload: SaveItineraryRequest, request: Request):
     email = (payload.email or "").strip().lower()
     if not _valid_email(email):
         raise HTTPException(status_code=400, detail="Enter a valid email.")
@@ -1087,6 +1148,29 @@ async def save_itinerary(payload: SaveItineraryRequest):
         "sent_at": delivery["sent_at"],
     }
     await db.saved_itineraries.insert_one(doc)
+    saved_step_events = [
+        _business_event_doc(
+            "saved_itinerary_business",
+            step.get("business"),
+            slot=step.get("slot", ""),
+            category_slug=(step.get("business") or {}).get("category_slug", ""),
+            city_slug=doc["city_slug"],
+            vibe=doc["vibe"],
+            itinerary_id=doc["source_itinerary_id"],
+            saved_itinerary_id=doc["id"],
+            source_itinerary_id=doc["source_itinerary_id"],
+            source_surface="save_itinerary",
+            ip=request.client.host if request.client else None,
+            user_agent=request.headers.get("user-agent"),
+        )
+        for step in safe_steps
+        if (step.get("business") or {}).get("id")
+    ]
+    if saved_step_events:
+        try:
+            await db.analytics_events.insert_many(saved_step_events)
+        except Exception as exc:
+            logger.warning("saved_itinerary_business analytics write failed: %s", exc)
     if doc["delivery_status"] != "provider_unconfigured":
         try:
             delivery = await run_in_threadpool(_send_resend_email, doc)
@@ -1491,19 +1575,43 @@ async def admin_business_analytics(business_id: str, days: int = 30, user=Depend
             "day": d,
             "business_appearance": row.get("business_appearance", 0),
             "business_view": row.get("business_view", 0),
+            "step_locked": row.get("step_locked", 0),
+            "saved_itinerary_business": row.get("saved_itinerary_business", 0),
             "website_click": row.get("website_click", 0),
             "phone_click": row.get("phone_click", 0),
             "directions_click": row.get("directions_click", 0),
+            "ticket_click": row.get("ticket_click", 0),
+            "total_engagement": (
+                row.get("step_locked", 0)
+                + row.get("saved_itinerary_business", 0)
+                + row.get("website_click", 0)
+                + row.get("phone_click", 0)
+                + row.get("directions_click", 0)
+                + row.get("ticket_click", 0)
+            ),
         })
+
+    total_engagement = (
+        totals.get("step_locked", 0)
+        + totals.get("saved_itinerary_business", 0)
+        + totals.get("website_click", 0)
+        + totals.get("phone_click", 0)
+        + totals.get("directions_click", 0)
+        + totals.get("ticket_click", 0)
+    )
 
     return {
         "business": biz,
         "totals": {
             "business_appearance": totals.get("business_appearance", 0),
             "business_view": totals.get("business_view", 0),
+            "step_locked": totals.get("step_locked", 0),
+            "saved_itinerary_business": totals.get("saved_itinerary_business", 0),
             "website_click": totals.get("website_click", 0),
             "phone_click": totals.get("phone_click", 0),
             "directions_click": totals.get("directions_click", 0),
+            "ticket_click": totals.get("ticket_click", 0),
+            "total_engagement": total_engagement,
         },
         "timeline": timeline,
     }
@@ -1549,6 +1657,14 @@ async def admin_analytics_summary(user=Depends(require_admin)):
             "business_id": bid,
             "name": name_map.get(bid, "(deleted)"),
             "sponsor_tier": tier_map.get(bid, "none"),
+            "total_engagement": (
+                counts.get("step_locked", 0)
+                + counts.get("saved_itinerary_business", 0)
+                + counts.get("website_click", 0)
+                + counts.get("phone_click", 0)
+                + counts.get("directions_click", 0)
+                + counts.get("ticket_click", 0)
+            ),
             **counts,
         }
         for bid, counts in by_biz.items()
@@ -1577,6 +1693,18 @@ async def admin_analytics_summary(user=Depends(require_admin)):
             sponsor_performance.append({"tier": tier, **by_tier[tier]})
 
     total_events = await db.analytics_events.count_documents({})
+    top_businesses_by_total_engagement = sorted(
+        business_breakdown,
+        key=lambda row: (-row.get("total_engagement", 0), -row.get("business_appearance", 0), row.get("name", "")),
+    )[:25]
+    top_locked_in_businesses = sorted(
+        business_breakdown,
+        key=lambda row: (-row.get("step_locked", 0), -row.get("total_engagement", 0), row.get("name", "")),
+    )[:25]
+    top_ticket_click_businesses = sorted(
+        business_breakdown,
+        key=lambda row: (-row.get("ticket_click", 0), -row.get("total_engagement", 0), row.get("name", "")),
+    )[:25]
 
     return {
         "total_events": total_events,
@@ -1584,6 +1712,9 @@ async def admin_analytics_summary(user=Depends(require_admin)):
         "by_category": [{"category_slug": r["_id"], "count": r["count"]} for r in cat_rows],
         "by_business": business_breakdown,
         "sponsor_performance": sponsor_performance,
+        "top_businesses_by_total_engagement": top_businesses_by_total_engagement,
+        "top_locked_in_businesses": top_locked_in_businesses,
+        "top_ticket_click_businesses": top_ticket_click_businesses,
     }
 
 

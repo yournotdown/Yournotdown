@@ -1,10 +1,24 @@
 ## Immediate Follow-Up
 
-1. Manually QA `/:citySlug/tonight?vibe=...` for the new lock flow:
+0. Manually QA the new sponsor-grade analytics events in a browser session before any deploy approval:
+   - lock a Tonight's Move card and confirm a `step_locked` event is created only on the lock click, not on rerenders or unlock
+   - click `Buy Tickets` from a Tonight entertainment card and confirm `ticket_click` now carries business/event context
+   - save a final locked itinerary and confirm each saved step writes a `saved_itinerary_business` analytics event without breaking the save-email flow
+   - inspect admin/business analytics responses for the new `step_locked`, `saved_itinerary_business`, `ticket_click`, and `total_engagement` totals
+1. If Blake wants the admin analytics UI expanded next, build it on top of the new backend fields instead of adding new event types again:
+   - leaderboard tables for top locked-in businesses, top ticket-click businesses, and top total-engagement businesses
+   - optional date-range, vibe, and slot filters once the UI shape is approved
+2. Before business-owner accounts, decide whether `Locked In` in sponsor reporting should mean:
+   - every `step_locked` click
+   - every business present in a fully saved final move
+   - or both as separate metrics
+3. If the existing pytest-based backend analytics integration suite needs to run locally, install `pytest` into the active Python environment first; the current workspace passed the unittest contracts but could not run `python3 -m pytest ...` because pytest is missing.
+
+4. Manually QA `/:citySlug/tonight?vibe=...` for the new lock flow:
    - lock dinner/drinks/late-night individually and confirm only unlocked slots reroll
    - lock `entertainment` and confirm the same live-music/Ticketmaster card and event details persist across `Another Night`
    - confirm every-4th `Another Night` still requests Ticketmaster only when `entertainment` is unlocked
-2. Manually QA the new `You're Locked In` overlay on `/:citySlug/tonight?vibe=...`:
+5. Manually QA the new `You're Locked In` overlay on `/:citySlug/tonight?vibe=...`:
    - confirm it auto-opens only after all 4 steps are locked
    - confirm `Keep editing` closes it without unlocking cards
    - confirm unlocking any step prevents immediate reopen until all 4 are locked again

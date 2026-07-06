@@ -11,6 +11,16 @@ describe("TonightPage source contract", () => {
     expect(tonightPageSource).toContain('window.scrollTo({ top: 0, behavior: "smooth" })');
     expect(tonightPageSource).toContain("window.requestAnimationFrame(() => {");
   });
+
+  test("lock and ticket actions include sponsor-grade analytics fields", () => {
+    expect(tonightPageSource).toContain('trackEvent("step_locked", {');
+    expect(tonightPageSource).toContain('source_surface: "tonight_page"');
+    expect(tonightPageSource).toContain("slot: step?.slot");
+    expect(tonightPageSource).toContain("category_slug: b.category_slug");
+    expect(tonightPageSource).toContain('onAction("ticket_click", b, step, {');
+    expect(tonightPageSource).toContain("event_id: event.external_event_id || event.id");
+    expect(tonightPageSource).toContain("event_source: event.source");
+  });
 });
 
 describe("VibePage source contract", () => {
