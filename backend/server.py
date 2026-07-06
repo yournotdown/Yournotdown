@@ -62,6 +62,10 @@ from seed_data import (
     default_slots_for_category,
 )
 from mood_system import MOOD_WEIGHTS, SPONSOR_MULTIPLIERS, NAME_TO_TAGS, TAGS as VALID_TAGS
+from saved_itinerary_email import (
+    saved_itinerary_email_content,
+    saved_itinerary_email_subject,
+)
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
@@ -656,83 +660,11 @@ def _email_delivery_result() -> dict:
 
 
 def _saved_itinerary_email_subject(doc: dict) -> str:
-    city = (doc.get("city_slug") or "tonight").replace("-", " ").title()
-    return f"YourNotDown: Tonight's Move for {city}"
-
-
-def _saved_itinerary_step_lines(step: dict) -> list[str]:
-    business = step.get("business") or {}
-    event = step.get("event") or {}
-    lines = [
-        f'{step.get("number", "")}. {step.get("label", "Step")} - {business.get("name", "Unknown spot")}'.strip(),
-    ]
-    if business.get("address"):
-        lines.append(f'Address: {business["address"]}')
-    if business.get("website"):
-        lines.append(f'Website: {business["website"]}')
-    if event.get("title"):
-        lines.append(f'Event: {event["title"]}')
-    if event.get("local_time"):
-        lines.append(f'Time: {event["local_time"]}')
-    if event.get("ticket_url"):
-        lines.append(f'Tickets: {event["ticket_url"]}')
-    return lines
+    return saved_itinerary_email_subject(doc)
 
 
 def _saved_itinerary_email_content(doc: dict) -> tuple[str, str]:
-    city = (doc.get("city_slug") or "nashville").replace("-", " ").title()
-    vibe = doc.get("vibe", "")
-    site_url = (
-        os.environ.get("PUBLIC_SITE_URL", "").strip()
-        or os.environ.get("FRONTEND_PUBLIC_URL", "").strip()
-    )
-    text_parts = [
-        "YourNotDown / Tonight's Move",
-        "",
-        f"City: {city}",
-        f"Vibe: {vibe}",
-        "",
-    ]
-    html_parts = [
-        "<html><body style=\"font-family:Arial,sans-serif;background:#0b0b0b;color:#ffffff;padding:24px;\">",
-        "<div style=\"max-width:640px;margin:0 auto;\">",
-        "<div style=\"font-size:12px;letter-spacing:0.2em;text-transform:uppercase;color:#c6ff00;\">YourNotDown</div>",
-        "<h1 style=\"margin:12px 0 8px;font-size:32px;line-height:1;\">Tonight's Move</h1>",
-        f"<p style=\"margin:0 0 16px;color:#cfcfcf;\">City: {city}<br />Vibe: {vibe}</p>",
-    ]
-    for step in doc.get("steps") or []:
-        business = step.get("business") or {}
-        event = step.get("event") or {}
-        text_parts.extend(_saved_itinerary_step_lines(step))
-        text_parts.append("")
-        html_parts.append("<div style=\"border-top:1px solid rgba(255,255,255,0.12);padding-top:16px;margin-top:16px;\">")
-        html_parts.append(
-            f"<div style=\"font-size:12px;letter-spacing:0.18em;text-transform:uppercase;color:#c6ff00;\">"
-            f"{step.get('number', '')}. {step.get('label', 'Step')}</div>"
-        )
-        html_parts.append(f"<h2 style=\"margin:8px 0 8px;font-size:24px;\">{business.get('name', 'Unknown spot')}</h2>")
-        if business.get("address"):
-            html_parts.append(f"<p style=\"margin:0 0 8px;color:#cfcfcf;\">{business['address']}</p>")
-        if business.get("website"):
-            html_parts.append(
-                f"<p style=\"margin:0 0 8px;\"><a style=\"color:#c6ff00;\" href=\"{business['website']}\">{business['website']}</a></p>"
-            )
-        if event.get("title"):
-            html_parts.append(f"<p style=\"margin:8px 0 0;color:#ffffff;\">Event: {event['title']}</p>")
-        if event.get("local_time"):
-            html_parts.append(f"<p style=\"margin:4px 0 0;color:#cfcfcf;\">Time: {event['local_time']}</p>")
-        if event.get("ticket_url"):
-            html_parts.append(
-                f"<p style=\"margin:4px 0 0;\"><a style=\"color:#c6ff00;\" href=\"{event['ticket_url']}\">Buy Tickets</a></p>"
-            )
-        html_parts.append("</div>")
-    if site_url:
-        text_parts.append(f"YourNotDown: {site_url}")
-        html_parts.append(f"<p style=\"margin-top:24px;\"><a style=\"color:#c6ff00;\" href=\"{site_url}\">Open YourNotDown</a></p>")
-    text_parts.append("Built with YourNotDown")
-    html_parts.append("<p style=\"margin-top:24px;color:#cfcfcf;\">Built with YourNotDown</p>")
-    html_parts.append("</div></body></html>")
-    return "\n".join(text_parts), "".join(html_parts)
+    return saved_itinerary_email_content(doc)
 
 
 def _send_resend_email(doc: dict) -> dict:
