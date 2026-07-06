@@ -37,7 +37,16 @@ export default function TonightPage() {
   const [lastTicketmasterEventIds, setLastTicketmasterEventIds] = useState([]);
   const [lockedSteps, setLockedSteps] = useState({});
   const [regenerating, setRegenerating] = useState(false);
+  const [saveOverlayOpen, setSaveOverlayOpen] = useState(false);
+  const [saveOverlayDismissed, setSaveOverlayDismissed] = useState(false);
+  const [email, setEmail] = useState("");
+  const [saveLoading, setSaveLoading] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState("");
+  const [saveError, setSaveError] = useState("");
   const sponsorship = itinerary?.tonight_move_sponsorship;
+  const allStepsLocked = Boolean(
+    itinerary?.steps?.length === 4 && itinerary.steps.every((step) => Boolean(lockedSteps[step.slot]))
+  );
 
   const generate = useCallback(
     async ({
@@ -96,9 +105,26 @@ export default function TonightPage() {
     setRefreshCount(0);
     setLastTicketmasterEventIds([]);
     setLockedSteps({});
+    setSaveOverlayOpen(false);
+    setSaveOverlayDismissed(false);
+    setEmail("");
+    setSaveLoading(false);
+    setSaveSuccess("");
+    setSaveError("");
     generate({ liveMusicEventMode: "ticketmaster_preferred" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [citySlug, vibe]);
+
+  useEffect(() => {
+    if (allStepsLocked) {
+      if (!saveOverlayDismissed && !saveSuccess) {
+        setSaveOverlayOpen(true);
+      }
+      return;
+    }
+    setSaveOverlayDismissed(false);
+    setSaveOverlayOpen(false);
+  }, [allStepsLocked, saveOverlayDismissed, saveSuccess]);
 
   const handleAnother = () => {
     setRegenerating(true);
@@ -119,15 +145,57 @@ export default function TonightPage() {
   };
 
   const handleLockStep = (step) => {
+    setSaveError("");
     setLockedSteps((prev) => ({ ...prev, [step.slot]: step }));
   };
 
   const handleUnlockStep = (slot) => {
+    setSaveSuccess("");
+    setSaveError("");
     setLockedSteps((prev) => {
       const next = { ...prev };
       delete next[slot];
       return next;
     });
+  };
+
+  const closeSaveOverlay = () => {
+    setSaveOverlayDismissed(true);
+    setSaveOverlayOpen(false);
+  };
+
+  const handleSaveItinerary = async () => {
+    setSaveLoading(true);
+    setSaveError("");
+    setSaveSuccess("");
+    try {
+      const lockedSlots = (itinerary?.steps || [])
+        .map((step) => step.slot)
+        .filter((slot) => Boolean(lockedSteps[slot]));
+      const r = await api.post("/itinerary/save", {
+        email,
+        city_slug: citySlug,
+        vibe,
+        source_itinerary_id: itinerary?.id,
+        steps: itinerary?.steps || [],
+        locked_slots: lockedSlots,
+      });
+      if (r.data?.delivery_status === "sent") {
+        setSaveSuccess("Sent — check your email.");
+      } else if (r.data?.delivery_status === "provider_unconfigured") {
+        setSaveSuccess("Your move is saved. Email sending is not configured yet.");
+      } else {
+        setSaveSuccess("Your move is saved. Email sending is not configured yet.");
+      }
+    } catch (e) {
+      if (e?.response?.status === 400) {
+        setSaveError("Enter a valid email.");
+      } else {
+        setSaveError("Couldn't save this yet. Try again.");
+      }
+    } finally {
+      setSaveLoading(false);
+    }
   };
 
   const directionsUrl = (b) => {
@@ -310,6 +378,74 @@ export default function TonightPage() {
             Every night is different
           </div>
         </motion.div>
+      )}
+
+      {saveOverlayOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/80 backdrop-blur-sm px-5 sm:px-10"
+          data-testid="tonight-save-overlay"
+        >
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="w-full max-w-md border border-white/10 bg-[#070707] p-6 sm:p-8 shadow-[0_0_60px_rgba(198,255,0,0.08)]">
+              <div className="text-[10px] uppercase tracking-[0.3em] text-[#C6FF00]">
+                Final move
+              </div>
+              <h2
+                className="mt-3 font-flyer uppercase text-white leading-[0.9]"
+                style={{ fontSize: "clamp(2rem, 8vw, 3.75rem)" }}
+              >
+                You're Locked In
+              </h2>
+              <p className="mt-4 text-sm text-white/65 leading-relaxed">
+                Save and send Tonight&apos;s Move to your email.
+              </p>
+
+              {saveSuccess ? (
+                <div className="mt-6 border border-[#C6FF00]/25 bg-[#C6FF00]/10 px-4 py-3 text-sm text-white">
+                  {saveSuccess}
+                </div>
+              ) : (
+                <>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Email address"
+                    className="mt-6 w-full border border-white/15 bg-black px-4 py-3 text-sm text-white placeholder:text-white/30 focus:border-[#C6FF00] focus:outline-none"
+                    data-testid="tonight-save-email-input"
+                  />
+                  {saveError ? (
+                    <div className="mt-3 text-sm text-[#FF8A8A]" data-testid="tonight-save-error">
+                      {saveError}
+                    </div>
+                  ) : null}
+                </>
+              )}
+
+              <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={closeSaveOverlay}
+                  className="inline-flex items-center justify-center px-4 py-3 border border-white/15 text-white uppercase text-[10px] tracking-[0.22em] font-bold transition-colors hover:border-[#C6FF00] hover:text-[#C6FF00]"
+                  data-testid="tonight-save-keep-editing"
+                >
+                  {saveSuccess ? "Close" : "Keep editing"}
+                </button>
+                {!saveSuccess ? (
+                  <button
+                    type="button"
+                    onClick={handleSaveItinerary}
+                    disabled={saveLoading}
+                    className="inline-flex items-center justify-center px-4 py-3 border border-[#C6FF00] bg-[#C6FF00] text-black uppercase text-[10px] tracking-[0.22em] font-bold transition-colors hover:bg-white hover:border-white disabled:opacity-60"
+                    data-testid="tonight-save-submit"
+                  >
+                    {saveLoading ? "Saving..." : "Send Tonight's Move"}
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Marquee */}

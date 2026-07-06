@@ -4,8 +4,14 @@
    - lock dinner/drinks/late-night individually and confirm only unlocked slots reroll
    - lock `entertainment` and confirm the same live-music/Ticketmaster card and event details persist across `Another Night`
    - confirm every-4th `Another Night` still requests Ticketmaster only when `entertainment` is unlocked
-2. If Blake approves the next chunk, add the lightweight `Save Tonight's Move` email-capture flow on top of the new locked-step snapshot shape rather than reworking lock behavior again.
-3. Treat `frontend/package-lock.json` as the intended install baseline going forward; use `cd frontend && npm install` for reproducible local/frontend CI setup and avoid falling back to ad hoc AJV patching.
+2. Manually QA the new `You're Locked In` overlay on `/:citySlug/tonight?vibe=...`:
+   - confirm it auto-opens only after all 4 steps are locked
+   - confirm `Keep editing` closes it without unlocking cards
+   - confirm unlocking any step prevents immediate reopen until all 4 are locked again
+   - confirm valid email submission shows the honest `provider_unconfigured` message in the current environment
+   - confirm invalid email shows `Enter a valid email.`
+3. If Blake approves the next chunk, wire a real email provider into the existing `/api/itinerary/save` scaffold instead of changing the saved-itinerary document semantics.
+4. Treat `frontend/package-lock.json` as the intended install baseline going forward; use `cd frontend && npm install` for reproducible local/frontend CI setup and avoid falling back to ad hoc AJV patching.
 
 ## Top 5 Next Tasks
 

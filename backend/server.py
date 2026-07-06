@@ -313,6 +313,15 @@ class LeadCreate(BaseModel):
     message: str = ""
 
 
+class SaveItineraryRequest(BaseModel):
+    email: str
+    city_slug: str = "nashville"
+    vibe: str = ""
+    source_itinerary_id: Optional[str] = None
+    steps: List[dict] = Field(default_factory=list)
+    locked_slots: List[str] = Field(default_factory=list)
+
+
 # ------------- App -------------
 app = FastAPI(title="You're Not Down")
 api_router = APIRouter(prefix="/api")
@@ -600,6 +609,53 @@ def _safe_locked_step(slot: str, snapshot: Optional[dict]) -> dict:
     if isinstance(raw_event, dict):
         step["event"] = dict(raw_event)
     return step
+
+
+def _safe_saved_itinerary_steps(steps: List[dict]) -> list[dict]:
+    safe_steps = []
+    for index, step in enumerate(steps or []):
+        slot = ""
+        if isinstance(step, dict):
+            slot = step.get("slot", "")
+        if not slot and index < len(SLOT_LABELS):
+            slot = SLOT_LABELS[index]["slot"]
+        safe_steps.append(_safe_locked_step(slot, step))
+    return safe_steps
+
+
+def _valid_email(value: str) -> bool:
+    email = (value or "").strip()
+    if not email or " " in email or "@" not in email:
+        return False
+    local_part, _, domain = email.partition("@")
+    if not local_part or not domain or "." not in domain:
+        return False
+    if domain.startswith(".") or domain.endswith(".") or ".." in domain:
+        return False
+    return True
+
+
+def _email_delivery_result() -> dict:
+    provider_envs = [
+        ("resend", os.environ.get("RESEND_API_KEY", "").strip()),
+        ("sendgrid", os.environ.get("SENDGRID_API_KEY", "").strip()),
+        ("mailgun", os.environ.get("MAILGUN_API_KEY", "").strip()),
+        ("smtp", os.environ.get("SMTP_HOST", "").strip() or os.environ.get("SMTP_URL", "").strip()),
+    ]
+    configured_provider = next((name for name, value in provider_envs if value), "")
+    if not configured_provider:
+        return {
+            "delivery_status": "provider_unconfigured",
+            "delivery_error": "",
+            "email_provider": "",
+            "sent_at": None,
+        }
+    return {
+        "delivery_status": "failed",
+        "delivery_error": "provider integration not implemented",
+        "email_provider": configured_provider,
+        "sent_at": None,
+    }
 
 
 async def _today_city_events(city: str) -> list[dict]:
@@ -954,6 +1010,44 @@ async def create_lead(lead: LeadCreate):
     doc["created_at"] = now_iso()
     await db.leads.insert_one(doc)
     return {"ok": True, "id": doc["id"]}
+
+
+@api_router.post("/itinerary/save")
+async def save_itinerary(payload: SaveItineraryRequest):
+    email = (payload.email or "").strip().lower()
+    if not _valid_email(email):
+        raise HTTPException(status_code=400, detail="Enter a valid email.")
+
+    safe_steps = _safe_saved_itinerary_steps(payload.steps)
+    safe_locked_slots = [
+        slot for slot in payload.locked_slots
+        if slot in {label["slot"] for label in SLOT_LABELS}
+    ]
+    delivery = _email_delivery_result()
+    doc = {
+        "id": str(uuid.uuid4()),
+        "source_itinerary_id": payload.source_itinerary_id,
+        "city_slug": payload.city_slug,
+        "vibe": payload.vibe,
+        "email": email,
+        "steps": safe_steps,
+        "locked_slots": safe_locked_slots,
+        "delivery_channel": "email",
+        "delivery_status": delivery["delivery_status"],
+        "delivery_error": delivery["delivery_error"],
+        "email_provider": delivery["email_provider"],
+        "created_at": now_iso(),
+        "sent_at": delivery["sent_at"],
+    }
+    await db.saved_itineraries.insert_one(doc)
+    return {
+        "ok": True,
+        "id": doc["id"],
+        "delivery_status": doc["delivery_status"],
+        "delivery_error": doc["delivery_error"],
+        "email_provider": doc["email_provider"],
+        "sent_at": doc["sent_at"],
+    }
 
 
 # ------------- Auth -------------

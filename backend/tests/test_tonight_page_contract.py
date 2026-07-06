@@ -42,6 +42,17 @@ class TestTonightPageContract(unittest.TestCase):
         self.assertIn("Locked in", TONIGHT_PAGE_SOURCE)
         self.assertIn("Unlock", TONIGHT_PAGE_SOURCE)
 
+    def test_all_locked_overlay_and_save_call_exist(self):
+        self.assertIn("You're Locked In", TONIGHT_PAGE_SOURCE)
+        self.assertIn("Send Tonight's Move", TONIGHT_PAGE_SOURCE)
+        self.assertIn('const [saveOverlayOpen, setSaveOverlayOpen] = useState(false);', TONIGHT_PAGE_SOURCE)
+        self.assertIn('const [saveOverlayDismissed, setSaveOverlayDismissed] = useState(false);', TONIGHT_PAGE_SOURCE)
+        self.assertIn("const allStepsLocked = Boolean(", TONIGHT_PAGE_SOURCE)
+        self.assertIn('const closeSaveOverlay = () => {', TONIGHT_PAGE_SOURCE)
+        self.assertIn('const handleSaveItinerary = async () => {', TONIGHT_PAGE_SOURCE)
+        self.assertIn('const r = await api.post("/itinerary/save", {', TONIGHT_PAGE_SOURCE)
+        self.assertIn('delivery_status === "provider_unconfigured"', TONIGHT_PAGE_SOURCE)
+
     def test_live_music_step_renders_event_details_inline(self):
         self.assertIn("Tonight: {event.title}", TONIGHT_PAGE_SOURCE)
         self.assertIn('formatEventTime(event?.local_time)', TONIGHT_PAGE_SOURCE)

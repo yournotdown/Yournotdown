@@ -61,6 +61,16 @@ Operational constraints preserved in this session:
 - no local or production apply sync execution from the new cron entrypoint
 
 Latest local patch state:
+- implemented Chunk 2A of the Tonight's Move save flow without adding any real email provider integration or SMS
+- `frontend/src/pages/TonightPage.jsx` now auto-detects when all four visible Tonight's Move steps are locked, opens a `You're Locked In` overlay once per all-locked cycle, supports `Keep editing`, preserves locked cards after dismiss, and posts the final itinerary snapshot to `POST /api/itinerary/save`
+- the save overlay tracks email input, submit loading, validation error, request failure, and post-save success state without altering `Another Night`, lock/unlock behavior, or the existing Ticketmaster cadence logic
+- added `POST /api/itinerary/save` in `backend/server.py`; it accepts `email`, `city_slug`, `vibe`, `source_itinerary_id`, `steps`, and `locked_slots`, validates email, sanitizes the saved step snapshots, writes to `db.saved_itineraries`, and currently returns `delivery_status=provider_unconfigured` when no provider env/config is present
+- the saved itinerary snapshot document shape is now `{id, source_itinerary_id, city_slug, vibe, email, steps, locked_slots, delivery_channel, delivery_status, delivery_error, email_provider, created_at, sent_at}`
+- no real email is sent in the current repo/runtime path; the scaffold is intentionally honest and reports `provider_unconfigured` until a real provider integration is added later
+- added dependency-free coverage in `backend/tests/test_saved_itinerary_contract.py` for save persistence shape, invalid email rejection, provider-unconfigured behavior, and saved step snapshot structure
+- updated Tonight page source contract coverage to assert the new all-locked overlay text and `/itinerary/save` call shape
+- validated locally with `python3 -m unittest backend.tests.test_saved_itinerary_contract backend.tests.test_locked_steps_contract backend.tests.test_tonight_page_contract backend.tests.test_city_events_filtering_contract backend.tests.test_ticketmaster_events_unit`, which passed (`76` tests)
+- validated the frontend locally with `cd frontend && npm run build` and `cd frontend && CI=true npm test -- --watchAll=false`, both of which passed from the stabilized repo-managed dependency state
 - stabilized the frontend dependency/toolchain path for the Chunk 1 lockable Tonight's Move work
 - updated `frontend/package.json` to keep `date-fns` at `4.1.0`, upgrade `react-day-picker` from `8.10.1` to `9.11.1` for React 19 compatibility, and add explicit `ajv` / `ajv-keywords` entries so the CRA/CRACO webpack toolchain no longer depends on a local-only patch
 - created an intended `frontend/package-lock.json` from a clean `npm install`
