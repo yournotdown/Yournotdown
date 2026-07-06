@@ -55,14 +55,14 @@ export default function VibePage() {
 
       {/* Content — playful, emoji-first */}
       <motion.div
-        className="relative z-10 mx-auto flex min-h-[100svh] w-full max-w-[1120px] flex-col justify-center px-5 pt-24 pb-32 sm:px-10 lg:pt-20 lg:pb-24"
+        className="relative z-10 mx-auto flex min-h-[100svh] w-full max-w-[1080px] flex-col justify-center px-5 pt-24 pb-32 sm:px-10 lg:pt-16 lg:pb-20"
         animate={crashing ? { scale: 0.98, opacity: 0 } : { scale: 1, opacity: 1 }}
         transition={{ duration: 0.24 }}
       >
         <motion.h1
           className="font-flyer text-white uppercase max-w-[8ch]"
           style={{
-            fontSize: "clamp(2.1rem, 4.1vw, 4.35rem)",
+            fontSize: "clamp(2.1rem, 3.6vw, 3.9rem)",
             transform: "rotate(-1.5deg)",
             transformOrigin: "left",
           }}
@@ -74,7 +74,7 @@ export default function VibePage() {
           How down<br />are you<span className="lime-dot">?</span>
         </motion.h1>
 
-        <div className="mt-8 grid grid-cols-2 gap-3 sm:mt-10 sm:gap-5 lg:mt-10 lg:max-w-[1040px] lg:grid-cols-2 lg:gap-5">
+        <div className="mt-8 grid grid-cols-2 gap-3 sm:mt-10 sm:gap-5 lg:mt-8 lg:max-w-[980px] lg:grid-cols-2 lg:gap-x-4 lg:gap-y-4">
           {VIBES.map((v, i) => (
             <motion.button
               key={v.slug}
@@ -84,7 +84,7 @@ export default function VibePage() {
               transition={{ delay: 0.1 + i * 0.07, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
               whileTap={{ scale: 0.95 }}
               whileHover={{ y: -6 }}
-              className="group relative aspect-square max-h-[240px] bg-[#0A0A0A] border border-white/10 hover:border-[#C6FF00]/60 hover:bg-[#0C0F08] flex flex-col items-center justify-center px-3 py-5 cursor-pointer transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C6FF00]/60 overflow-hidden sm:aspect-[5/4] sm:max-h-[280px] md:max-h-[300px] lg:aspect-[8/5] lg:max-h-[240px] lg:px-5 lg:py-4"
+              className="group relative aspect-square max-h-[240px] bg-[#0A0A0A] border border-white/10 hover:border-[#C6FF00]/60 hover:bg-[#0C0F08] flex flex-col items-center justify-center px-3 py-5 cursor-pointer transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C6FF00]/60 overflow-hidden sm:aspect-[5/4] sm:max-h-[280px] md:max-h-[300px] lg:aspect-[9/5] lg:max-h-[210px] lg:px-4 lg:py-3"
               data-testid={`vibe-btn-${v.slug}`}
             >
               {/* Hover lime aura behind emoji */}
@@ -101,7 +101,7 @@ export default function VibePage() {
               <motion.span
                 className="relative select-none leading-none drop-shadow-[0_8px_24px_rgba(198,255,0,0.18)]"
                 aria-hidden
-                style={{ fontSize: "clamp(4.5rem, 7vw, 6rem)" }}
+                style={{ fontSize: "clamp(4.5rem, 6.2vw, 5.25rem)" }}
                 animate={{ y: [0, -5, 0], rotate: [0, i % 2 === 0 ? 2 : -2, 0] }}
                 transition={{
                   duration: 4 + i * 0.5,
@@ -113,7 +113,7 @@ export default function VibePage() {
               </motion.span>
 
               {/* Small caption */}
-              <span className="relative mt-2 font-flyer text-[11px] uppercase tracking-[0.18em] text-white group-hover:text-[#C6FF00] transition-colors text-center leading-tight sm:mt-3 sm:text-sm lg:mt-2 lg:text-[0.88rem]">
+              <span className="relative mt-2 font-flyer text-[11px] uppercase tracking-[0.18em] text-white group-hover:text-[#C6FF00] transition-colors text-center leading-tight sm:mt-3 sm:text-sm lg:mt-1.5 lg:text-[0.82rem]">
                 {v.label}
               </span>
             </motion.button>

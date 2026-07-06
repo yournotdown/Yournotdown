@@ -22,8 +22,9 @@ describe("VibePage source contract", () => {
   });
 
   test("uses compact desktop grid sizing", () => {
-    expect(vibePageSource).toContain("lg:aspect-[8/5]");
-    expect(vibePageSource).toContain("lg:max-h-[240px]");
-    expect(vibePageSource).toContain("lg:pt-20 lg:pb-24");
+    expect(vibePageSource).toContain("lg:aspect-[9/5]");
+    expect(vibePageSource).toContain("lg:max-h-[210px]");
+    expect(vibePageSource).toContain("lg:gap-x-4 lg:gap-y-4");
+    expect(vibePageSource).toContain("lg:pt-16 lg:pb-20");
   });
 });
