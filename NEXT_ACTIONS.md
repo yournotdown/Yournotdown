@@ -12,12 +12,17 @@
    - confirm valid email submission shows the honest `provider_unconfigured` message when Resend env vars are absent
    - confirm a forced provider failure path shows `Saved, but the email could not be sent. Try again.`
    - confirm invalid email shows `Enter a valid email.`
+   - confirm the premium email renders cleanly on iPhone Mail, Gmail mobile, and desktop Gmail/Apple Mail, including the neon-lime wordmark fallback, numbered cards, action buttons, and friendly event times
 3. If Blake wants this live in Railway, configure:
    - `RESEND_API_KEY`
    - `RESEND_FROM_EMAIL`
    - optional `RESEND_REPLY_TO`
    - optional `PUBLIC_SITE_URL` or `FRONTEND_PUBLIC_URL`
-4. After Railway env vars are configured, manually verify a real end-to-end transactional email from `/api/itinerary/save` before any deploy approval.
+4. After Railway env vars are configured, manually verify a real end-to-end transactional email from `/api/itinerary/save` before any deploy approval:
+   - confirm subject `Your Tonight’s Move is locked in`
+   - confirm preheader `Nashville is set. Here’s your locked-in move.`
+   - confirm the updated `YND / EST. 26` header renders cleanly across inboxes and the neon-lime divider is visible without image blocking issues
+   - confirm raw vibe slugs and raw `HH:MM:SS` event times are no longer visible
 5. Treat `frontend/package-lock.json` as the intended install baseline going forward; use `cd frontend && npm install` for reproducible local/frontend CI setup and avoid falling back to ad hoc AJV patching.
 
 ## Top 5 Next Tasks

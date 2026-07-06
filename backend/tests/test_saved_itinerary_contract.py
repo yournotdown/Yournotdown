@@ -3,6 +3,7 @@ import ast
 import os
 from datetime import datetime, timezone
 import unittest
+from html import unescape
 from pathlib import Path
 from typing import List, Optional
 
@@ -10,6 +11,9 @@ from typing import List, Optional
 SERVER_PATH = Path(__file__).resolve().parents[1] / "server.py"
 SERVER_SOURCE = SERVER_PATH.read_text()
 SERVER_TREE = ast.parse(SERVER_SOURCE)
+EMAIL_TEMPLATE_PATH = Path(__file__).resolve().parents[1] / "saved_itinerary_email.py"
+EMAIL_TEMPLATE_SOURCE = EMAIL_TEMPLATE_PATH.read_text()
+EMAIL_TEMPLATE_TREE = ast.parse(EMAIL_TEMPLATE_SOURCE)
 
 
 def named_function(name: str):
@@ -17,6 +21,14 @@ def named_function(name: str):
         node
         for node in SERVER_TREE.body
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == name
+    )
+
+
+def template_named_function(name: str):
+    return next(
+        node
+        for node in EMAIL_TEMPLATE_TREE.body
+        if isinstance(node, ast.FunctionDef) and node.name == name
     )
 
 
@@ -32,6 +44,8 @@ def load_save_helpers():
         "List": List,
         "os": os,
         "requests": __import__("requests"),
+        "saved_itinerary_email_content": None,
+        "saved_itinerary_email_subject": None,
         "now_iso": lambda: datetime(2026, 7, 6, 17, 0, tzinfo=timezone.utc).isoformat(),
     }
     exec(ast.get_source_segment(SERVER_SOURCE, named_function("_slot_meta")), namespace)
@@ -39,20 +53,61 @@ def load_save_helpers():
     exec(ast.get_source_segment(SERVER_SOURCE, named_function("_safe_saved_itinerary_steps")), namespace)
     exec(ast.get_source_segment(SERVER_SOURCE, named_function("_valid_email")), namespace)
     exec(ast.get_source_segment(SERVER_SOURCE, named_function("_email_delivery_result")), namespace)
+    template_namespace = {
+        "html": __import__("html"),
+        "os": os,
+        "datetime": datetime,
+        "quote_plus": __import__("urllib.parse").parse.quote_plus,
+    }
+    for assign_name in ("VIBE_META", "STEP_LABELS", "EMAIL_SUBJECT", "EMAIL_PREHEADER"):
+        assign_node = next(
+            node
+            for node in EMAIL_TEMPLATE_TREE.body
+            if isinstance(node, ast.Assign) and any(getattr(target, "id", None) == assign_name for target in node.targets)
+        )
+        exec(ast.get_source_segment(EMAIL_TEMPLATE_SOURCE, assign_node), template_namespace)
+    for fn_name in (
+        "_escape",
+        "_friendly_vibe_label",
+        "_friendly_city_label",
+        "_friendly_step_label",
+        "_friendly_time",
+        "_directions_url",
+        "_step_links",
+        "_step_card_html",
+        "_text_step_block",
+        "saved_itinerary_email_subject",
+        "saved_itinerary_email_preheader",
+        "saved_itinerary_email_content",
+    ):
+        exec(ast.get_source_segment(EMAIL_TEMPLATE_SOURCE, template_named_function(fn_name)), template_namespace)
+    namespace["saved_itinerary_email_subject"] = template_namespace["saved_itinerary_email_subject"]
+    namespace["saved_itinerary_email_content"] = template_namespace["saved_itinerary_email_content"]
     exec(ast.get_source_segment(SERVER_SOURCE, named_function("_saved_itinerary_email_subject")), namespace)
-    exec(ast.get_source_segment(SERVER_SOURCE, named_function("_saved_itinerary_step_lines")), namespace)
     exec(ast.get_source_segment(SERVER_SOURCE, named_function("_saved_itinerary_email_content")), namespace)
     exec(ast.get_source_segment(SERVER_SOURCE, named_function("_send_resend_email")), namespace)
     return (
         namespace["_safe_saved_itinerary_steps"],
         namespace["_valid_email"],
         namespace["_email_delivery_result"],
+        namespace["_saved_itinerary_email_subject"],
         namespace["_saved_itinerary_email_content"],
         namespace["_send_resend_email"],
+        template_namespace["saved_itinerary_email_preheader"],
+        template_namespace["_friendly_time"],
     )
 
 
-SAFE_SAVED_ITINERARY_STEPS, VALID_EMAIL, EMAIL_DELIVERY_RESULT, EMAIL_CONTENT, SEND_RESEND_EMAIL = load_save_helpers()
+(
+    SAFE_SAVED_ITINERARY_STEPS,
+    VALID_EMAIL,
+    EMAIL_DELIVERY_RESULT,
+    EMAIL_SUBJECT,
+    EMAIL_CONTENT,
+    SEND_RESEND_EMAIL,
+    EMAIL_PREHEADER,
+    FRIENDLY_TIME,
+) = load_save_helpers()
 
 
 class TestSavedItineraryContract(unittest.TestCase):
@@ -107,32 +162,100 @@ class TestSavedItineraryContract(unittest.TestCase):
         self.assertEqual(steps[0]["business"]["id"], "pelato")
         self.assertEqual(steps[1]["event"]["external_event_id"], "tm-1")
 
-    def test_email_content_includes_locked_steps_and_footer(self):
+    def test_email_template_uses_premium_branding_and_buttons(self):
         text_body, html_body = EMAIL_CONTENT({
             "city_slug": "nashville",
             "vibe": "send-it",
             "steps": [
                 {
                     "number": 1,
+                    "slot": "dinner",
                     "label": "Dinner",
                     "business": {"name": "Pelato", "address": "123 Main", "website": "https://pelato.example"},
                 },
                 {
                     "number": 3,
+                    "slot": "entertainment",
                     "label": "Entertainment",
-                    "business": {"name": "The Basement East"},
+                    "business": {"name": "The Basement East", "address": "917 Woodland St"},
                     "event": {"title": "Indie Show", "local_time": "20:00:00", "ticket_url": "https://tickets.example"},
                 },
             ],
         })
-        self.assertIn("YourNotDown / Tonight's Move", text_body)
+        visible_html = unescape(html_body)
+        self.assertEqual(EMAIL_SUBJECT({"city_slug": "nashville"}), "Your Tonight’s Move is locked in")
+        self.assertEqual(EMAIL_PREHEADER({"city_slug": "nashville"}), "Nashville is set. Here’s your locked-in move.")
+        self.assertIn("YND", visible_html)
+        self.assertIn("EST. 26", visible_html)
+        self.assertIn("You’re Locked In", visible_html)
+        self.assertIn("🚀 No Regrets", visible_html)
+        self.assertNotIn(">send-it<", visible_html)
+        self.assertIn("01 DINNER", visible_html)
+        self.assertIn("03 LIVE MUSIC", visible_html)
+        self.assertIn("View Venue", visible_html)
+        self.assertIn("Get Directions", visible_html)
+        self.assertIn("Buy Tickets", visible_html)
+        self.assertIn("Built with YourNotDown", visible_html)
         self.assertIn("Pelato", text_body)
         self.assertIn("Indie Show", text_body)
-        self.assertIn("Built with YourNotDown", text_body)
-        self.assertIn("Tonight's Move", html_body)
-        self.assertIn("https://tickets.example", html_body)
+        self.assertIn("Vibe: 🚀 No Regrets", text_body)
+        self.assertIn("View Venue: https://pelato.example", text_body)
+        self.assertIn("Buy Tickets: https://tickets.example", text_body)
+
+    def test_event_time_formats_to_friendly_time(self):
+        self.assertEqual(FRIENDLY_TIME("19:00:00"), "7:00 PM")
+        self.assertEqual(FRIENDLY_TIME("2026-07-06T19:00:00"), "Jul 6, 7:00 PM")
+
+    def test_email_html_escapes_business_and_event_names(self):
+        _, html_body = EMAIL_CONTENT({
+            "city_slug": "nashville",
+            "vibe": "down",
+            "steps": [
+                {
+                    "number": 2,
+                    "slot": "drinks",
+                    "business": {
+                        "name": '<script>alert("x")</script> & Lounge',
+                        "address": '123 <Main> & "Broadway"',
+                    },
+                    "event": {"title": 'Rock & Roll <Bash>'},
+                },
+            ],
+        })
+        self.assertIn("&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt; &amp; Lounge", html_body)
+        self.assertIn("123 &lt;Main&gt; &amp; &quot;Broadway&quot;", html_body)
+        self.assertIn("Rock &amp; Roll &lt;Bash&gt;", html_body)
+        self.assertNotIn("<script>alert", html_body)
+
+    def test_plain_text_email_is_generated_cleanly(self):
+        text_body, _ = EMAIL_CONTENT({
+            "city_slug": "nashville",
+            "vibe": "very-down",
+            "steps": [
+                {
+                    "number": 4,
+                    "slot": "late-night",
+                    "business": {
+                        "name": "Schulman's",
+                        "address": "1201 Porter Rd",
+                        "website": "https://schulmans.example",
+                    },
+                },
+            ],
+        })
+        self.assertIn("YOURNOTDOWN", text_body)
+        self.assertIn("Tonight's Move", text_body)
+        self.assertIn("City: Nashville", text_body)
+        self.assertIn("Vibe: 🔥 Let's Make It Count", text_body)
+        self.assertIn("04 LATE NIGHT", text_body)
+        self.assertIn("Schulman's", text_body)
+        self.assertIn("1201 Porter Rd", text_body)
+        self.assertIn("View Venue: https://schulmans.example", text_body)
+        self.assertNotIn("{", text_body)
 
     def test_sent_status_when_mocked_resend_succeeds(self):
+        payloads = []
+
         class FakeResponse:
             content = b'{"id":"msg_123"}'
 
@@ -155,12 +278,22 @@ class TestSavedItineraryContract(unittest.TestCase):
             os.environ["RESEND_API_KEY"] = "test-key"
             os.environ["RESEND_FROM_EMAIL"] = "hello@yournotdown.com"
             os.environ["RESEND_REPLY_TO"] = "reply@yournotdown.com"
-            requests_module.post = lambda *args, **kwargs: FakeResponse()
+            def fake_post(*args, **kwargs):
+                payloads.append(kwargs["json"])
+                return FakeResponse()
+
+            requests_module.post = fake_post
             result = SEND_RESEND_EMAIL({
                 "email": "traveler@example.com",
                 "city_slug": "nashville",
                 "vibe": "down",
-                "steps": [],
+                "steps": [
+                    {
+                        "number": 1,
+                        "slot": "dinner",
+                        "business": {"name": "Pelato", "address": "123 Main", "website": "https://pelato.example"},
+                    },
+                ],
             })
         finally:
             requests_module.post = original_post
@@ -174,6 +307,11 @@ class TestSavedItineraryContract(unittest.TestCase):
         self.assertEqual(result["provider_message_id"], "msg_123")
         self.assertEqual(result["delivery_error"], "")
         self.assertTrue(result["sent_at"])
+        self.assertEqual(payloads[0]["subject"], "Your Tonight’s Move is locked in")
+        self.assertIn("YND", payloads[0]["html"])
+        self.assertIn("EST. 26", payloads[0]["html"])
+        self.assertIn("You’re Locked In", payloads[0]["html"])
+        self.assertIn("Pelato", payloads[0]["text"])
 
     def test_failed_status_when_mocked_resend_fails(self):
         source = ast.get_source_segment(SERVER_SOURCE, named_function("save_itinerary"))

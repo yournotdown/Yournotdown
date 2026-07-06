@@ -63,16 +63,19 @@ Operational constraints preserved in this session:
 Latest local patch state:
 - implemented Chunk 2B of the Tonight's Move save flow by wiring real Resend delivery on top of the existing saved-itinerary scaffold
 - `backend/server.py` now renders transactional text + HTML Tonight's Move email content, calls Resend via HTTPS when `RESEND_API_KEY` and `RESEND_FROM_EMAIL` are configured, stores `email_provider="resend"`, `provider_message_id`, `sent_at`, and `delivery_error`, and preserves the prior `provider_unconfigured` fallback when env vars are missing
+- extracted the saved-itinerary email rendering into `backend/saved_itinerary_email.py` and upgraded the template from a raw system email to a premium mobile-first YourNotDown transactional email with a neon-lime text wordmark fallback, branded header/hero, city and vibe chips, numbered itinerary cards, email-safe action buttons, friendly vibe labels, friendly event time formatting, a clean text fallback, and HTML escaping for venue/event strings
+- refined the transactional email header to match the approved hotel-QR sign direction more closely by replacing the `YOURNOTDOWN` HTML wordmark with a premium text treatment of `YND / EST. 26`, keeping the black background, muted secondary mark, and a thin neon-lime accent divider without introducing any image dependency
 - the save endpoint now updates `db.saved_itineraries` after send attempts so the persisted snapshot reflects `sent`, `failed`, or `provider_unconfigured` accurately without mutating `db.itineraries`
 - `frontend/src/pages/TonightPage.jsx` now distinguishes all three delivery outcomes honestly:
   - `sent` -> `Sent — check your email.`
   - `provider_unconfigured` -> `Your move is saved. Email sending is not configured yet.`
   - `failed` -> `Saved, but the email could not be sent. Try again.`
 - no secrets were added and no SMS path was implemented
-- added dependency-free coverage in `backend/tests/test_saved_itinerary_contract.py` for mocked Resend success, failure-path source handling, provider-unconfigured fallback, persisted provider fields, and email content shape
+- added dependency-free coverage in `backend/tests/test_saved_itinerary_contract.py` for mocked Resend success, failure-path source handling, provider-unconfigured fallback, persisted provider fields, premium HTML/text content shape, friendly vibe labels, button rendering, friendly event time formatting, and HTML escaping
+- the premium email tests now assert the updated `YND` and `EST. 26` header treatment instead of the older all-text `YOURNOTDOWN` header while preserving the Resend/provider behavior checks
 - updated Tonight page source contract coverage to assert the `sent` / `provider_unconfigured` / `failed` frontend response handling branches
-- validated locally with `python3 -m unittest backend.tests.test_saved_itinerary_contract backend.tests.test_locked_steps_contract backend.tests.test_tonight_page_contract backend.tests.test_city_events_filtering_contract backend.tests.test_ticketmaster_events_unit`, which passed (`79` tests)
-- validated the frontend locally with `cd frontend && npm run build` and `cd frontend && CI=true npm test -- --watchAll=false`, both of which passed after the Resend integration changes
+- validated locally with `python3 -m unittest backend.tests.test_saved_itinerary_contract backend.tests.test_locked_steps_contract backend.tests.test_tonight_page_contract backend.tests.test_city_events_filtering_contract backend.tests.test_ticketmaster_events_unit`, which passed (`82` tests) after the premium email-template update
+- validated the frontend locally with `cd frontend && npm run build` and `cd frontend && CI=true npm test -- --watchAll=false`, both of which passed after the premium email-template update
 - implemented Chunk 2A of the Tonight's Move save flow without adding any real email provider integration or SMS
 - `frontend/src/pages/TonightPage.jsx` now auto-detects when all four visible Tonight's Move steps are locked, opens a `You're Locked In` overlay once per all-locked cycle, supports `Keep editing`, preserves locked cards after dismiss, and posts the final itinerary snapshot to `POST /api/itinerary/save`
 - the save overlay tracks email input, submit loading, validation error, request failure, and post-save success state without altering `Another Night`, lock/unlock behavior, or the existing Ticketmaster cadence logic
