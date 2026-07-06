@@ -1,0 +1,146 @@
+"""Dependency-free source contracts for business-owner invite and session scaffolding."""
+import ast
+import os
+import unittest
+from pathlib import Path
+
+
+SERVER_PATH = Path(__file__).resolve().parents[1] / "server.py"
+SERVER_SOURCE = SERVER_PATH.read_text()
+SERVER_TREE = ast.parse(SERVER_SOURCE)
+EMAIL_PATH = Path(__file__).resolve().parents[1] / "business_owner_email.py"
+EMAIL_SOURCE = EMAIL_PATH.read_text()
+EMAIL_TREE = ast.parse(EMAIL_SOURCE)
+
+
+def named_function(name: str):
+    return next(
+        node
+        for node in SERVER_TREE.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == name
+    )
+
+
+def email_named_function(name: str):
+    return next(
+        node
+        for node in EMAIL_TREE.body
+        if isinstance(node, ast.FunctionDef) and node.name == name
+    )
+
+
+def load_owner_helpers():
+    namespace = {
+        "hashlib": __import__("hashlib"),
+        "secrets": __import__("secrets"),
+        "os": os,
+    }
+    exec(ast.get_source_segment(SERVER_SOURCE, named_function("_hash_token")), namespace)
+    exec(ast.get_source_segment(SERVER_SOURCE, named_function("_new_owner_token")), namespace)
+    exec(ast.get_source_segment(SERVER_SOURCE, named_function("_business_owner_claim_url")), namespace)
+    exec(ast.get_source_segment(SERVER_SOURCE, named_function("_owner_invite_delivery_result")), namespace)
+
+    email_namespace = {
+        "html": __import__("html"),
+        "datetime": __import__("datetime").datetime,
+    }
+    assign = next(
+        node for node in EMAIL_TREE.body
+        if isinstance(node, ast.Assign) and any(getattr(target, "id", None) == "EMAIL_SUBJECT" for target in node.targets)
+    )
+    exec(ast.get_source_segment(EMAIL_SOURCE, assign), email_namespace)
+    for fn_name in (
+        "_escape",
+        "_friendly_expiration",
+        "business_owner_invite_email_subject",
+        "business_owner_invite_email_content",
+    ):
+        exec(ast.get_source_segment(EMAIL_SOURCE, email_named_function(fn_name)), email_namespace)
+    return (
+        namespace["_hash_token"],
+        namespace["_new_owner_token"],
+        namespace["_business_owner_claim_url"],
+        namespace["_owner_invite_delivery_result"],
+        email_namespace["business_owner_invite_email_subject"],
+        email_namespace["business_owner_invite_email_content"],
+    )
+
+
+(
+    HASH_TOKEN,
+    NEW_OWNER_TOKEN,
+    BUSINESS_OWNER_CLAIM_URL,
+    OWNER_INVITE_DELIVERY_RESULT,
+    OWNER_INVITE_EMAIL_SUBJECT,
+    OWNER_INVITE_EMAIL_CONTENT,
+) = load_owner_helpers()
+
+
+class TestBusinessOwnerContract(unittest.TestCase):
+    def test_invite_endpoint_stores_token_hash_not_raw_token(self):
+        source = ast.get_source_segment(SERVER_SOURCE, named_function("admin_business_owner_invite"))
+        self.assertIn('"token_hash": _hash_token(raw_token)', source)
+        self.assertNotIn('"token": raw_token', source)
+        self.assertIn('timedelta(days=BUSINESS_OWNER_INVITE_DAYS)', source)
+        self.assertIn('await db.business_owner_invites.insert_one(doc)', source)
+
+    def test_claim_endpoint_hashes_token_and_sets_cookie(self):
+        source = ast.get_source_segment(SERVER_SOURCE, named_function("business_claim"))
+        self.assertIn('{"token_hash": _hash_token(raw_token)}', source)
+        self.assertIn('"session_token_hash": _hash_token(session_token)', source)
+        self.assertIn('response.set_cookie(', source)
+        self.assertIn('key=BUSINESS_OWNER_SESSION_COOKIE', source)
+        self.assertIn('"status": "accepted"', source)
+
+    def test_owner_auth_and_me_endpoints_are_business_scoped(self):
+        auth_source = ast.get_source_segment(SERVER_SOURCE, named_function("get_current_business_owner"))
+        self.assertIn('business_owner_session: Optional[str] = Cookie(None)', auth_source)
+        self.assertIn('await db.business_owner_sessions.find_one({"session_token_hash": token_hash}', auth_source)
+        self.assertIn('await db.businesses.find_one({"id": owner["business_id"]}', auth_source)
+        me_source = ast.get_source_segment(SERVER_SOURCE, named_function("business_me"))
+        self.assertIn("Depends(get_current_business_owner)", me_source)
+        self.assertIn('_owner_safe(owner_ctx["owner"], owner_ctx["business"])', me_source)
+
+    def test_provider_unconfigured_when_resend_env_missing(self):
+        previous = {
+            "RESEND_API_KEY": os.environ.get("RESEND_API_KEY"),
+            "RESEND_FROM_EMAIL": os.environ.get("RESEND_FROM_EMAIL"),
+        }
+        try:
+            os.environ.pop("RESEND_API_KEY", None)
+            os.environ.pop("RESEND_FROM_EMAIL", None)
+            result = OWNER_INVITE_DELIVERY_RESULT()
+        finally:
+            for key, value in previous.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
+        self.assertEqual(result["delivery_status"], "provider_unconfigured")
+        self.assertEqual(result["email_provider"], "")
+
+    def test_token_and_claim_url_helpers(self):
+        token = NEW_OWNER_TOKEN()
+        self.assertTrue(token)
+        self.assertEqual(HASH_TOKEN("abc"), HASH_TOKEN("abc"))
+        self.assertNotEqual(HASH_TOKEN("abc"), HASH_TOKEN("xyz"))
+        url = BUSINESS_OWNER_CLAIM_URL("raw-token")
+        self.assertIn("/business/claim/raw-token", url)
+
+    def test_owner_invite_email_template_is_branded(self):
+        self.assertEqual(OWNER_INVITE_EMAIL_SUBJECT({}), "Create your YourNotDown business account")
+        text_body, html_body = OWNER_INVITE_EMAIL_CONTENT({
+            "business_name": "The Patterson House",
+            "claim_url": "https://www.yournotdown.com/business/claim/test-token",
+            "expires_at": "2026-07-13T17:00:00+00:00",
+        })
+        self.assertIn("YND", html_body)
+        self.assertIn("Create Account", html_body)
+        self.assertIn("The Patterson House", html_body)
+        self.assertIn("Jul", text_body)
+        self.assertIn("Built with YourNotDown", html_body)
+        self.assertIn("https://www.yournotdown.com/business/claim/test-token", text_body)
+
+
+if __name__ == "__main__":
+    unittest.main()

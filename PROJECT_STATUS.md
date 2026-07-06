@@ -48,8 +48,39 @@ Latest local admin analytics update:
 - `frontend/src/pages/AdminBusinessAnalyticsPage.jsx` now exposes the new metrics per business: Locked In, Saved in Final Move, Buy Tickets, and Total Engagement
 - local regression results for Chunk B:
   - `python3 -m unittest backend.tests.test_analytics_contract backend.tests.test_saved_itinerary_contract backend.tests.test_locked_steps_contract backend.tests.test_tonight_page_contract backend.tests.test_city_events_filtering_contract backend.tests.test_ticketmaster_events_unit` passed (`88` tests)
+- `cd frontend && npm run build` passed
+- `cd frontend && CI=true npm test -- --watchAll=false` passed (`3` suites, `15` tests)
+
+Latest local business-owner scaffold update:
+- implemented Chunk C of the business-owner invite and magic-link access foundation without changing public Tonight's Move behavior, sponsorship weighting, or billing
+- `backend/server.py` now includes:
+  - admin owner-access status endpoint
+  - admin owner-invite send endpoint
+  - admin owner-access revoke endpoint
+  - public business claim endpoint
+  - owner-only `GET /api/business/me`
+  - owner-only `GET /api/business/analytics`
+  - separate business-owner auth middleware using its own secure cookie and session collection
+- added secure token/session scaffolding:
+  - invite tokens are generated with `secrets.token_urlsafe(...)`
+  - only `token_hash` / `session_token_hash` are stored
+  - owner invite expiry is `7` days
+  - owner sessions are separate from admin sessions and currently expire after `30` days
+- added `backend/business_owner_email.py` for a branded Resend-backed invite email with `YND / EST. 26`, business name, create-account CTA, and 7-day expiration messaging
+- if Resend env vars are missing, owner-invite creation now returns a truthful `provider_unconfigured` delivery status instead of crashing or pretending the email was sent
+- `frontend/src/pages/AdminDashboardPage.jsx` now includes a Business Owner Access section in the existing business edit modal with:
+  - owner email input
+  - invite send action
+  - invite/portal status display
+  - revoke access action
+- added owner routes and shells:
+  - `/business/claim/:token`
+  - `/business/dashboard`
+- the business dashboard remains intentionally lightweight for now: business identity, sponsor tier, and basic metrics from the existing analytics model; deeper dashboard buildout is still deferred to Chunk D
+- local regression results for Chunk C:
+  - `python3 -m unittest backend.tests.test_business_owner_contract backend.tests.test_analytics_contract backend.tests.test_saved_itinerary_contract backend.tests.test_locked_steps_contract backend.tests.test_tonight_page_contract backend.tests.test_city_events_filtering_contract backend.tests.test_ticketmaster_events_unit` passed (`94` tests)
   - `cd frontend && npm run build` passed
-  - `cd frontend && CI=true npm test -- --watchAll=false` passed (`3` suites, `15` tests)
+  - `cd frontend && CI=true npm test -- --watchAll=false` passed (`3` suites, `19` tests)
 
 Verified production Ticketmaster cron/apply summary:
 - `status=ok`

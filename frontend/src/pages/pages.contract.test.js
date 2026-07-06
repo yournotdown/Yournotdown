@@ -4,6 +4,9 @@ import path from "path";
 const tonightPageSource = fs.readFileSync(path.join(__dirname, "TonightPage.jsx"), "utf8");
 const vibePageSource = fs.readFileSync(path.join(__dirname, "VibePage.jsx"), "utf8");
 const adminDashboardSource = fs.readFileSync(path.join(__dirname, "AdminDashboardPage.jsx"), "utf8");
+const businessClaimSource = fs.readFileSync(path.join(__dirname, "BusinessClaimPage.jsx"), "utf8");
+const businessDashboardSource = fs.readFileSync(path.join(__dirname, "BusinessDashboardPage.jsx"), "utf8");
+const appSource = fs.readFileSync(path.join(__dirname, "..", "App.js"), "utf8");
 
 describe("TonightPage source contract", () => {
   test("Another Night scrolls to the top after a successful reroll", () => {
@@ -49,5 +52,31 @@ describe("AdminDashboardPage source contract", () => {
     expect(adminDashboardSource).toContain("Dinner");
     expect(adminDashboardSource).toContain("Drinks");
     expect(adminDashboardSource).toContain("Late Night");
+  });
+
+  test("admin business area includes Invite Owner UI", () => {
+    expect(adminDashboardSource).toContain("Business Owner Access");
+    expect(adminDashboardSource).toContain("Invite Owner");
+    expect(adminDashboardSource).toContain("business-owner-invite-send");
+    expect(adminDashboardSource).toContain("business-owner-revoke-access");
+  });
+});
+
+describe("Business owner routes source contract", () => {
+  test("claim and dashboard routes exist", () => {
+    expect(appSource).toContain('path="/business/claim/:token"');
+    expect(appSource).toContain('path="/business/dashboard"');
+  });
+
+  test("claim page posts token to the business claim endpoint", () => {
+    expect(businessClaimSource).toContain('.post("/business/claim", { token })');
+    expect(businessClaimSource).toContain("Create Account");
+  });
+
+  test("dashboard shell contains business and sponsor language", () => {
+    expect(businessDashboardSource).toContain('api.get("/business/me")');
+    expect(businessDashboardSource).toContain('api.get("/business/analytics")');
+    expect(businessDashboardSource).toContain("Business Portal");
+    expect(businessDashboardSource).toContain("Sponsor tier:");
   });
 });

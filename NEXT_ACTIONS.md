@@ -1,33 +1,46 @@
 ## Immediate Follow-Up
 
-0. Manually QA the upgraded admin analytics tab before any deploy approval:
+0. Manually QA the new business-owner invite flow before any deploy approval:
+   - open an existing business in the admin edit modal and confirm the Business Owner Access section loads
+   - send an invite with Resend configured and confirm the email arrives with the claim link
+   - send an invite without Resend configured and confirm the UI reports the honest `provider_unconfigured` state
+   - claim the link and confirm `/business/dashboard` loads with only that business context
+   - revoke owner access and confirm the existing owner session can no longer reach `/api/business/me`
+1. Build Chunk D on top of the new owner session scaffold rather than inventing a second auth model:
+   - richer owner dashboard tables/charts
+   - vibe/category breakdowns
+   - better empty/error states
+   - owner logout / session UX if Blake wants it
+2. Decide whether business-owner sessions should stay at `30` days or be shortened before production launch; the current scaffold chose a separate long-lived owner cookie for MVP convenience.
+3. If Blake wants resend/reissue behavior later, add a dedicated “resend invite” control on top of the existing `owner-invite` endpoint semantics rather than creating a separate invite model.
+
+4. Manually QA the upgraded admin analytics tab before any deploy approval:
    - switch between `7d`, `30d`, `90d`, and `All time` and confirm leaderboard/card totals update
    - apply vibe and slot filters and confirm the category-winner tables, sponsor performance rows, and top-business tables update consistently
    - confirm older analytics records without `slot` do not crash the page and simply fall out of slot-specific leaderboards
    - confirm the per-business analytics page now shows Locked In, Saved in Final Move, Buy Tickets, and Total Engagement
-1. If Blake wants business-owner accounts next, build them on top of the new admin leaderboards and per-business totals rather than inventing another analytics model.
-2. Decide whether the admin analytics tab should eventually expose a city filter in the UI once non-Nashville markets are live; the backend summary endpoint now has room for city-scoped filtering later.
-3. If Blake wants deeper sponsor reporting later, the next safe extension is a dedicated `/api/admin/analytics/leaderboards` endpoint or CSV export rather than adding more rendering complexity to the current summary payload.
+5. Decide whether the admin analytics tab should eventually expose a city filter in the UI once non-Nashville markets are live; the backend summary endpoint now has room for city-scoped filtering later.
+6. If Blake wants deeper sponsor reporting later, the next safe extension is a dedicated `/api/admin/analytics/leaderboards` endpoint or CSV export rather than adding more rendering complexity to the current summary payload.
 
-4. Manually QA the new sponsor-grade analytics events in a browser session before any deploy approval:
+7. Manually QA the new sponsor-grade analytics events in a browser session before any deploy approval:
    - lock a Tonight's Move card and confirm a `step_locked` event is created only on the lock click, not on rerenders or unlock
    - click `Buy Tickets` from a Tonight entertainment card and confirm `ticket_click` now carries business/event context
    - save a final locked itinerary and confirm each saved step writes a `saved_itinerary_business` analytics event without breaking the save-email flow
    - inspect admin/business analytics responses for the new `step_locked`, `saved_itinerary_business`, `ticket_click`, and `total_engagement` totals
-5. If Blake wants the admin analytics UI expanded next, build it on top of the new backend fields instead of adding new event types again:
+8. If Blake wants the admin analytics UI expanded next, build it on top of the new backend fields instead of adding new event types again:
    - leaderboard tables for top locked-in businesses, top ticket-click businesses, and top total-engagement businesses
    - optional date-range, vibe, and slot filters once the UI shape is approved
-6. Before business-owner accounts, decide whether `Locked In` in sponsor reporting should mean:
+9. Before business-owner-facing sponsor reporting, decide whether `Locked In` should mean:
    - every `step_locked` click
    - every business present in a fully saved final move
    - or both as separate metrics
-7. If the old pytest-based backend integration suite needs to run again, remember it still targets `https://whatsyoudown.preview.emergentagent.com` via `backend/tests/test_config.py`; the latest failure was preview DNS resolution, not a meaningful application assertion.
+10. If the old pytest-based backend integration suite needs to run again, remember it still targets `https://whatsyoudown.preview.emergentagent.com` via `backend/tests/test_config.py`; the latest failure was preview DNS resolution, not a meaningful application assertion.
 
-8. Manually QA `/:citySlug/tonight?vibe=...` for the new lock flow:
+11. Manually QA `/:citySlug/tonight?vibe=...` for the new lock flow:
    - lock dinner/drinks/late-night individually and confirm only unlocked slots reroll
    - lock `entertainment` and confirm the same live-music/Ticketmaster card and event details persist across `Another Night`
    - confirm every-4th `Another Night` still requests Ticketmaster only when `entertainment` is unlocked
-9. Manually QA the new `You're Locked In` overlay on `/:citySlug/tonight?vibe=...`:
+12. Manually QA the new `You're Locked In` overlay on `/:citySlug/tonight?vibe=...`:
    - confirm it auto-opens only after all 4 steps are locked
    - confirm `Keep editing` closes it without unlocking cards
    - confirm unlocking any step prevents immediate reopen until all 4 are locked again

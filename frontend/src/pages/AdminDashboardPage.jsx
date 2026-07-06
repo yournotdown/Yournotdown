@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import {
   Plus, Pencil, Trash2, Star, ArrowUp, ArrowDown, Upload,
   LogOut, BarChart3, Store, LayoutGrid, Image as ImageIcon, TrendingUp,
-  ClipboardCheck, CheckCircle, XCircle, ExternalLink, Globe, Phone, Navigation, Ticket, Lock,
+  ClipboardCheck, CheckCircle, XCircle, ExternalLink, Globe, Phone, Navigation, Ticket, Lock, Mail,
 } from "lucide-react";
 import { api, resolveImageUrl } from "../lib/api";
 import { Button } from "@/components/ui/button";
@@ -103,6 +103,11 @@ export default function AdminDashboardPage() {
   const [form, setForm] = useState(empty);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [ownerInviteEmail, setOwnerInviteEmail] = useState("");
+  const [ownerAccess, setOwnerAccess] = useState(null);
+  const [ownerAccessLoading, setOwnerAccessLoading] = useState(false);
+  const [ownerInviteSending, setOwnerInviteSending] = useState(false);
+  const [ownerRevoking, setOwnerRevoking] = useState(false);
   const [savingFeaturedLiveMusic, setSavingFeaturedLiveMusic] = useState(false);
   const [savingTonightMoveSponsorship, setSavingTonightMoveSponsorship] = useState(false);
   const fileInputRef = useRef(null);
@@ -174,12 +179,26 @@ export default function AdminDashboardPage() {
   const openCreate = () => {
     setEditing(null);
     setForm({ ...empty, category_slug: categories[0]?.slug || "drinks", order: businesses.length });
+    setOwnerInviteEmail("");
+    setOwnerAccess(null);
     setOpen(true);
   };
 
   const openEdit = (b) => {
     setEditing(b);
     setForm({ ...empty, ...b });
+    setOwnerInviteEmail("");
+    setOwnerAccessLoading(true);
+    api
+      .get(`/admin/businesses/${b.id}/owner-access`)
+      .then((r) => {
+        setOwnerAccess(r.data);
+        setOwnerInviteEmail(r.data?.invite?.email || r.data?.owner?.email || "");
+      })
+      .catch(() => {
+        toast.error("Failed to load owner access");
+      })
+      .finally(() => setOwnerAccessLoading(false));
     setOpen(true);
   };
 
@@ -348,6 +367,40 @@ export default function AdminDashboardPage() {
       await loadAll();
     } catch (e) {
       toast.error(e?.response?.data?.detail || "Bulk review failed");
+    }
+  };
+
+  const handleSendOwnerInvite = async () => {
+    if (!editing?.id) return;
+    setOwnerInviteSending(true);
+    try {
+      const response = await api.post(`/admin/businesses/${editing.id}/owner-invite`, {
+        email: ownerInviteEmail,
+      });
+      setOwnerAccess(response.data);
+      toast.success(
+        response.data?.invite?.delivery_status === "provider_unconfigured"
+          ? "Invite saved, but email sending is not configured."
+          : "Owner invite sent"
+      );
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Failed to send owner invite");
+    } finally {
+      setOwnerInviteSending(false);
+    }
+  };
+
+  const handleRevokeOwnerAccess = async () => {
+    if (!editing?.id) return;
+    setOwnerRevoking(true);
+    try {
+      const response = await api.post(`/admin/businesses/${editing.id}/owner-access/revoke`);
+      setOwnerAccess(response.data);
+      toast.success("Owner access revoked");
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Failed to revoke owner access");
+    } finally {
+      setOwnerRevoking(false);
     }
   };
 
@@ -693,6 +746,87 @@ export default function AdminDashboardPage() {
                 applies — be honest, not aspirational.
               </p>
             </Field>
+
+            {editing ? (
+              <div className="border border-white/10 bg-[#0D0D12] p-5 space-y-4" data-testid="business-owner-access-panel">
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <div>
+                    <div className="text-xs font-bold uppercase tracking-wide text-[#A1A1AA]">Business Owner Access</div>
+                    <p className="mt-2 text-sm text-white/60">
+                      Send a create-account invitation and manage business portal access.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2 text-[10px] uppercase tracking-[0.18em]">
+                    <span className="px-3 py-1 rounded-full bg-white/5 text-white/60" data-testid="business-owner-portal-status">
+                      {ownerAccess?.portal_access_active ? "Portal active" : "Portal inactive"}
+                    </span>
+                    <span className="px-3 py-1 rounded-full bg-white/5 text-white/60" data-testid="business-owner-invite-status">
+                      Invite {ownerAccess?.invite?.status || "none"}
+                    </span>
+                  </div>
+                </div>
+
+                {ownerAccessLoading ? (
+                  <div className="text-sm text-[#A1A1AA]">Loading owner access…</div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <div className="text-[10px] uppercase tracking-[0.2em] text-white/35">Owner email</div>
+                        <div className="mt-1 text-white/80" data-testid="business-owner-email-display">
+                          {ownerAccess?.owner?.email || ownerAccess?.invite?.email || "—"}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] uppercase tracking-[0.2em] text-white/35">Last invite sent</div>
+                        <div className="mt-1 text-white/80">
+                          {ownerAccess?.invite?.sent_at || "—"}
+                        </div>
+                      </div>
+                    </div>
+
+                    <Field label="Invite owner">
+                      <div className="flex flex-col sm:flex-row gap-3">
+                        <Input
+                          value={ownerInviteEmail}
+                          onChange={(e) => setOwnerInviteEmail(e.target.value)}
+                          placeholder="owner@example.com"
+                          className="bg-[#1A1A22] border-white/10 text-white"
+                          data-testid="business-owner-invite-email"
+                        />
+                        <Button
+                          type="button"
+                          onClick={handleSendOwnerInvite}
+                          disabled={ownerInviteSending}
+                          className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white"
+                          data-testid="business-owner-invite-send"
+                        >
+                          <Mail className="w-4 h-4 mr-2" />
+                          {ownerInviteSending ? "Sending…" : "Invite Owner"}
+                        </Button>
+                      </div>
+                    </Field>
+
+                    <div className="text-xs text-white/45 leading-relaxed">
+                      {ownerAccess?.invite?.delivery_status === "provider_unconfigured"
+                        ? "Invite is saved, but email sending is not configured yet."
+                        : "Magic links expire after 7 days and can only be claimed once."}
+                    </div>
+
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={handleRevokeOwnerAccess}
+                      disabled={ownerRevoking}
+                      className="text-red-300 hover:text-red-200 hover:bg-red-500/10"
+                      data-testid="business-owner-revoke-access"
+                    >
+                      {ownerRevoking ? "Revoking…" : "Revoke access"}
+                    </Button>
+                  </>
+                )}
+              </div>
+            ) : null}
           </div>
           <DialogFooter>
             <Button

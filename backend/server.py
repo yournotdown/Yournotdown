@@ -1,7 +1,9 @@
 """You're Not Down — FastAPI backend."""
 import asyncio
+import hashlib
 import os
 import logging
+import secrets
 import uuid
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
@@ -66,6 +68,10 @@ from saved_itinerary_email import (
     saved_itinerary_email_content,
     saved_itinerary_email_subject,
 )
+from business_owner_email import (
+    business_owner_invite_email_content,
+    business_owner_invite_email_subject,
+)
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
@@ -94,6 +100,9 @@ EVENT_START_GRACE_MINUTES = max(0, int(os.environ.get("EVENT_START_GRACE_MINUTES
 
 EMERGENT_AUTH_URL = "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data"
 ADMIN_EMAILS = [e.strip().lower() for e in os.environ.get("ADMIN_EMAILS", "").split(",") if e.strip()]
+BUSINESS_OWNER_INVITE_DAYS = 7
+BUSINESS_OWNER_SESSION_DAYS = 30
+BUSINESS_OWNER_SESSION_COOKIE = "business_owner_session"
 
 
 # ------------- Models -------------
@@ -332,6 +341,14 @@ class SaveItineraryRequest(BaseModel):
     locked_slots: List[str] = Field(default_factory=list)
 
 
+class BusinessOwnerInviteCreate(BaseModel):
+    email: str
+
+
+class BusinessOwnerClaimRequest(BaseModel):
+    token: str
+
+
 # ------------- App -------------
 app = FastAPI(title="You're Not Down")
 api_router = APIRouter(prefix="/api")
@@ -528,6 +545,44 @@ async def require_admin(user=Depends(get_current_user)):
     return user
 
 
+async def get_current_business_owner(
+    request: Request,
+    business_owner_session: Optional[str] = Cookie(None),
+):
+    token = business_owner_session
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    token_hash = _hash_token(token)
+    session = await db.business_owner_sessions.find_one({"session_token_hash": token_hash}, {"_id": 0})
+    if not session:
+        raise HTTPException(status_code=401, detail="Invalid session")
+    if session.get("revoked_at"):
+        raise HTTPException(status_code=401, detail="Session revoked")
+
+    expires_at = session.get("expires_at")
+    if isinstance(expires_at, str):
+        expires_at = datetime.fromisoformat(expires_at)
+    if expires_at and expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if expires_at and expires_at < datetime.now(timezone.utc):
+        raise HTTPException(status_code=401, detail="Session expired")
+
+    owner = await db.business_owners.find_one({"owner_id": session["owner_id"]}, {"_id": 0})
+    if not owner or owner.get("status") != "active":
+        raise HTTPException(status_code=403, detail="Owner access revoked")
+
+    business = await db.businesses.find_one({"id": owner["business_id"]}, {"_id": 0})
+    if not business:
+        raise HTTPException(status_code=404, detail="Business not found")
+
+    await db.business_owner_sessions.update_one(
+        {"session_id": session["session_id"]},
+        {"$set": {"last_seen_at": now_iso()}},
+    )
+    return {"owner": owner, "business": business, "session": session}
+
+
 # ------------- Itinerary engine -------------
 import random
 
@@ -631,6 +686,99 @@ def _safe_saved_itinerary_steps(steps: List[dict]) -> list[dict]:
             slot = SLOT_LABELS[index]["slot"]
         safe_steps.append(_safe_locked_step(slot, step))
     return safe_steps
+
+
+def _hash_token(value: str) -> str:
+    return hashlib.sha256((value or "").encode("utf-8")).hexdigest()
+
+
+def _new_owner_token() -> str:
+    return secrets.token_urlsafe(32)
+
+
+def _business_owner_claim_url(token: str) -> str:
+    base = (
+        os.environ.get("PUBLIC_SITE_URL", "").strip()
+        or os.environ.get("FRONTEND_PUBLIC_URL", "").strip()
+        or "https://www.yournotdown.com"
+    ).rstrip("/")
+    return f"{base}/business/claim/{token}"
+
+
+def _owner_invite_delivery_result() -> dict:
+    resend_api_key = os.environ.get("RESEND_API_KEY", "").strip()
+    resend_from_email = os.environ.get("RESEND_FROM_EMAIL", "").strip()
+    if not resend_api_key or not resend_from_email:
+        return {
+            "delivery_status": "provider_unconfigured",
+            "delivery_error": "",
+            "email_provider": "",
+            "provider_message_id": "",
+            "sent_at": None,
+        }
+    return {
+        "delivery_status": "pending",
+        "delivery_error": "",
+        "email_provider": "resend",
+        "provider_message_id": "",
+        "sent_at": None,
+    }
+
+
+def _owner_invite_safe(invite: Optional[dict]) -> Optional[dict]:
+    if not invite:
+        return None
+    return {
+        "id": invite.get("id"),
+        "business_id": invite.get("business_id"),
+        "email": invite.get("email", ""),
+        "status": invite.get("status", ""),
+        "sent_at": invite.get("sent_at"),
+        "expires_at": invite.get("expires_at"),
+        "accepted_at": invite.get("accepted_at"),
+        "revoked_at": invite.get("revoked_at"),
+        "created_at": invite.get("created_at"),
+        "delivery_status": invite.get("delivery_status", ""),
+        "delivery_error": invite.get("delivery_error", ""),
+        "email_provider": invite.get("email_provider", ""),
+    }
+
+
+def _owner_safe(owner: Optional[dict], business: Optional[dict] = None) -> Optional[dict]:
+    if not owner:
+        return None
+    payload = {
+        "owner_id": owner.get("owner_id"),
+        "business_id": owner.get("business_id"),
+        "email": owner.get("email", ""),
+        "status": owner.get("status", "active"),
+        "invite_id": owner.get("invite_id"),
+        "created_at": owner.get("created_at"),
+        "last_login_at": owner.get("last_login_at"),
+    }
+    if business:
+        payload["business"] = {
+            "id": business.get("id"),
+            "name": business.get("name", ""),
+            "city_slug": business.get("city_slug", ""),
+            "sponsor_tier": business.get("sponsor_tier", "none"),
+        }
+    return payload
+
+
+async def _owner_access_summary(business_id: str) -> dict:
+    latest_invite = await db.business_owner_invites.find(
+        {"business_id": business_id},
+        {"_id": 0},
+    ).sort([("created_at", -1)]).to_list(1)
+    owner = await db.business_owners.find_one({"business_id": business_id}, {"_id": 0})
+    invite = latest_invite[0] if latest_invite else None
+    return {
+        "business_id": business_id,
+        "invite": _owner_invite_safe(invite),
+        "owner": _owner_safe(owner),
+        "portal_access_active": bool(owner and owner.get("status") == "active"),
+    }
 
 
 BUSINESS_SCOPED_EVENT_TYPES = {
@@ -830,6 +978,44 @@ def _send_resend_email(doc: dict) -> dict:
     )
     response.raise_for_status()
     data = response.json() if response.content else {}
+    return {
+        "delivery_status": "sent",
+        "delivery_error": "",
+        "email_provider": "resend",
+        "provider_message_id": data.get("id", ""),
+        "sent_at": now_iso(),
+    }
+
+
+def _send_business_owner_invite_email(doc: dict, claim_url: str, business_name: str) -> dict:
+    api_key = os.environ.get("RESEND_API_KEY", "").strip()
+    from_email = os.environ.get("RESEND_FROM_EMAIL", "").strip()
+    reply_to = os.environ.get("RESEND_REPLY_TO", "").strip()
+    text_body, html_body = business_owner_invite_email_content({
+        "business_name": business_name,
+        "claim_url": claim_url,
+        "expires_at": doc.get("expires_at"),
+    })
+    payload = {
+        "from": from_email,
+        "to": [doc["email"]],
+        "subject": business_owner_invite_email_subject({"business_name": business_name}),
+        "text": text_body,
+        "html": html_body,
+    }
+    if reply_to:
+        payload["reply_to"] = reply_to
+    response = requests.post(
+        "https://api.resend.com/emails",
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        json=payload,
+        timeout=20,
+    )
+    response.raise_for_status()
+    data = response.json()
     return {
         "delivery_status": "sent",
         "delivery_error": "",
@@ -1365,6 +1551,116 @@ async def logout(response: Response, session_token: Optional[str] = Cookie(None)
     return {"ok": True}
 
 
+@api_router.post("/business/claim")
+async def business_claim(payload: BusinessOwnerClaimRequest, response: Response, request: Request):
+    raw_token = (payload.token or "").strip()
+    if not raw_token:
+        raise HTTPException(status_code=400, detail="Invalid or expired invite.")
+    invite = await db.business_owner_invites.find_one({"token_hash": _hash_token(raw_token)}, {"_id": 0})
+    if not invite:
+        raise HTTPException(status_code=400, detail="Invalid or expired invite.")
+    if invite.get("status") == "revoked":
+        raise HTTPException(status_code=400, detail="This invite is no longer active.")
+    if invite.get("status") == "accepted":
+        raise HTTPException(status_code=400, detail="This invite has already been used.")
+
+    expires_at_raw = invite.get("expires_at")
+    expires_at = datetime.fromisoformat(expires_at_raw) if expires_at_raw else None
+    if expires_at and expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if expires_at and expires_at < datetime.now(timezone.utc):
+        await db.business_owner_invites.update_one(
+            {"id": invite["id"]},
+            {"$set": {"status": "expired"}},
+        )
+        raise HTTPException(status_code=400, detail="This invite has expired.")
+    if invite.get("status") != "pending":
+        raise HTTPException(status_code=400, detail="Invalid or expired invite.")
+
+    business = await db.businesses.find_one({"id": invite["business_id"]}, {"_id": 0})
+    if not business:
+        raise HTTPException(status_code=404, detail="Business not found")
+
+    owner = await db.business_owners.find_one(
+        {"business_id": invite["business_id"], "email": invite["email"]},
+        {"_id": 0},
+    )
+    owner_id = owner.get("owner_id") if owner else f"owner_{uuid.uuid4().hex[:12]}"
+    owner_doc = {
+        "owner_id": owner_id,
+        "business_id": invite["business_id"],
+        "email": invite["email"],
+        "status": "active",
+        "invite_id": invite["id"],
+        "created_at": owner.get("created_at") if owner else now_iso(),
+        "last_login_at": now_iso(),
+    }
+    if owner:
+        await db.business_owners.update_one(
+            {"owner_id": owner_id},
+            {"$set": {
+                "status": "active",
+                "invite_id": invite["id"],
+                "last_login_at": owner_doc["last_login_at"],
+            }},
+        )
+    else:
+        await db.business_owners.insert_one(owner_doc)
+
+    await db.business_owner_invites.update_one(
+        {"id": invite["id"]},
+        {"$set": {"status": "accepted", "accepted_at": now_iso()}},
+    )
+
+    session_token = _new_owner_token()
+    session_doc = {
+        "session_id": str(uuid.uuid4()),
+        "owner_id": owner_id,
+        "business_id": invite["business_id"],
+        "session_token_hash": _hash_token(session_token),
+        "expires_at": (datetime.now(timezone.utc) + timedelta(days=BUSINESS_OWNER_SESSION_DAYS)).isoformat(),
+        "created_at": now_iso(),
+        "last_seen_at": now_iso(),
+        "revoked_at": None,
+        "ip": request.client.host if request.client else None,
+        "user_agent": request.headers.get("user-agent"),
+    }
+    await db.business_owner_sessions.insert_one(session_doc)
+    response.set_cookie(
+        key=BUSINESS_OWNER_SESSION_COOKIE,
+        value=session_token,
+        max_age=BUSINESS_OWNER_SESSION_DAYS * 24 * 60 * 60,
+        httponly=True,
+        secure=True,
+        samesite="none",
+        path="/",
+    )
+    return {
+        "ok": True,
+        "owner": _owner_safe(owner_doc, business),
+    }
+
+
+@api_router.get("/business/me")
+async def business_me(owner_ctx=Depends(get_current_business_owner)):
+    return _owner_safe(owner_ctx["owner"], owner_ctx["business"])
+
+
+@api_router.get("/business/analytics")
+async def business_analytics(owner_ctx=Depends(get_current_business_owner)):
+    business_id = owner_ctx["owner"]["business_id"]
+    pipeline = [
+        {"$match": {"business_id": business_id}},
+        {"$group": {"_id": "$event_type", "count": {"$sum": 1}}},
+    ]
+    rows = await db.analytics_events.aggregate(pipeline).to_list(100)
+    counts = {row["_id"]: row["count"] for row in rows}
+    return {
+        "business_id": business_id,
+        **_metric_aliases(counts),
+    }
+
+
 # ------------- Admin: businesses -------------
 @api_router.get("/admin/businesses")
 async def admin_list_businesses(imported_status: Optional[str] = None, user=Depends(require_admin)):
@@ -1373,6 +1669,113 @@ async def admin_list_businesses(imported_status: Optional[str] = None, user=Depe
     query = {"imported_status": imported_status} if imported_status else {}
     items = await db.businesses.find(query, {"_id": 0}).sort([("order", 1)]).to_list(5000)
     return annotate_itinerary_buckets(items)
+
+
+@api_router.get("/admin/businesses/{business_id}/owner-access")
+async def admin_business_owner_access(business_id: str, user=Depends(require_admin)):
+    business = await db.businesses.find_one({"id": business_id}, {"_id": 0, "id": 1})
+    if not business:
+        raise HTTPException(status_code=404, detail="Business not found")
+    return await _owner_access_summary(business_id)
+
+
+@api_router.post("/admin/businesses/{business_id}/owner-invite")
+async def admin_business_owner_invite(business_id: str, payload: BusinessOwnerInviteCreate, user=Depends(require_admin)):
+    business = await db.businesses.find_one({"id": business_id}, {"_id": 0})
+    if not business:
+        raise HTTPException(status_code=404, detail="Business not found")
+
+    email = (payload.email or "").strip().lower()
+    if not _valid_email(email):
+        raise HTTPException(status_code=400, detail="Enter a valid email.")
+
+    now = datetime.now(timezone.utc)
+    raw_token = _new_owner_token()
+    invite_id = str(uuid.uuid4())
+    doc = {
+        "id": invite_id,
+        "business_id": business_id,
+        "email": email,
+        "token_hash": _hash_token(raw_token),
+        "status": "pending",
+        "sent_at": None,
+        "expires_at": (now + timedelta(days=BUSINESS_OWNER_INVITE_DAYS)).isoformat(),
+        "accepted_at": None,
+        "revoked_at": None,
+        "created_by_user_id": user["user_id"],
+        "created_at": now_iso(),
+        "delivery_status": "",
+        "delivery_error": "",
+        "email_provider": "",
+        "provider_message_id": "",
+    }
+    await db.business_owner_invites.update_many(
+        {"business_id": business_id, "email": email, "status": "pending"},
+        {"$set": {"status": "revoked", "revoked_at": now_iso()}},
+    )
+    delivery = _owner_invite_delivery_result()
+    doc.update({
+        "delivery_status": delivery["delivery_status"],
+        "delivery_error": delivery["delivery_error"],
+        "email_provider": delivery["email_provider"],
+        "provider_message_id": delivery["provider_message_id"],
+        "sent_at": delivery["sent_at"],
+    })
+    await db.business_owner_invites.insert_one(doc)
+
+    if doc["delivery_status"] != "provider_unconfigured":
+        claim_url = _business_owner_claim_url(raw_token)
+        try:
+            delivery = await run_in_threadpool(_send_business_owner_invite_email, doc, claim_url, business.get("name", ""))
+        except requests.RequestException as exc:
+            delivery = {
+                "delivery_status": "failed",
+                "delivery_error": str(exc),
+                "email_provider": "resend",
+                "provider_message_id": "",
+                "sent_at": None,
+            }
+        await db.business_owner_invites.update_one(
+            {"id": invite_id},
+            {"$set": {
+                "delivery_status": delivery["delivery_status"],
+                "delivery_error": delivery["delivery_error"],
+                "email_provider": delivery["email_provider"],
+                "provider_message_id": delivery["provider_message_id"],
+                "sent_at": delivery["sent_at"],
+            }},
+        )
+        doc.update(delivery)
+
+    summary = await _owner_access_summary(business_id)
+    return {
+        "ok": True,
+        "invite": summary["invite"],
+        "owner": summary["owner"],
+        "portal_access_active": summary["portal_access_active"],
+    }
+
+
+@api_router.post("/admin/businesses/{business_id}/owner-access/revoke")
+async def admin_revoke_business_owner_access(business_id: str, user=Depends(require_admin)):
+    business = await db.businesses.find_one({"id": business_id}, {"_id": 0, "id": 1})
+    if not business:
+        raise HTTPException(status_code=404, detail="Business not found")
+    revoked_at = now_iso()
+    await db.business_owner_invites.update_many(
+        {"business_id": business_id, "status": "pending"},
+        {"$set": {"status": "revoked", "revoked_at": revoked_at}},
+    )
+    await db.business_owners.update_many(
+        {"business_id": business_id, "status": "active"},
+        {"$set": {"status": "revoked"}},
+    )
+    await db.business_owner_sessions.update_many(
+        {"business_id": business_id, "revoked_at": None},
+        {"$set": {"revoked_at": revoked_at}},
+    )
+    summary = await _owner_access_summary(business_id)
+    return {"ok": True, **summary}
 
 
 @api_router.get("/admin/featured-events/live-music")
