@@ -70,6 +70,8 @@ describe("Business owner routes source contract", () => {
 
   test("claim page posts token to the business claim endpoint", () => {
     expect(businessClaimSource).toContain('.post("/business/claim", { token })');
+    expect(businessClaimSource).toContain('api.get("/business/me")');
+    expect(businessClaimSource).toContain('window.location.replace("/business/dashboard")');
     expect(businessClaimSource).toContain("Create Account");
   });
 
@@ -78,5 +80,7 @@ describe("Business owner routes source contract", () => {
     expect(businessDashboardSource).toContain('api.get("/business/analytics")');
     expect(businessDashboardSource).toContain("Business Portal");
     expect(businessDashboardSource).toContain("Sponsor tier:");
+    expect(businessDashboardSource).not.toContain("MVP");
+    expect(businessDashboardSource).not.toContain("being prepared");
   });
 });

@@ -90,6 +90,10 @@ class TestBusinessOwnerContract(unittest.TestCase):
         self.assertIn('"session_token_hash": _hash_token(session_token)', source)
         self.assertIn('response.set_cookie(', source)
         self.assertIn('key=BUSINESS_OWNER_SESSION_COOKIE', source)
+        self.assertIn('httponly=True', source)
+        self.assertIn('secure=True', source)
+        self.assertIn('samesite="none"', source)
+        self.assertIn('path="/"', source)
         self.assertIn('"status": "accepted"', source)
 
     def test_owner_auth_and_me_endpoints_are_business_scoped(self):
@@ -140,6 +144,13 @@ class TestBusinessOwnerContract(unittest.TestCase):
         self.assertIn("Jul", text_body)
         self.assertIn("Built with YourNotDown", html_body)
         self.assertIn("https://www.yournotdown.com/business/claim/test-token", text_body)
+        self.assertNotIn("MVP", html_body)
+        self.assertIn("No password required.", html_body)
+
+    def test_owner_cors_uses_explicit_allowed_origins(self):
+        self.assertIn("def _cors_allowed_origins()", SERVER_SOURCE)
+        self.assertIn('allow_origins=_cors_allowed_origins()', SERVER_SOURCE)
+        self.assertNotIn('allow_origin_regex=".*"', SERVER_SOURCE)
 
 
 if __name__ == "__main__":

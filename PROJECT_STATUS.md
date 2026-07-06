@@ -6,6 +6,23 @@ The repo is currently on branch `main`. The only known worktree changes outside 
 
 ## Latest Work Session
 
+Latest local business-owner hotfix update:
+- patched the owner invite / claim flow after real QA exposed two issues in Chunk C: business-facing copy said `MVP`, and a successful invite claim could still land on `/business/dashboard` with `Not authenticated`
+- removed internal product-development wording from business-facing owner surfaces:
+  - `backend/business_owner_email.py` now says `Use the secure link below to create your business portal access. No password required.`
+  - `frontend/src/pages/BusinessDashboardPage.jsx` now uses customer-facing loading / summary copy instead of `being prepared` language
+- hardened owner-session establishment for cross-origin production requests:
+  - `backend/server.py` no longer uses credentialed wildcard CORS
+  - CORS now uses explicit allowed origins for `yournotdown.com`, `www.yournotdown.com`, and local dev origins, with optional `PUBLIC_SITE_URL` / `FRONTEND_PUBLIC_URL` additions
+  - `frontend/src/pages/BusinessClaimPage.jsx` now waits for `POST /api/business/claim`, immediately verifies the new owner session via `GET /api/business/me`, and only then redirects with a full-page `window.location.replace("/business/dashboard")`
+- likely root cause of the live `Not authenticated` issue:
+  - the initial cross-origin claim request had no existing cookie, and the backend was using `allow_origin_regex=".*"` with `allow_credentials=True`
+  - that wildcard credentialed CORS setup is unsafe for first-time session establishment and could prevent the browser from persisting the new HTTP-only owner cookie on the claim response
+- local regression results for the hotfix:
+  - `python3 -m unittest backend.tests.test_business_owner_contract backend.tests.test_analytics_contract backend.tests.test_saved_itinerary_contract backend.tests.test_locked_steps_contract backend.tests.test_tonight_page_contract backend.tests.test_city_events_filtering_contract backend.tests.test_ticketmaster_events_unit` passed
+  - `cd frontend && npm run build` passed
+  - `cd frontend && CI=true npm test -- --watchAll=false` passed
+
 The immediate production issue is no longer cron execution. Ticketmaster sync and the Railway cron are verified working in production, and the current local follow-up is correcting how today/tonight event data is filtered and rendered in the customer-facing product.
 
 Latest local analytics foundation update:

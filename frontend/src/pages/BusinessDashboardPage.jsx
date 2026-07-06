@@ -47,7 +47,7 @@ export default function BusinessDashboardPage() {
         <div className="w-full max-w-md border border-white/10 bg-[#121218] p-8">
           <div className="text-[10px] uppercase tracking-[0.3em] text-[#C6FF00]">YND / EST. 26</div>
           <h1 className="mt-4 font-flyer uppercase text-4xl leading-[0.92]">Business Portal</h1>
-          <p className="mt-4 text-sm text-white/65">Preparing your dashboard…</p>
+          <p className="mt-4 text-sm text-white/65">Loading your business dashboard…</p>
         </div>
       </div>
     );
@@ -74,7 +74,7 @@ export default function BusinessDashboardPage() {
           {business.name || "Your Venue"}
         </h1>
         <p className="mt-4 text-sm text-white/65 max-w-2xl">
-          Sponsor tier: <span className="text-white">{business.sponsor_tier || "none"}</span>. Your performance dashboard is being prepared for deeper reporting in the next chunk.
+          Sponsor tier: <span className="text-white">{business.sponsor_tier || "none"}</span>. Your portal includes your venue snapshot and current performance totals.
         </p>
 
         <div className="mt-10 grid grid-cols-2 lg:grid-cols-4 gap-4">

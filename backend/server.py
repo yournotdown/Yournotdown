@@ -110,6 +110,24 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _cors_allowed_origins() -> List[str]:
+    origins = {
+        "https://www.yournotdown.com",
+        "https://yournotdown.com",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    }
+    for value in (
+        os.environ.get("PUBLIC_SITE_URL", "").strip(),
+        os.environ.get("FRONTEND_PUBLIC_URL", "").strip(),
+    ):
+        if value:
+            origins.add(value.rstrip("/"))
+    return sorted(origins)
+
+
 class City(BaseModel):
     model_config = ConfigDict(extra="ignore")
     slug: str
@@ -2289,7 +2307,7 @@ app.include_router(api_router)
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origin_regex=".*",
+    allow_origins=_cors_allowed_origins(),
     allow_methods=["*"],
     allow_headers=["*"],
 )

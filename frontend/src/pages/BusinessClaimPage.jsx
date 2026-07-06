@@ -1,30 +1,30 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { api } from "../lib/api";
 
 export default function BusinessClaimPage() {
   const { token } = useParams();
-  const navigate = useNavigate();
   const [error, setError] = useState("");
 
   useEffect(() => {
     let mounted = true;
-    api
-      .post("/business/claim", { token })
-      .then(() => {
+    (async () => {
+      try {
+        await api.post("/business/claim", { token });
+        await api.get("/business/me");
         if (mounted) {
-          navigate("/business/dashboard", { replace: true });
+          window.location.replace("/business/dashboard");
         }
-      })
-      .catch((err) => {
+      } catch (err) {
         if (mounted) {
           setError(err?.response?.data?.detail || "This invite link is not valid anymore.");
         }
-      });
+      }
+    })();
     return () => {
       mounted = false;
     };
-  }, [navigate, token]);
+  }, [token]);
 
   return (
     <div className="min-h-screen bg-[#050505] text-white flex items-center justify-center px-6" data-testid="business-claim-page">
@@ -37,7 +37,7 @@ export default function BusinessClaimPage() {
           </p>
         ) : (
           <p className="mt-4 text-sm text-white/65" data-testid="business-claim-loading">
-            Verifying your access link…
+            Verifying your secure access link…
           </p>
         )}
       </div>

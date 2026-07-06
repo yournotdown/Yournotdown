@@ -1,5 +1,11 @@
 ## Immediate Follow-Up
 
+0. After the business-owner hotfix deploy, send a fresh invite to `lansingblake@gmail.com` for `The End` and manually verify:
+   - invite email no longer contains `MVP`
+   - claim link succeeds end to end
+   - `/business/dashboard` loads with the owner session instead of `Not authenticated`
+   - reopening the consumed invite fails cleanly
+   - revoking owner access kills `/api/business/me` and `/business/dashboard`
 0. Manually QA the new business-owner invite flow before any deploy approval:
    - open an existing business in the admin edit modal and confirm the Business Owner Access section loads
    - send an invite with Resend configured and confirm the email arrives with the claim link

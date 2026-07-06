@@ -64,7 +64,7 @@ def business_owner_invite_email_content(payload: dict) -> tuple[str, str]:
             <div style="font-size:11px;letter-spacing:0.24em;text-transform:uppercase;color:rgba(255,255,255,0.45);">Venue</div>
             <div style="margin-top:8px;font-size:24px;font-weight:800;color:#ffffff;">{business_name}</div>
             <p style="margin:14px 0 0;font-size:14px;line-height:1.7;color:rgba(255,255,255,0.72);">
-              Claim access with the secure magic link below. No password is required for this MVP.
+              Use the secure link below to create your business portal access. No password required.
             </p>
             <div style="margin-top:22px;">
               <a href="{claim_url}" style="display:inline-block;padding:14px 22px;background:#C6FF00;color:#020202;text-decoration:none;font-size:11px;font-weight:800;letter-spacing:0.22em;text-transform:uppercase;">
