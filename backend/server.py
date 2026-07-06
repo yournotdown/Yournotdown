@@ -5,7 +5,7 @@ import logging
 import uuid
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 import requests
 from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, UploadFile, File, Header, Cookie, Depends
@@ -519,6 +519,7 @@ class ItineraryRequest(BaseModel):
     exclude_ids: List[str] = Field(default_factory=list)
     exclude_event_ids: List[str] = Field(default_factory=list)
     live_music_event_mode: str = "normal"
+    locked_steps: Dict[str, dict] = Field(default_factory=dict)
 
 
 def _relevance_score(business: dict, vibe: Optional[str]) -> float:
@@ -554,6 +555,51 @@ def _weighted_pick(
         sponsor_mult = SPONSOR_MULTIPLIERS.get(b.get("sponsor_tier", "none"), 1)
         weights.append(relevance * sponsor_mult)
     return random.choices(pool, weights=weights, k=1)[0]
+
+
+def _slot_meta(slot: str) -> dict:
+    for label in SLOT_LABELS:
+        if label["slot"] == slot:
+            return label
+    return {
+        "slot": slot,
+        "number": 0,
+        "label": slot.replace("-", " ").title() if slot else "",
+        "emoji": "✨",
+    }
+
+
+def _safe_locked_step(slot: str, snapshot: Optional[dict]) -> dict:
+    meta = _slot_meta(slot)
+    raw_step = snapshot if isinstance(snapshot, dict) else {}
+    raw_business = raw_step.get("business")
+    business = raw_business if isinstance(raw_business, dict) else {}
+    safe_business = {
+        "id": business.get("id", ""),
+        "name": business.get("name", ""),
+        "description": business.get("description", ""),
+        "image_url": business.get("image_url", ""),
+        "image_path": business.get("image_path"),
+        "website": business.get("website", ""),
+        "phone": business.get("phone", ""),
+        "address": business.get("address", ""),
+        "google_photo_names": business.get("google_photo_names") or [],
+        "sponsor_tier": business.get("sponsor_tier", "none"),
+        **business,
+    }
+    step = {
+        "slot": slot or raw_step.get("slot", ""),
+        "number": raw_step.get("number", meta["number"]),
+        "label": raw_step.get("label", meta["label"]),
+        "emoji": raw_step.get("emoji", meta["emoji"]),
+        "business": safe_business,
+    }
+    if "relevance_score" in raw_step:
+        step["relevance_score"] = raw_step.get("relevance_score")
+    raw_event = raw_step.get("event")
+    if isinstance(raw_event, dict):
+        step["event"] = dict(raw_event)
+    return step
 
 
 async def _today_city_events(city: str) -> list[dict]:
@@ -637,9 +683,25 @@ async def generate_itinerary(req: ItineraryRequest, request: Request):
 
     exclude = set(req.exclude_ids)
     exclude_event_ids = set(req.exclude_event_ids)
-    chosen_ids: set = set()
+    locked_steps_by_slot = {
+        slot: _safe_locked_step(slot, step)
+        for slot, step in (req.locked_steps or {}).items()
+        if slot
+    }
+    chosen_ids: set = {
+        business_id
+        for business_id in [
+            ((step.get("business") or {}).get("id"))
+            for step in locked_steps_by_slot.values()
+        ]
+        if business_id
+    }
     steps = []
     for label in SLOT_LABELS:
+        locked_step = locked_steps_by_slot.get(label["slot"])
+        if locked_step:
+            steps.append(locked_step)
+            continue
         candidates = by_slot.get(label["slot"], [])
         pick = None
         forced_event = None

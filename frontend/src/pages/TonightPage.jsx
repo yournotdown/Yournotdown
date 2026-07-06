@@ -35,11 +35,17 @@ export default function TonightPage() {
   const [seenIds, setSeenIds] = useState([]);
   const [refreshCount, setRefreshCount] = useState(0);
   const [lastTicketmasterEventIds, setLastTicketmasterEventIds] = useState([]);
+  const [lockedSteps, setLockedSteps] = useState({});
   const [regenerating, setRegenerating] = useState(false);
   const sponsorship = itinerary?.tonight_move_sponsorship;
 
   const generate = useCallback(
-    async ({ excludeIds = [], excludeEventIds = [], liveMusicEventMode = "normal" } = {}) => {
+    async ({
+      excludeIds = [],
+      excludeEventIds = [],
+      liveMusicEventMode = "normal",
+      lockedStepsBySlot = {},
+    } = {}) => {
       setError(null);
       try {
         const r = await api.post("/itinerary/generate", {
@@ -48,17 +54,30 @@ export default function TonightPage() {
           exclude_ids: excludeIds,
           exclude_event_ids: excludeEventIds,
           live_music_event_mode: liveMusicEventMode,
+          locked_steps: lockedStepsBySlot,
         });
         setItinerary(r.data);
         trackEvent("itinerary_view", { vibe, itinerary_id: r.data.id, city_slug: citySlug });
-        const newIds = r.data.steps.map((s) => s.business.id);
+        const lockedSlots = new Set(Object.keys(lockedStepsBySlot));
+        const nextLockedSteps = {};
+        r.data.steps.forEach((step) => {
+          if (lockedSlots.has(step.slot)) {
+            nextLockedSteps[step.slot] = step;
+          }
+        });
+        setLockedSteps(nextLockedSteps);
+        const newIds = r.data.steps
+          .filter((step) => !lockedSlots.has(step.slot))
+          .map((s) => s.business?.id)
+          .filter(Boolean);
         const liveMusicStep = r.data.steps.find((step) => step.slot === "entertainment");
         const liveMusicEvent = liveMusicStep?.event;
         const liveMusicEventId = liveMusicEvent?.external_event_id || liveMusicEvent?.id;
+        const entertainmentLocked = lockedSlots.has("entertainment");
         setSeenIds(newIds);
-        if (liveMusicEvent?.source === "ticketmaster" && liveMusicEventId) {
+        if (!entertainmentLocked && liveMusicEvent?.source === "ticketmaster" && liveMusicEventId) {
           setLastTicketmasterEventIds([liveMusicEventId]);
-        } else if (liveMusicEventMode === "ticketmaster") {
+        } else if (!entertainmentLocked && liveMusicEventMode === "ticketmaster") {
           setLastTicketmasterEventIds([]);
         }
       } catch (e) {
@@ -76,6 +95,7 @@ export default function TonightPage() {
     setSeenIds([]);
     setRefreshCount(0);
     setLastTicketmasterEventIds([]);
+    setLockedSteps({});
     generate({ liveMusicEventMode: "ticketmaster_preferred" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [citySlug, vibe]);
@@ -85,11 +105,28 @@ export default function TonightPage() {
     trackEvent("another_night_click", { vibe, city_slug: citySlug });
     const nextRefreshCount = refreshCount + 1;
     const liveMusicEventMode = nextRefreshCount % 4 === 0 ? "ticketmaster" : "normal";
+    const unlockedCurrentIds = (itinerary?.steps || [])
+      .filter((step) => !lockedSteps[step.slot])
+      .map((step) => step.business?.id)
+      .filter(Boolean);
     setRefreshCount(nextRefreshCount);
     generate({
-      excludeIds: seenIds,
+      excludeIds: unlockedCurrentIds.length > 0 ? unlockedCurrentIds : seenIds,
       excludeEventIds: liveMusicEventMode === "ticketmaster" ? lastTicketmasterEventIds : [],
       liveMusicEventMode,
+      lockedStepsBySlot: lockedSteps,
+    });
+  };
+
+  const handleLockStep = (step) => {
+    setLockedSteps((prev) => ({ ...prev, [step.slot]: step }));
+  };
+
+  const handleUnlockStep = (slot) => {
+    setLockedSteps((prev) => {
+      const next = { ...prev };
+      delete next[slot];
+      return next;
     });
   };
 
@@ -229,6 +266,9 @@ export default function TonightPage() {
                     step={step}
                     idx={idx}
                     total={itinerary.steps.length}
+                    locked={Boolean(lockedSteps[step.slot])}
+                    onLock={handleLockStep}
+                    onUnlock={handleUnlockStep}
                     onAction={handleAction}
                     directionsUrl={directionsUrl}
                   />
@@ -290,8 +330,8 @@ export default function TonightPage() {
   );
 }
 
-function StepCard({ step, idx, total, onAction, directionsUrl }) {
-  const b = step.business;
+function StepCard({ step, idx, total, locked, onLock, onUnlock, onAction, directionsUrl }) {
+  const b = step.business || {};
   const event = step.event;
   const imageUrl = resolveImageUrl(b) || event?.image_url;
   const sponsored = b.sponsor_tier && b.sponsor_tier !== "none";
@@ -304,7 +344,11 @@ function StepCard({ step, idx, total, onAction, directionsUrl }) {
       initial={{ opacity: 0, y: 18 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: idx * 0.08, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-      className="border-t border-white/10 py-8 sm:py-10"
+      className={`border-t py-8 sm:py-10 ${
+        locked
+          ? "border-[#C6FF00]/60 bg-[linear-gradient(180deg,rgba(198,255,0,0.08),rgba(0,0,0,0))]"
+          : "border-white/10"
+      }`}
       data-testid={`tonight-step-${step.slot}`}
     >
       {/* Top row: number + slot label + featured tag */}
@@ -321,6 +365,17 @@ function StepCard({ step, idx, total, onAction, directionsUrl }) {
           </div>
           <div className="text-[11px] uppercase tracking-[0.3em] text-white mt-1 flex flex-wrap items-center gap-x-2">
             <span>{title}</span>
+            {locked && (
+              <>
+                <span className="text-white/30">·</span>
+                <span
+                  className="text-[#C6FF00]"
+                  data-testid={`tonight-locked-badge-${step.slot}`}
+                >
+                  Locked in
+                </span>
+              </>
+            )}
             {sponsored && (
               <>
                 <span className="text-white/30">·</span>
@@ -373,6 +428,34 @@ function StepCard({ step, idx, total, onAction, directionsUrl }) {
       </p>
 
       <div className="mt-5 flex flex-wrap gap-2">
+        {locked ? (
+          <>
+            <button
+              type="button"
+              className="inline-flex items-center gap-2 px-4 py-3 border border-[#C6FF00] bg-[#C6FF00] text-black uppercase text-[10px] tracking-[0.22em] font-bold"
+              data-testid={`tonight-lock-${step.slot}`}
+            >
+              Locked in
+            </button>
+            <button
+              type="button"
+              onClick={() => onUnlock(step.slot)}
+              className="inline-flex items-center gap-2 px-4 py-3 border border-white/20 text-white uppercase text-[10px] tracking-[0.22em] font-bold transition-colors hover:border-[#C6FF00] hover:text-[#C6FF00]"
+              data-testid={`tonight-unlock-${step.slot}`}
+            >
+              Unlock
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            onClick={() => onLock(step)}
+            className="inline-flex items-center gap-2 px-4 py-3 border border-white/20 text-white uppercase text-[10px] tracking-[0.22em] font-bold transition-colors hover:border-[#C6FF00] hover:text-[#C6FF00]"
+            data-testid={`tonight-lock-${step.slot}`}
+          >
+            Lock this in
+          </button>
+        )}
         {b.phone ? (
           <ActionBtn
             href={`tel:${b.phone}`}

@@ -11,13 +11,15 @@ class TestTonightPageContract(unittest.TestCase):
     def test_another_night_posts_excluded_event_ids(self):
         self.assertIn("exclude_event_ids: excludeEventIds", TONIGHT_PAGE_SOURCE)
         self.assertIn("live_music_event_mode: liveMusicEventMode", TONIGHT_PAGE_SOURCE)
+        self.assertIn("locked_steps: lockedStepsBySlot", TONIGHT_PAGE_SOURCE)
         self.assertIn('const liveMusicStep = r.data.steps.find((step) => step.slot === "entertainment");', TONIGHT_PAGE_SOURCE)
         self.assertIn("const liveMusicEvent = liveMusicStep?.event;", TONIGHT_PAGE_SOURCE)
         self.assertIn("const liveMusicEventId = liveMusicEvent?.external_event_id || liveMusicEvent?.id;", TONIGHT_PAGE_SOURCE)
+        self.assertIn('const entertainmentLocked = lockedSlots.has("entertainment");', TONIGHT_PAGE_SOURCE)
         self.assertIn("setSeenIds(newIds)", TONIGHT_PAGE_SOURCE)
-        self.assertIn('if (liveMusicEvent?.source === "ticketmaster" && liveMusicEventId)', TONIGHT_PAGE_SOURCE)
+        self.assertIn('if (!entertainmentLocked && liveMusicEvent?.source === "ticketmaster" && liveMusicEventId)', TONIGHT_PAGE_SOURCE)
         self.assertIn("setLastTicketmasterEventIds([liveMusicEventId]);", TONIGHT_PAGE_SOURCE)
-        self.assertIn('} else if (liveMusicEventMode === "ticketmaster") {', TONIGHT_PAGE_SOURCE)
+        self.assertIn('} else if (!entertainmentLocked && liveMusicEventMode === "ticketmaster") {', TONIGHT_PAGE_SOURCE)
         self.assertIn("setLastTicketmasterEventIds([]);", TONIGHT_PAGE_SOURCE)
         self.assertNotIn("new Set([...prev, ...newIds])", TONIGHT_PAGE_SOURCE)
         self.assertNotIn("new Set([...prev, ...newEventIds])", TONIGHT_PAGE_SOURCE)
@@ -30,7 +32,15 @@ class TestTonightPageContract(unittest.TestCase):
 
     def test_first_load_requests_ticketmaster_preferred_mode(self):
         self.assertIn('generate({ liveMusicEventMode: "ticketmaster_preferred" });', TONIGHT_PAGE_SOURCE)
-        self.assertIn('if (liveMusicEvent?.source === "ticketmaster" && liveMusicEventId)', TONIGHT_PAGE_SOURCE)
+        self.assertIn('if (!entertainmentLocked && liveMusicEvent?.source === "ticketmaster" && liveMusicEventId)', TONIGHT_PAGE_SOURCE)
+
+    def test_lock_controls_exist(self):
+        self.assertIn("const [lockedSteps, setLockedSteps] = useState({});", TONIGHT_PAGE_SOURCE)
+        self.assertIn("const handleLockStep = (step) => {", TONIGHT_PAGE_SOURCE)
+        self.assertIn("const handleUnlockStep = (slot) => {", TONIGHT_PAGE_SOURCE)
+        self.assertIn("Lock this in", TONIGHT_PAGE_SOURCE)
+        self.assertIn("Locked in", TONIGHT_PAGE_SOURCE)
+        self.assertIn("Unlock", TONIGHT_PAGE_SOURCE)
 
     def test_live_music_step_renders_event_details_inline(self):
         self.assertIn("Tonight: {event.title}", TONIGHT_PAGE_SOURCE)

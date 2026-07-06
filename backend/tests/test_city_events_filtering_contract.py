@@ -17,6 +17,9 @@ def named_function(name: str) -> ast.AsyncFunctionDef:
 
 
 class TestCityEventsFilteringContract(unittest.TestCase):
+    def test_itinerary_request_accepts_locked_steps(self):
+        self.assertIn("locked_steps: Dict[str, dict] = Field(default_factory=dict)", SERVER_SOURCE)
+
     def test_server_imports_shared_event_eligibility_helper(self):
         self.assertIn("eligible_city_events", SERVER_SOURCE)
         self.assertIn("eligible_public_businesses", SERVER_SOURCE)
@@ -41,6 +44,10 @@ class TestCityEventsFilteringContract(unittest.TestCase):
         self.assertIn("tonight_move_sponsorship = await _active_tonight_move_sponsorship(req.city)", source)
         self.assertIn("today_events_by_business = events_by_business_id(event_rows)", source)
         self.assertIn("exclude_event_ids = set(req.exclude_event_ids)", source)
+        self.assertIn("locked_steps_by_slot = {", source)
+        self.assertIn("chosen_ids: set = {", source)
+        self.assertIn('locked_step = locked_steps_by_slot.get(label["slot"])', source)
+        self.assertIn("steps.append(locked_step)", source)
         self.assertIn('if label["slot"] == "entertainment":', source)
         self.assertIn('event_candidates = [business for business in candidates if business_supports_live_music_event(business)]', source)
         self.assertIn("if featured_live_music:", source)
@@ -53,6 +60,13 @@ class TestCityEventsFilteringContract(unittest.TestCase):
         self.assertIn('elif label["slot"] == "entertainment":', source)
         self.assertNotIn('"live_music_events":', source)
         self.assertIn('"tonight_move_sponsorship": tonight_move_sponsorship', source)
+
+    def test_locked_steps_are_checked_before_entertainment_generation(self):
+        source = ast.get_source_segment(SERVER_SOURCE, named_function("generate_itinerary"))
+        self.assertLess(
+            source.index('locked_step = locked_steps_by_slot.get(label["slot"])'),
+            source.index('if label["slot"] == "entertainment":'),
+        )
 
 
 if __name__ == "__main__":
