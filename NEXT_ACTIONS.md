@@ -12,15 +12,21 @@
    - confirm the table/search/filter behavior is unchanged
 0. Manually QA the new `Hotel QR` admin tab after the next deploy:
    - create a QR code such as `The Russell Lobby`
-   - confirm the generated destination URL uses `https://www.yournotdown.com/nashville?qr=<slug>`
+   - confirm the generated destination URL uses `https://www.yournotdown.com?qr=<slug>`
    - confirm `Copy URL` works
+   - confirm QR previews render
+   - confirm `Download QR` saves a usable PNG
    - confirm deactivate flips the placement inactive without deleting history
 0. Manually QA end-to-end Hotel QR attribution after the next deploy:
    - open the public site with a real `?qr=<slug>` URL
+   - confirm the root homepage URL redirects into Nashville without losing the `qr` param
    - confirm one `hotel_qr_scan` is recorded for the session
    - confirm later `homepage_visit`, `vibe_click`, `itinerary_view`, `step_locked`, and `save_itinerary` activity inherit the same `qr_slug`
    - save a locked move and confirm the Hotel QR row reflects scans, lock clicks, saved moves, email captures, and marketing opt-ins
-0. Decide whether to add QR image preview/download in a later chunk; this pass intentionally shipped the tracking URL + copy + analytics foundation first, without adding a QR rendering dependency.
+0. There are no existing hotel QR placard/card design assets in the repo today, so the safer next step is:
+   - keep admin QR download separate from placard design for now
+   - place the downloaded QR into a manually designed hotel placard/card once the print layout is approved
+   - only build `Download Placard` after Blake locks the real placard format, copy, and brand treatment
 0. Decide whether `PATCH /api/admin/hotel-qr/{id}` should keep the slug stable on future metadata edits or intentionally regenerate it when the placement name changes; the current implementation regenerates the slug when `name` changes.
 
 0. Manually QA the Tonight's Move card CTA hierarchy after the next deploy:

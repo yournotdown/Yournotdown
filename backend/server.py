@@ -1019,7 +1019,7 @@ def _hotel_qr_destination_url(city_slug: str, qr_slug: str) -> str:
         or os.environ.get("FRONTEND_PUBLIC_URL", "").strip()
         or "https://www.yournotdown.com"
     ).rstrip("/")
-    return f"{base}/{city_slug}?qr={qr_slug}"
+    return f"{base}?qr={qr_slug}"
 
 
 async def _upsert_visitor_profile(

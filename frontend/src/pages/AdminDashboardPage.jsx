@@ -2,10 +2,11 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
+import QRCode from "qrcode";
 import {
   Plus, Pencil, Trash2, Star, ArrowUp, ArrowDown, Upload,
   LogOut, BarChart3, Store, LayoutGrid, Image as ImageIcon, TrendingUp,
-  ClipboardCheck, CheckCircle, XCircle, ExternalLink, Globe, Phone, Navigation, Ticket, Lock, Mail, RotateCw, Building2, Copy,
+  ClipboardCheck, CheckCircle, XCircle, ExternalLink, Globe, Phone, Navigation, Ticket, Lock, Mail, RotateCw, Building2, Copy, Download,
 } from "lucide-react";
 import { api, resolveImageUrl } from "../lib/api";
 import { Button } from "@/components/ui/button";
@@ -2300,6 +2301,7 @@ function HotelQrPanel({ rows, loading, error, form, onFormChange, onCreate, onDe
                 <tr className="text-left text-xs uppercase tracking-wide text-[#A1A1AA]">
                   <th className="px-5 py-4">Placement</th>
                   <th className="px-3 py-4">URL</th>
+                  <th className="px-3 py-4">QR</th>
                   <th className="px-3 py-4">Scans</th>
                   <th className="px-3 py-4">Visitors</th>
                   <th className="px-3 py-4">Tonight Views</th>
@@ -2314,11 +2316,11 @@ function HotelQrPanel({ rows, loading, error, form, onFormChange, onCreate, onDe
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={11} className="px-5 py-12 text-center text-[#A1A1AA]">Loading Hotel QR…</td>
+                    <td colSpan={12} className="px-5 py-12 text-center text-[#A1A1AA]">Loading Hotel QR…</td>
                   </tr>
                 ) : rows.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="px-5 py-12 text-center text-[#A1A1AA]">No Hotel QR codes yet.</td>
+                    <td colSpan={12} className="px-5 py-12 text-center text-[#A1A1AA]">No Hotel QR codes yet.</td>
                   </tr>
                 ) : rows.map((row) => (
                   <tr key={row.id} className="border-t border-white/5" data-testid={`admin-hotel-qr-row-${row.slug}`}>
@@ -2333,6 +2335,12 @@ function HotelQrPanel({ rows, loading, error, form, onFormChange, onCreate, onDe
                     </td>
                     <td className="px-3 py-4 max-w-[240px]">
                       <div className="truncate text-[#A1A1AA]">{row.destination_url}</div>
+                    </td>
+                    <td className="px-3 py-4">
+                      <HotelQrCodePreview
+                        url={row.destination_url}
+                        slug={row.slug}
+                      />
                     </td>
                     <td className="px-3 py-4 text-white">{row.analytics?.scans || 0}</td>
                     <td className="px-3 py-4 text-[#A1A1AA]">{row.analytics?.unique_visitors || 0}</td>
@@ -2354,6 +2362,10 @@ function HotelQrPanel({ rows, loading, error, form, onFormChange, onCreate, onDe
                           <Copy className="mr-2 h-3.5 w-3.5" />
                           Copy URL
                         </Button>
+                        <HotelQrDownloadButton
+                          url={row.destination_url}
+                          slug={row.slug}
+                        />
                         {row.active !== false ? (
                           <Button
                             variant="outline"
@@ -2375,5 +2387,88 @@ function HotelQrPanel({ rows, loading, error, form, onFormChange, onCreate, onDe
         </div>
       </div>
     </div>
+  );
+}
+
+function HotelQrCodePreview({ url, slug }) {
+  const [dataUrl, setDataUrl] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    QRCode.toDataURL(url, {
+      width: 112,
+      margin: 1,
+      color: {
+        dark: "#C6FF00",
+        light: "#000000",
+      },
+    })
+      .then((value) => {
+        if (active) {
+          setDataUrl(value);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setDataUrl("");
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [url]);
+
+  if (!dataUrl) {
+    return (
+      <div className="flex h-20 w-20 items-center justify-center rounded-2xl border border-white/10 bg-black/30 text-[10px] uppercase tracking-[0.18em] text-white/35">
+        QR
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black p-2" data-testid={`hotel-qr-preview-${slug}`}>
+      <img src={dataUrl} alt={`QR for ${slug}`} className="h-20 w-20 rounded-lg" />
+    </div>
+  );
+}
+
+function HotelQrDownloadButton({ url, slug }) {
+  const [downloading, setDownloading] = useState(false);
+
+  const handleDownload = async () => {
+    setDownloading(true);
+    try {
+      const dataUrl = await QRCode.toDataURL(url, {
+        width: 960,
+        margin: 1,
+        color: {
+          dark: "#C6FF00",
+          light: "#000000",
+        },
+      });
+      const link = document.createElement("a");
+      link.href = dataUrl;
+      link.download = `ynd-hotel-qr-${slug}.png`;
+      link.click();
+    } catch (e) {
+      toast.error("Couldn’t generate this QR code.");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={handleDownload}
+      disabled={downloading}
+      className="border-white/10 bg-transparent text-white/70 hover:bg-white/5 hover:text-white"
+      data-testid={`hotel-qr-download-${slug}`}
+    >
+      <Download className="mr-2 h-3.5 w-3.5" />
+      {downloading ? "Preparing…" : "Download QR"}
+    </Button>
   );
 }

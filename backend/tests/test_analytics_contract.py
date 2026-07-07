@@ -78,7 +78,7 @@ class TestAnalyticsContract(unittest.TestCase):
         destination_source = ast.get_source_segment(SERVER_SOURCE, named_function("_hotel_qr_destination_url"))
         self.assertIn("re.sub", slug_source)
         self.assertIn('candidate = f"{slug}-{suffix}"', unique_source)
-        self.assertIn('return f"{base}/{city_slug}?qr={qr_slug}"', destination_source)
+        self.assertIn('return f"{base}?qr={qr_slug}"', destination_source)
 
     def test_hotel_qr_analytics_summary_includes_scans_saves_and_lock_clicks(self):
         source = ast.get_source_segment(SERVER_SOURCE, named_function("admin_list_hotel_qr_codes"))

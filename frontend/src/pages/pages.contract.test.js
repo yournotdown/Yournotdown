@@ -103,6 +103,9 @@ describe("AdminDashboardPage source contract", () => {
     expect(adminDashboardSource).toContain("Location label");
     expect(adminDashboardSource).toContain('data-testid="hotel-qr-form-name"');
     expect(adminDashboardSource).toContain("Copy URL");
+    expect(adminDashboardSource).toContain("Download QR");
+    expect(adminDashboardSource).toContain("HotelQrCodePreview");
+    expect(adminDashboardSource).toContain("QRCode.toDataURL");
   });
 
   test("audience panel defends against missing data and exposes a clean error state", () => {
@@ -177,5 +180,10 @@ describe("Visitor tracking contract", () => {
     const homePageSource = fs.readFileSync(path.join(__dirname, "HomePage.jsx"), "utf8");
     expect(homePageSource).toContain("rememberQrSlugFromSearch(location.search)");
     expect(homePageSource).toContain('trackEvent("hotel_qr_scan", { city_slug: citySlug, qr_slug: qrSlug })');
+  });
+
+  test("homepage qr links remain on the root url before redirecting into Nashville", () => {
+    const serverSource = fs.readFileSync(path.join(__dirname, "..", "..", "..", "backend", "server.py"), "utf8");
+    expect(serverSource).toContain('return f"{base}?qr={qr_slug}"');
   });
 });

@@ -58,11 +58,19 @@ Latest local Hotel QR tracking + Audience simplification update:
   - Copy URL actions
   - low-risk tracking-first approach without adding QR image generation yet
 - current QR destination format:
-  - `https://www.yournotdown.com/nashville?qr=<qr_slug>`
+  - `https://www.yournotdown.com?qr=<qr_slug>`
+- added local QR preview/download in the admin `Hotel QR` table using the small `qrcode` frontend package:
+  - each row now shows a QR preview
+  - each row has a `Download QR` button that saves a PNG
+  - no separate backend QR image endpoint was needed
+- homepage QR attribution still works with the root URL format because:
+  - `/` preserves `location.search` when redirecting into the Nashville flow
+  - `frontend/src/pages/HomePage.jsx` still captures `?qr=<slug>` on the destination page
+  - the stored `qr_slug` continues to flow into analytics events, saved itineraries, audience contacts, and visitor profiles
 - local verification for this Hotel QR + Audience simplification pass:
   - `python3 -m unittest backend.tests.test_business_owner_contract backend.tests.test_analytics_contract backend.tests.test_saved_itinerary_contract backend.tests.test_locked_steps_contract backend.tests.test_tonight_page_contract backend.tests.test_city_events_filtering_contract backend.tests.test_ticketmaster_events_unit` passed (`110` tests)
   - `cd frontend && npm run build` passed
-  - `cd frontend && CI=true npm test -- --watchAll=false` passed (`3` suites, `31` tests)
+  - `cd frontend && CI=true npm test -- --watchAll=false` passed (`3` suites, `32` tests)
 
 Latest local Tonight's Move card CTA hierarchy polish:
 - made `Lock This In` the clear primary action on itinerary cards in `frontend/src/pages/TonightPage.jsx`
