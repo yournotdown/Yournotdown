@@ -1022,6 +1022,37 @@ def _hotel_qr_destination_url(city_slug: str, qr_slug: str) -> str:
     return f"{base}?qr={qr_slug}"
 
 
+def _hotel_qr_response(doc: Optional[dict]) -> Optional[dict]:
+    if not doc:
+        return None
+    payload = {
+        "id": doc.get("id", ""),
+        "name": doc.get("name", ""),
+        "slug": doc.get("slug", ""),
+        "city_slug": doc.get("city_slug", ""),
+        "destination_url": doc.get("destination_url", ""),
+        "hotel_name": doc.get("hotel_name", ""),
+        "location_label": doc.get("location_label", ""),
+        "notes": doc.get("notes", ""),
+        "active": bool(doc.get("active", True)),
+        "created_at": doc.get("created_at"),
+        "updated_at": doc.get("updated_at"),
+        "created_by_user_id": doc.get("created_by_user_id", ""),
+    }
+    if "analytics" in doc and isinstance(doc.get("analytics"), dict):
+        payload["analytics"] = {
+            "scans": int(doc["analytics"].get("scans", 0)),
+            "unique_visitors": int(doc["analytics"].get("unique_visitors", 0)),
+            "tonight_move_views": int(doc["analytics"].get("tonight_move_views", 0)),
+            "lock_clicks": int(doc["analytics"].get("lock_clicks", 0)),
+            "saved_moves": int(doc["analytics"].get("saved_moves", 0)),
+            "email_captures": int(doc["analytics"].get("email_captures", 0)),
+            "marketing_opt_ins": int(doc["analytics"].get("marketing_opt_ins", 0)),
+            "conversion_rate": float(doc["analytics"].get("conversion_rate", 0)),
+        }
+    return payload
+
+
 async def _upsert_visitor_profile(
     *,
     visitor_id: str,
@@ -1925,7 +1956,7 @@ async def admin_list_hotel_qr_codes(user=Depends(require_admin)):
         stats = analytics_by_slug.get(row.get("slug"), {})
         scans = stats.get("scans", 0)
         saved_moves = stats.get("saved_moves", 0)
-        payload_rows.append({
+        payload_rows.append(_hotel_qr_response({
             **row,
             "analytics": {
                 "scans": scans,
@@ -1937,7 +1968,7 @@ async def admin_list_hotel_qr_codes(user=Depends(require_admin)):
                 "marketing_opt_ins": len(stats.get("marketing_emails", set())),
                 "conversion_rate": round(saved_moves / scans, 4) if scans else 0,
             },
-        })
+        }))
     return {"rows": payload_rows}
 
 
@@ -1962,7 +1993,7 @@ async def admin_create_hotel_qr_code(body: HotelQrCodeCreate, user=Depends(requi
         "created_by_user_id": user["user_id"],
     }
     await db.hotel_qr_codes.insert_one(doc)
-    return doc
+    return _hotel_qr_response(doc)
 
 
 @api_router.patch("/admin/hotel-qr/{qr_id}")
@@ -1984,7 +2015,7 @@ async def admin_update_hotel_qr_code(qr_id: str, body: HotelQrCodeUpdate, user=D
     update["destination_url"] = _hotel_qr_destination_url(city_slug, slug)
     update["updated_at"] = now_iso()
     await db.hotel_qr_codes.update_one({"id": qr_id}, {"$set": update})
-    return await db.hotel_qr_codes.find_one({"id": qr_id}, {"_id": 0})
+    return _hotel_qr_response(await db.hotel_qr_codes.find_one({"id": qr_id}, {"_id": 0}))
 
 
 @api_router.post("/admin/hotel-qr/{qr_id}/deactivate")
@@ -1995,7 +2026,7 @@ async def admin_deactivate_hotel_qr_code(qr_id: str, user=Depends(require_admin)
     )
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Hotel QR not found")
-    return await db.hotel_qr_codes.find_one({"id": qr_id}, {"_id": 0})
+    return _hotel_qr_response(await db.hotel_qr_codes.find_one({"id": qr_id}, {"_id": 0}))
 
 
 # ------------- Auth -------------

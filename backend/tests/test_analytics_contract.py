@@ -80,6 +80,12 @@ class TestAnalyticsContract(unittest.TestCase):
         self.assertIn('candidate = f"{slug}-{suffix}"', unique_source)
         self.assertIn('return f"{base}?qr={qr_slug}"', destination_source)
 
+    def test_hotel_qr_response_helper_strips_raw_objectid_fields(self):
+        source = ast.get_source_segment(SERVER_SOURCE, named_function("_hotel_qr_response"))
+        self.assertIn('"id": doc.get("id", "")', source)
+        self.assertIn('"destination_url": doc.get("destination_url", "")', source)
+        self.assertNotIn('"_id"', source)
+
     def test_hotel_qr_analytics_summary_includes_scans_saves_and_lock_clicks(self):
         source = ast.get_source_segment(SERVER_SOURCE, named_function("admin_list_hotel_qr_codes"))
         self.assertIn('"hotel_qr_scan"', source)
@@ -88,6 +94,16 @@ class TestAnalyticsContract(unittest.TestCase):
         self.assertIn('"email_captures": len(stats.get("emails", set()))', source)
         self.assertIn('"marketing_opt_ins": len(stats.get("marketing_emails", set()))', source)
         self.assertIn('"conversion_rate": round(saved_moves / scans, 4) if scans else 0', source)
+        self.assertIn("payload_rows.append(_hotel_qr_response({", source)
+
+    def test_hotel_qr_create_update_and_deactivate_return_json_safe_responses(self):
+        create_source = ast.get_source_segment(SERVER_SOURCE, named_function("admin_create_hotel_qr_code"))
+        update_source = ast.get_source_segment(SERVER_SOURCE, named_function("admin_update_hotel_qr_code"))
+        deactivate_source = ast.get_source_segment(SERVER_SOURCE, named_function("admin_deactivate_hotel_qr_code"))
+        self.assertIn("await db.hotel_qr_codes.insert_one(doc)", create_source)
+        self.assertIn("return _hotel_qr_response(doc)", create_source)
+        self.assertIn("return _hotel_qr_response(await db.hotel_qr_codes.find_one", update_source)
+        self.assertIn("return _hotel_qr_response(await db.hotel_qr_codes.find_one", deactivate_source)
 
     def test_admin_summary_supports_filters_and_leaderboards(self):
         source = ast.get_source_segment(SERVER_SOURCE, named_function("admin_analytics_summary"))

@@ -67,6 +67,10 @@ Latest local Hotel QR tracking + Audience simplification update:
   - `/` preserves `location.search` when redirecting into the Nashville flow
   - `frontend/src/pages/HomePage.jsx` still captures `?qr=<slug>` on the destination page
   - the stored `qr_slug` continues to flow into analytics events, saved itineraries, audience contacts, and visitor profiles
+- fixed a Hotel QR create/list/update/deactivate response bug in `backend/server.py`:
+  - root cause was Mongo `insert_one(doc)` mutating the response dict by adding `_id: ObjectId(...)`
+  - FastAPI then failed to JSON-encode that raw ObjectId for the admin create response
+  - all Hotel QR endpoints now return a sanitized response shape via `_hotel_qr_response(...)`
 - local verification for this Hotel QR + Audience simplification pass:
   - `python3 -m unittest backend.tests.test_business_owner_contract backend.tests.test_analytics_contract backend.tests.test_saved_itinerary_contract backend.tests.test_locked_steps_contract backend.tests.test_tonight_page_contract backend.tests.test_city_events_filtering_contract backend.tests.test_ticketmaster_events_unit` passed (`110` tests)
   - `cd frontend && npm run build` passed

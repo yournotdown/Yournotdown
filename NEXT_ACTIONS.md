@@ -13,6 +13,7 @@
 0. Manually QA the new `Hotel QR` admin tab after the next deploy:
    - create a QR code such as `The Russell Lobby`
    - confirm the generated destination URL uses `https://www.yournotdown.com?qr=<slug>`
+   - confirm create no longer fails with a JSON/ObjectId response serialization error
    - confirm `Copy URL` works
    - confirm QR previews render
    - confirm `Download QR` saves a usable PNG
