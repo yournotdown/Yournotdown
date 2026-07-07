@@ -1,5 +1,12 @@
 ## Immediate Follow-Up
 
+0. Manually QA the new all-time visitor-stickness layer in the admin `Audience` tab:
+   - confirm a first-time browser/device appears as a `New` visitor after its first tracked event/save
+   - confirm the same browser/device becomes `Returning` after subsequent tracked events or another saved move
+   - confirm repeat saver counts increase when the same visitor/email saves multiple locked itineraries
+   - confirm saves without a `visitor_id` still work and show `Unknown` visitor status without crashing the table
+0. Decide whether the Audience tab should eventually support date-range-aware new/returning visitor stats; this chunk intentionally kept visitor stickiness all-time only.
+0. Decide whether future reporting should merge multiple visitor ids by normalized email after enough real traffic is observed; this chunk intentionally does not merge visitor profiles by email.
 0. Manually QA the new admin `Audience` tab after the next deploy:
    - save a locked Tonight's Move once without checking the marketing box and confirm the contact appears as `Not opted in`
    - save again with the same email and the marketing box checked and confirm the same contact record is reused, `saved_itinerary_count` increments, and opt-in flips to `true`

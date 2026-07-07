@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Phone, Navigation, Globe, RotateCw, ExternalLink } from "lucide-react";
 import { api, formatEventTime, trackEvent, resolveImageUrl } from "../lib/api";
+import { getVisitorId } from "../lib/visitor";
 import { activeCitySlug, cityPath } from "../lib/cities";
 
 const VIBE_LABELS = {
@@ -193,6 +194,7 @@ export default function TonightPage() {
       const r = await api.post("/itinerary/save", {
         email,
         marketing_opt_in: marketingOptIn,
+        visitor_id: getVisitorId(),
         city_slug: citySlug,
         vibe,
         source_itinerary_id: itinerary?.id,

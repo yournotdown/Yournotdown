@@ -1,10 +1,21 @@
 jest.mock("axios", () => ({
-  create: jest.fn(() => ({
-    post: jest.fn(),
-  })),
+  ...(() => {
+    const mockPost = jest.fn(() => Promise.resolve({ data: { ok: true } }));
+    return {
+      __mockPost: mockPost,
+      create: jest.fn(() => ({
+        post: mockPost,
+      })),
+    };
+  })(),
 }));
 
-import { API, formatEventSchedule, formatEventTime, matchedEventsForBusinesses, resolveImageUrl } from "./api";
+import { API, formatEventSchedule, formatEventTime, matchedEventsForBusinesses, resolveImageUrl, trackEvent } from "./api";
+
+const getPostMock = () => {
+  const axios = require("axios");
+  return axios.__mockPost;
+};
 
 describe("resolveImageUrl", () => {
   test("prefers uploaded image paths", () => {
@@ -34,6 +45,17 @@ describe("resolveImageUrl", () => {
 });
 
 describe("event helpers", () => {
+  beforeEach(() => {
+    getPostMock().mockClear();
+    window.localStorage.clear();
+    Object.defineProperty(window, "crypto", {
+      value: {
+        randomUUID: jest.fn(() => "visitor-123"),
+      },
+      configurable: true,
+    });
+  });
+
   test("formats event schedule with date and time", () => {
     expect(formatEventSchedule({ local_date: "2026-07-05", local_time: "19:30:00" }))
       .toBe("2026-07-05 · 19:30:00");
@@ -54,5 +76,15 @@ describe("event helpers", () => {
         { id: "business-3" },
       ])
     ).toEqual([event]);
+  });
+
+  test("analytics tracking includes visitor_id", async () => {
+    trackEvent("homepage_visit", { city_slug: "nashville" });
+    await Promise.resolve();
+    expect(getPostMock()).toHaveBeenCalledWith("/analytics/track", {
+      event_type: "homepage_visit",
+      visitor_id: "visitor-123",
+      city_slug: "nashville",
+    });
   });
 });

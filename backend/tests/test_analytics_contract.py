@@ -32,9 +32,24 @@ class TestAnalyticsContract(unittest.TestCase):
     def test_track_endpoint_stamps_sponsor_tier_for_business_scoped_events(self):
         source = ast.get_source_segment(SERVER_SOURCE, named_function("track_event"))
         self.assertIn("event.event_type in BUSINESS_SCOPED_EVENT_TYPES", source)
+        self.assertIn('"visitor_id": _normalize_visitor_id(event.visitor_id) or None', source)
         self.assertIn('"slot": event.slot', source)
         self.assertIn('"event_id": event.event_id', source)
         self.assertIn('"event_source": event.event_source', source)
+        self.assertIn("await _upsert_visitor_profile(", source)
+
+    def test_visitor_profile_helper_tracks_first_and_repeat_events(self):
+        source = ast.get_source_segment(SERVER_SOURCE, named_function("_upsert_visitor_profile"))
+        self.assertIn('"visitor_id": visitor_id', source)
+        self.assertIn('"first_seen_at": now', source)
+        self.assertIn('"last_seen_at": now', source)
+        self.assertIn('"event_count": int(existing.get("event_count", 0)) + 1', source)
+        self.assertIn('"saved_itinerary_count": int(existing.get("saved_itinerary_count", 0)) + (1 if increment_saved_itinerary else 0)', source)
+
+    def test_missing_visitor_id_is_ignored_safely(self):
+        source = ast.get_source_segment(SERVER_SOURCE, named_function("_upsert_visitor_profile"))
+        self.assertIn("if not visitor_id:", source)
+        self.assertIn("return None", source)
 
     def test_save_itinerary_writes_saved_business_analytics_events(self):
         source = ast.get_source_segment(SERVER_SOURCE, named_function("save_itinerary"))

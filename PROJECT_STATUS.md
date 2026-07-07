@@ -6,6 +6,45 @@ The repo is currently on branch `main`. The only known worktree changes outside 
 
 ## Latest Work Session
 
+Latest local visitor-stickness audience update:
+- added anonymous `visitor_id` tracking to the audience/email-capture stack using a browser-local UUID stored in `localStorage`
+- created `frontend/src/lib/visitor.js` so the public frontend now:
+  - generates a random visitor id once
+  - reuses it for later analytics/save requests
+  - does not use fingerprinting or ask for extra user fields
+- `frontend/src/lib/api.js` now automatically includes `visitor_id` on analytics events sent through `trackEvent(...)`
+- `frontend/src/pages/TonightPage.jsx` now includes `visitor_id` in `POST /api/itinerary/save`
+- `backend/server.py` now accepts `visitor_id` on:
+  - `POST /api/analytics/track`
+  - `POST /api/itinerary/save`
+- saved-itinerary and audience records now store visitor context when available:
+  - `saved_itineraries.visitor_id`
+  - `audience_contacts.visitor_id`
+- added `visitor_profiles` upsert logic keyed by `visitor_id` with:
+  - first/last seen timestamps
+  - first/last city
+  - first/last vibe
+  - event count
+  - saved itinerary count
+  - first/last saved itinerary ids
+  - first email captured timestamp
+  - linked normalized email
+- the admin `Audience` section now includes all-time visitor stickiness stats:
+  - total anonymous visitors
+  - new visitors
+  - returning visitors
+  - returning visitor rate
+  - repeat savers
+  - repeat saver rate
+- the audience table now also shows visitor status (`New`, `Returning`, or `Unknown`) per captured email when visitor data exists
+- current limitation kept intentionally simple for this chunk:
+  - new/returning visitor metrics are all-time only
+  - different visitor ids are not merged by email yet
+- local verification for this visitor-tracking pass:
+  - `python3 -m unittest backend.tests.test_business_owner_contract backend.tests.test_analytics_contract backend.tests.test_saved_itinerary_contract backend.tests.test_locked_steps_contract backend.tests.test_tonight_page_contract backend.tests.test_city_events_filtering_contract backend.tests.test_ticketmaster_events_unit` passed (`105` tests)
+  - `cd frontend && npm run build` passed
+  - `cd frontend && CI=true npm test -- --watchAll=false` passed (`3` suites, `27` tests)
+
 Latest local audience / email captures update:
 - added `marketing_opt_in` to the Tonight's Move save flow so the locked-itinerary overlay still sends the saved move email either way, while optionally capturing consent for future Nashville picks and YourNotDown updates
 - `frontend/src/pages/TonightPage.jsx` now includes:

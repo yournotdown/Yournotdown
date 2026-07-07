@@ -8,6 +8,7 @@ const businessClaimSource = fs.readFileSync(path.join(__dirname, "BusinessClaimP
 const businessDashboardSource = fs.readFileSync(path.join(__dirname, "BusinessDashboardPage.jsx"), "utf8");
 const appSource = fs.readFileSync(path.join(__dirname, "..", "App.js"), "utf8");
 const indexHtmlSource = fs.readFileSync(path.join(__dirname, "..", "..", "public", "index.html"), "utf8");
+const visitorHelperSource = fs.readFileSync(path.join(__dirname, "..", "lib", "visitor.js"), "utf8");
 
 describe("TonightPage source contract", () => {
   test("Another Night scrolls to the top after a successful reroll", () => {
@@ -31,6 +32,7 @@ describe("TonightPage source contract", () => {
     expect(tonightPageSource).toContain("Send me occasional Nashville picks and YourNotDown updates.");
     expect(tonightPageSource).toContain("We&apos;ll send your saved move either way. Updates are optional.");
     expect(tonightPageSource).toContain("marketing_opt_in: marketingOptIn");
+    expect(tonightPageSource).toContain("visitor_id: getVisitorId()");
     expect(tonightPageSource).not.toContain("First name");
     expect(tonightPageSource).not.toContain("Last name");
   });
@@ -81,6 +83,10 @@ describe("AdminDashboardPage source contract", () => {
   test("admin dashboard contains audience labels", () => {
     expect(adminDashboardSource).toContain("Audience");
     expect(adminDashboardSource).toContain("Email captures from Save Tonight&apos;s Move.");
+    expect(adminDashboardSource).toContain("Anonymous Visitors");
+    expect(adminDashboardSource).toContain("New Visitors");
+    expect(adminDashboardSource).toContain("Returning Visitors");
+    expect(adminDashboardSource).toContain("Repeat Savers");
     expect(adminDashboardSource).toContain("Marketing Opted In");
     expect(adminDashboardSource).toContain("Recent Captures");
     expect(adminDashboardSource).toContain("Search by email");
@@ -121,5 +127,18 @@ describe("Brand assets contract", () => {
   test("index.html prefers the local YND SVG favicon", () => {
     expect(indexHtmlSource).toContain('rel="icon" type="image/svg+xml" href="%PUBLIC_URL%/favicon.svg"');
     expect(indexHtmlSource).toContain('rel="alternate icon" href="%PUBLIC_URL%/favicon.svg"');
+  });
+});
+
+describe("Visitor tracking contract", () => {
+  test("visitor helper stores a local visitor id", () => {
+    expect(visitorHelperSource).toContain('const VISITOR_ID_KEY = "ynd_visitor_id"');
+    expect(visitorHelperSource).toContain("window.localStorage.getItem(VISITOR_ID_KEY)");
+    expect(visitorHelperSource).toContain("window.localStorage.setItem(VISITOR_ID_KEY, nextId)");
+  });
+
+  test("api analytics tracking includes visitor ids", () => {
+    const apiSource = fs.readFileSync(path.join(__dirname, "..", "lib", "api.js"), "utf8");
+    expect(apiSource).toContain('visitor_id: getVisitorId()');
   });
 });

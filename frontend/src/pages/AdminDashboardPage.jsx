@@ -2026,11 +2026,34 @@ function AudiencePanel({ audience, audienceLoading, filters, onFiltersChange }) 
         <AnalyticsStatCard label="Recent Captures" value={totals.recent_captures || 0} icon={TrendingUp} />
       </div>
 
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <AnalyticsStatCard label="Anonymous Visitors" value={totals.total_anonymous_visitors || 0} icon={Globe} />
+        <AnalyticsStatCard label="New Visitors" value={totals.new_visitors || 0} icon={Plus} accent="text-white" />
+        <AnalyticsStatCard label="Returning Visitors" value={totals.returning_visitors || 0} icon={RotateCw} />
+        <AnalyticsStatCard label="Repeat Savers" value={totals.repeat_savers || 0} icon={TrendingUp} />
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="bg-[#121218] border border-white/10 rounded-3xl p-5">
+          <div className="text-xs uppercase tracking-[0.22em] text-[#A1A1AA] font-bold">Returning Visitor Rate</div>
+          <div className="font-display text-4xl font-black mt-4 tracking-tight">
+            {`${(((totals.returning_visitor_rate || 0) * 100)).toFixed(1)}%`}
+          </div>
+        </div>
+        <div className="bg-[#121218] border border-white/10 rounded-3xl p-5">
+          <div className="text-xs uppercase tracking-[0.22em] text-[#A1A1AA] font-bold">Repeat Saver Rate</div>
+          <div className="font-display text-4xl font-black mt-4 tracking-tight">
+            {`${(((totals.repeat_saver_rate || 0) * 100)).toFixed(1)}%`}
+          </div>
+        </div>
+      </div>
+
       <div className="bg-[#121218] rounded-3xl border border-white/10 overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-xs uppercase tracking-wide text-[#A1A1AA]">
               <th className="px-5 py-4">Email</th>
+              <th className="px-3 py-4">Visitor</th>
               <th className="px-3 py-4">Status</th>
               <th className="px-3 py-4">City</th>
               <th className="px-3 py-4">Last vibe</th>
@@ -2042,15 +2065,26 @@ function AudiencePanel({ audience, audienceLoading, filters, onFiltersChange }) 
           <tbody>
             {audienceLoading ? (
               <tr>
-                <td colSpan={7} className="px-5 py-12 text-center text-[#A1A1AA]">Loading audience…</td>
+                <td colSpan={8} className="px-5 py-12 text-center text-[#A1A1AA]">Loading audience…</td>
               </tr>
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-5 py-12 text-center text-[#A1A1AA]">No email captures yet.</td>
+                <td colSpan={8} className="px-5 py-12 text-center text-[#A1A1AA]">No email captures yet.</td>
               </tr>
             ) : rows.map((row) => (
               <tr key={row.email} className="border-t border-white/5" data-testid={`admin-audience-row-${row.email}`}>
                 <td className="px-5 py-4 font-medium text-white">{row.email}</td>
+                <td className="px-3 py-4">
+                  <span className={`inline-flex rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] ${
+                    row.visitor_status === "returning"
+                      ? "bg-[#C6FF00]/10 text-[#D7FF6B]"
+                      : row.visitor_status === "new"
+                        ? "bg-white/5 text-white/70"
+                        : "bg-white/5 text-white/40"
+                  }`}>
+                    {row.visitor_status === "returning" ? "Returning" : row.visitor_status === "new" ? "New" : "Unknown"}
+                  </span>
+                </td>
                 <td className="px-3 py-4">
                   <span className={`inline-flex rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] ${
                     row.marketing_opt_in ? "bg-[#C6FF00]/10 text-[#D7FF6B]" : "bg-white/5 text-white/55"

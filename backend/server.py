@@ -265,6 +265,7 @@ class BulkImportReviewPayload(BaseModel):
 
 class AnalyticsEvent(BaseModel):
     event_type: str
+    visitor_id: Optional[str] = None
     business_id: Optional[str] = None
     category_slug: Optional[str] = None
     slot: Optional[str] = None
@@ -353,6 +354,7 @@ class LeadCreate(BaseModel):
 
 class SaveItineraryRequest(BaseModel):
     email: str
+    visitor_id: Optional[str] = None
     city_slug: str = "nashville"
     vibe: str = ""
     source_itinerary_id: Optional[str] = None
@@ -420,6 +422,7 @@ async def _apply_startup_maintenance():
     await db.city_events.create_index([("city_slug", 1), ("local_date", 1)])
     await db.city_events.create_index([("source", 1), ("external_event_id", 1)], unique=True)
     await db.audience_contacts.create_index("email_normalized", unique=True)
+    await db.visitor_profiles.create_index("visitor_id", unique=True)
 
     # Seed cities
     for c in CITIES:
@@ -913,6 +916,7 @@ def _business_event_doc(
     return {
         "id": str(uuid.uuid4()),
         "event_type": event_type,
+        "visitor_id": None,
         "business_id": payload_business.get("id"),
         "category_slug": category_slug or payload_business.get("category_slug"),
         "slot": slot,
@@ -947,9 +951,85 @@ def _normalize_email(value: str) -> str:
     return (value or "").strip().lower()
 
 
+def _normalize_visitor_id(value: Optional[str]) -> str:
+    return (value or "").strip()
+
+
+async def _upsert_visitor_profile(
+    *,
+    visitor_id: str,
+    city_slug: str = "",
+    vibe: str = "",
+    saved_itinerary_id: Optional[str] = None,
+    email_normalized: str = "",
+    increment_saved_itinerary: bool = False,
+) -> Optional[dict]:
+    visitor_id = _normalize_visitor_id(visitor_id)
+    if not visitor_id:
+        return None
+
+    now = now_iso()
+    existing = await db.visitor_profiles.find_one({"visitor_id": visitor_id}, {"_id": 0})
+
+    if existing:
+        updated = {
+            **existing,
+            "last_seen_at": now,
+            "last_city_slug": city_slug or existing.get("last_city_slug", ""),
+            "last_vibe": vibe or existing.get("last_vibe", ""),
+            "event_count": int(existing.get("event_count", 0)) + 1,
+            "saved_itinerary_count": int(existing.get("saved_itinerary_count", 0)) + (1 if increment_saved_itinerary else 0),
+            "last_saved_itinerary_id": saved_itinerary_id or existing.get("last_saved_itinerary_id"),
+            "email_normalized": email_normalized or existing.get("email_normalized", ""),
+            "updated_at": now,
+        }
+        if increment_saved_itinerary and not existing.get("first_saved_itinerary_id"):
+            updated["first_saved_itinerary_id"] = saved_itinerary_id
+        if email_normalized and not existing.get("first_email_captured_at"):
+            updated["first_email_captured_at"] = now
+        await db.visitor_profiles.update_one(
+            {"visitor_id": visitor_id},
+            {"$set": {
+                "last_seen_at": updated["last_seen_at"],
+                "last_city_slug": updated["last_city_slug"],
+                "last_vibe": updated["last_vibe"],
+                "event_count": updated["event_count"],
+                "saved_itinerary_count": updated["saved_itinerary_count"],
+                "last_saved_itinerary_id": updated["last_saved_itinerary_id"],
+                "email_normalized": updated["email_normalized"],
+                "updated_at": updated["updated_at"],
+                "first_saved_itinerary_id": updated.get("first_saved_itinerary_id", existing.get("first_saved_itinerary_id")),
+                "first_email_captured_at": updated.get("first_email_captured_at", existing.get("first_email_captured_at")),
+            }},
+        )
+        return updated
+
+    created = {
+        "id": str(uuid.uuid4()),
+        "visitor_id": visitor_id,
+        "first_seen_at": now,
+        "last_seen_at": now,
+        "first_city_slug": city_slug,
+        "last_city_slug": city_slug,
+        "first_vibe": vibe,
+        "last_vibe": vibe,
+        "event_count": 1,
+        "saved_itinerary_count": 1 if increment_saved_itinerary else 0,
+        "first_saved_itinerary_id": saved_itinerary_id if increment_saved_itinerary else None,
+        "last_saved_itinerary_id": saved_itinerary_id if increment_saved_itinerary else None,
+        "first_email_captured_at": now if email_normalized else None,
+        "email_normalized": email_normalized,
+        "created_at": now,
+        "updated_at": now,
+    }
+    await db.visitor_profiles.insert_one(created)
+    return created
+
+
 async def _upsert_audience_contact(
     *,
     email: str,
+    visitor_id: str = "",
     city_slug: str,
     vibe: str,
     marketing_opt_in: bool,
@@ -969,6 +1049,7 @@ async def _upsert_audience_contact(
             **existing,
             "email": email_normalized,
             "email_normalized": email_normalized,
+            "visitor_id": visitor_id or existing.get("visitor_id", ""),
             "marketing_opt_in": next_marketing_opt_in,
             "marketing_opt_in_at": marketing_opt_in_at,
             "source": "save_tonights_move",
@@ -985,6 +1066,7 @@ async def _upsert_audience_contact(
             {"$set": {
                 "email": updated["email"],
                 "email_normalized": updated["email_normalized"],
+                "visitor_id": updated["visitor_id"],
                 "marketing_opt_in": updated["marketing_opt_in"],
                 "marketing_opt_in_at": updated["marketing_opt_in_at"],
                 "source": updated["source"],
@@ -1003,6 +1085,7 @@ async def _upsert_audience_contact(
         "id": str(uuid.uuid4()),
         "email": email_normalized,
         "email_normalized": email_normalized,
+        "visitor_id": visitor_id,
         "marketing_opt_in": bool(marketing_opt_in),
         "marketing_opt_in_at": now if marketing_opt_in else None,
         "source": "save_tonights_move",
@@ -1449,6 +1532,7 @@ async def track_event(event: AnalyticsEvent, request: Request):
     doc = {
         "id": str(uuid.uuid4()),
         "event_type": event.event_type,
+        "visitor_id": _normalize_visitor_id(event.visitor_id) or None,
         "business_id": event.business_id,
         "category_slug": event.category_slug,
         "slot": event.slot,
@@ -1469,6 +1553,11 @@ async def track_event(event: AnalyticsEvent, request: Request):
         if biz:
             doc["sponsor_tier"] = biz.get("sponsor_tier", "none")
     await db.analytics_events.insert_one(doc)
+    await _upsert_visitor_profile(
+        visitor_id=event.visitor_id or "",
+        city_slug=event.city_slug or "",
+        vibe=event.vibe or "",
+    )
     return {"ok": True}
 
 
@@ -1487,6 +1576,7 @@ async def save_itinerary(payload: SaveItineraryRequest, request: Request):
     email = (payload.email or "").strip().lower()
     if not _valid_email(email):
         raise HTTPException(status_code=400, detail="Enter a valid email.")
+    visitor_id = _normalize_visitor_id(payload.visitor_id)
 
     safe_steps = _safe_saved_itinerary_steps(payload.steps)
     safe_locked_slots = [
@@ -1500,6 +1590,7 @@ async def save_itinerary(payload: SaveItineraryRequest, request: Request):
         "city_slug": payload.city_slug,
         "vibe": payload.vibe,
         "email": email,
+        "visitor_id": visitor_id or None,
         "marketing_opt_in": bool(payload.marketing_opt_in),
         "steps": safe_steps,
         "locked_slots": safe_locked_slots,
@@ -1514,11 +1605,20 @@ async def save_itinerary(payload: SaveItineraryRequest, request: Request):
     await db.saved_itineraries.insert_one(doc)
     await _upsert_audience_contact(
         email=email,
+        visitor_id=visitor_id,
         city_slug=doc["city_slug"],
         vibe=doc["vibe"],
         marketing_opt_in=bool(payload.marketing_opt_in),
         saved_itinerary_id=doc["id"],
         locked_slots=safe_locked_slots,
+    )
+    await _upsert_visitor_profile(
+        visitor_id=visitor_id,
+        city_slug=doc["city_slug"],
+        vibe=doc["vibe"],
+        saved_itinerary_id=doc["id"],
+        email_normalized=email,
+        increment_saved_itinerary=True,
     )
     saved_step_events = [
         _business_event_doc(
@@ -1594,26 +1694,61 @@ async def admin_audience(
         query["email_normalized"] = {"$regex": re.escape(q.strip().lower())}
 
     rows = await db.audience_contacts.find(query, {"_id": 0}).sort([("last_saved_at", -1)]).to_list(500)
+    visitor_ids = [row.get("visitor_id") for row in rows if row.get("visitor_id")]
+    visitor_profiles = []
+    if visitor_ids:
+        visitor_profiles = await db.visitor_profiles.find(
+            {"visitor_id": {"$in": visitor_ids}},
+            {"_id": 0},
+        ).to_list(1000)
+    visitor_profiles_by_id = {
+        profile.get("visitor_id"): profile
+        for profile in visitor_profiles
+        if profile.get("visitor_id")
+    }
+    all_visitor_profiles = await db.visitor_profiles.find({}, {"_id": 0}).to_list(5000)
     now = datetime.now(timezone.utc)
     total_contacts = len(rows)
     marketing_opted_in_contacts = sum(1 for row in rows if row.get("marketing_opt_in"))
     non_marketing_contacts = total_contacts - marketing_opted_in_contacts
     total_saved_itineraries = sum(int(row.get("saved_itinerary_count", 0)) for row in rows)
+    total_anonymous_visitors = len(all_visitor_profiles)
+    new_visitors = sum(1 for profile in all_visitor_profiles if int(profile.get("event_count", 0)) <= 1)
+    returning_visitors = max(total_anonymous_visitors - new_visitors, 0)
+    returning_visitor_rate = round(returning_visitors / total_anonymous_visitors, 4) if total_anonymous_visitors else 0
+    repeat_saver_keys = set()
+    for profile in all_visitor_profiles:
+        if int(profile.get("saved_itinerary_count", 0)) > 1 and profile.get("visitor_id"):
+            repeat_saver_keys.add(f"visitor:{profile['visitor_id']}")
+    for row in rows:
+        if int(row.get("saved_itinerary_count", 0)) > 1:
+            if row.get("visitor_id"):
+                repeat_saver_keys.add(f"visitor:{row['visitor_id']}")
+            elif row.get("email_normalized"):
+                repeat_saver_keys.add(f"email:{row['email_normalized']}")
+    repeat_savers = len(repeat_saver_keys)
+    repeat_saver_rate = round(repeat_savers / total_contacts, 4) if total_contacts else 0
     recent_cutoff = now - timedelta(days=7)
     recent_captures = 0
     for row in rows:
-      saved_at_raw = row.get("last_saved_at")
-      if not saved_at_raw:
-          continue
-      saved_at = datetime.fromisoformat(saved_at_raw)
-      if saved_at.tzinfo is None:
-          saved_at = saved_at.replace(tzinfo=timezone.utc)
-      if saved_at >= recent_cutoff:
-          recent_captures += 1
+        saved_at_raw = row.get("last_saved_at")
+        if not saved_at_raw:
+            continue
+        saved_at = datetime.fromisoformat(saved_at_raw)
+        if saved_at.tzinfo is None:
+            saved_at = saved_at.replace(tzinfo=timezone.utc)
+        if saved_at >= recent_cutoff:
+            recent_captures += 1
     payload_rows = [
         {
             "id": row.get("id"),
             "email": row.get("email", ""),
+            "visitor_id": row.get("visitor_id", ""),
+            "visitor_status": (
+                "returning"
+                if int((visitor_profiles_by_id.get(row.get("visitor_id")) or {}).get("event_count", 0)) > 1
+                else "new"
+            ) if row.get("visitor_id") else "unknown",
             "marketing_opt_in": bool(row.get("marketing_opt_in")),
             "city_slug": row.get("city_slug", ""),
             "last_vibe": row.get("last_vibe", ""),
@@ -1626,9 +1761,15 @@ async def admin_audience(
     return {
         "totals": {
             "total_contacts": total_contacts,
+            "total_anonymous_visitors": total_anonymous_visitors,
+            "new_visitors": new_visitors,
+            "returning_visitors": returning_visitors,
+            "returning_visitor_rate": returning_visitor_rate,
             "marketing_opted_in_contacts": marketing_opted_in_contacts,
             "non_marketing_contacts": non_marketing_contacts,
             "total_saved_itineraries": total_saved_itineraries,
+            "repeat_savers": repeat_savers,
+            "repeat_saver_rate": repeat_saver_rate,
             "recent_captures": recent_captures,
         },
         "rows": payload_rows,
