@@ -291,18 +291,18 @@ export default function TonightPage() {
             </span>
             {sponsorship?.sponsor_name ? (
               <span
-                className="notranslate inline-flex max-w-full items-center gap-3 rounded-full border border-[#C6FF00]/35 bg-[#0E0E12] px-4 py-3 text-left align-middle text-[0.9rem] normal-case tracking-normal text-white shadow-[0_0_24px_rgba(198,255,0,0.12)] sm:mb-2 sm:px-5 sm:py-3 sm:text-[1rem]"
+                className="notranslate inline-flex max-w-full items-center gap-2.5 rounded-full border border-[#C6FF00]/20 bg-white/[0.04] px-3.5 py-2 text-left align-middle text-[0.86rem] normal-case tracking-normal text-white shadow-[0_0_16px_rgba(198,255,0,0.08)] backdrop-blur-sm sm:mb-2 sm:px-4 sm:py-2"
                 data-testid="tonight-sponsorship"
               >
                 {sponsorship.sponsor_logo_url ? (
                   <img
                     src={sponsorship.sponsor_logo_url}
                     alt=""
-                    className="h-10 w-10 rounded-xl object-cover border border-[#C6FF00]/20"
+                    className="h-8 w-8 rounded-full object-cover border border-white/10"
                   />
                 ) : null}
-                <span className="min-w-0">
-                  <span className="block text-[10px] uppercase tracking-[0.28em] text-[#C6FF00]/78">
+                <span className="min-w-0 leading-none">
+                  <span className="block text-[9px] uppercase tracking-[0.26em] text-[#C6FF00]/72">
                     Sponsored by
                   </span>
                   {sponsorship.sponsor_url ? (
@@ -310,14 +310,14 @@ export default function TonightPage() {
                       href={sponsorship.sponsor_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="block truncate font-display text-lg leading-none text-white hover:text-[#C6FF00] transition-colors"
+                      className="mt-1 block truncate font-display text-[1rem] leading-none text-white hover:text-[#D7FF6B] transition-colors sm:text-[1.05rem]"
                       data-testid="tonight-sponsorship-link"
                     >
                       {sponsorship.sponsor_name}
                     </a>
                   ) : (
                     <span
-                      className="block truncate font-display text-lg leading-none text-white"
+                      className="mt-1 block truncate font-display text-[1rem] leading-none text-white sm:text-[1.05rem]"
                       data-testid="tonight-sponsorship-name"
                     >
                       {sponsorship.sponsor_name}

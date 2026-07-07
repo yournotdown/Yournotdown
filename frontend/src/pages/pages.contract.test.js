@@ -42,6 +42,7 @@ describe("TonightPage source contract", () => {
     expect(tonightPageSource).toContain('mt-2 flex flex-col items-start gap-3 sm:flex-row sm:items-end sm:gap-4');
     expect(tonightPageSource).toContain('data-testid="tonight-sponsorship"');
     expect(tonightPageSource).toContain("Sponsored by");
+    expect(tonightPageSource).toContain("rounded-full border border-[#C6FF00]/20");
   });
 });
 
@@ -90,6 +91,15 @@ describe("AdminDashboardPage source contract", () => {
     expect(adminDashboardSource).toContain("Marketing Opted In");
     expect(adminDashboardSource).toContain("Recent Captures");
     expect(adminDashboardSource).toContain("Search by email");
+  });
+
+  test("audience panel defends against missing data and exposes a clean error state", () => {
+    expect(adminDashboardSource).toContain("const [audienceError, setAudienceError] = useState(\"\")");
+    expect(adminDashboardSource).toContain("totals: response?.data?.totals || {}");
+    expect(adminDashboardSource).toContain("rows: Array.isArray(response?.data?.rows) ? response.data.rows : []");
+    expect(adminDashboardSource).toContain("const rows = Array.isArray(audience?.rows) ? audience.rows : []");
+    expect(adminDashboardSource).toContain('data-testid="admin-audience-error"');
+    expect(adminDashboardSource).toContain("Couldn’t load audience right now.");
   });
 });
 

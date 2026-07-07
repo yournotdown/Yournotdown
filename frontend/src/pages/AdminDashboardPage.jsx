@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import {
   Plus, Pencil, Trash2, Star, ArrowUp, ArrowDown, Upload,
   LogOut, BarChart3, Store, LayoutGrid, Image as ImageIcon, TrendingUp,
-  ClipboardCheck, CheckCircle, XCircle, ExternalLink, Globe, Phone, Navigation, Ticket, Lock, Mail,
+  ClipboardCheck, CheckCircle, XCircle, ExternalLink, Globe, Phone, Navigation, Ticket, Lock, Mail, RotateCw,
 } from "lucide-react";
 import { api, resolveImageUrl } from "../lib/api";
 import { Button } from "@/components/ui/button";
@@ -97,6 +97,7 @@ export default function AdminDashboardPage() {
   const [importSummary, setImportSummary] = useState(null);
   const [audience, setAudience] = useState(null);
   const [audienceLoading, setAudienceLoading] = useState(false);
+  const [audienceError, setAudienceError] = useState("");
   const [audienceFilters, setAudienceFilters] = useState({
     q: "",
     filter: "all",
@@ -185,13 +186,19 @@ export default function AdminDashboardPage() {
   const loadAudience = useCallback(async () => {
     if (!user) return;
     setAudienceLoading(true);
+    setAudienceError("");
     try {
       const params = {};
       if (audienceFilters.q.trim()) params.q = audienceFilters.q.trim();
       if (audienceFilters.filter !== "all") params.filter = audienceFilters.filter;
       const response = await api.get("/admin/audience", { params });
-      setAudience(response.data);
+      setAudience({
+        totals: response?.data?.totals || {},
+        rows: Array.isArray(response?.data?.rows) ? response.data.rows : [],
+      });
     } catch (e) {
+      setAudience({ totals: {}, rows: [] });
+      setAudienceError(e?.response?.data?.detail || "Couldn’t load audience right now.");
       toast.error("Failed to load audience");
     } finally {
       setAudienceLoading(false);
@@ -562,6 +569,7 @@ export default function AdminDashboardPage() {
           <AudiencePanel
             audience={audience}
             audienceLoading={audienceLoading}
+            audienceError={audienceError}
             filters={audienceFilters}
             onFiltersChange={setAudienceFilters}
           />
@@ -1977,9 +1985,9 @@ function AnalyticsPanel({ analytics, analyticsLoading, filters, onFiltersChange,
   );
 }
 
-function AudiencePanel({ audience, audienceLoading, filters, onFiltersChange }) {
+function AudiencePanel({ audience, audienceLoading, audienceError, filters, onFiltersChange }) {
   const totals = audience?.totals || {};
-  const rows = audience?.rows || [];
+  const rows = Array.isArray(audience?.rows) ? audience.rows : [];
 
   return (
     <div className="space-y-8" data-testid="admin-audience-panel">
@@ -2047,6 +2055,12 @@ function AudiencePanel({ audience, audienceLoading, filters, onFiltersChange }) 
           </div>
         </div>
       </div>
+
+      {audienceError ? (
+        <div className="rounded-3xl border border-red-400/15 bg-red-500/[0.06] px-5 py-4 text-sm text-red-100" data-testid="admin-audience-error">
+          {audienceError}
+        </div>
+      ) : null}
 
       <div className="bg-[#121218] rounded-3xl border border-white/10 overflow-x-auto">
         <table className="w-full text-sm">

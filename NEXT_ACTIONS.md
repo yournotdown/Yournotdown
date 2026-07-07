@@ -1,5 +1,14 @@
 ## Immediate Follow-Up
 
+0. Manually QA the repaired admin `Audience` tab after the next deploy:
+   - confirm the tab no longer blanks when opening Audience
+   - confirm a failed `/api/admin/audience` request shows the new inline error state instead of crashing the page
+   - confirm empty-data cases still show `No email captures yet.` cleanly
+   - confirm the new/returning visitor stat cards render even when some totals are missing
+0. Manually QA the refined Tonight's Move sponsor badge:
+   - confirm it still sits beside or just under `MOVE`, never above the headline
+   - confirm the slimmer pill reads clearly on desktop and mobile
+   - confirm sponsor logo + name spacing feels premium and not cramped
 0. Manually QA the new all-time visitor-stickness layer in the admin `Audience` tab:
    - confirm a first-time browser/device appears as a `New` visitor after its first tracked event/save
    - confirm the same browser/device becomes `Returning` after subsequent tracked events or another saved move

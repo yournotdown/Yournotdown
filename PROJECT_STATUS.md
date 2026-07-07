@@ -6,6 +6,37 @@ The repo is currently on branch `main`. The only known worktree changes outside 
 
 ## Latest Work Session
 
+Latest local admin audience + sponsor-badge polish fix:
+- fixed a real admin Audience tab blank-screen bug in `frontend/src/pages/AdminDashboardPage.jsx`
+- root cause:
+  - the Audience panel rendered a `Returning Visitors` stat card using `RotateCw`
+  - `RotateCw` was not imported from `lucide-react`
+  - that missing symbol caused a runtime render crash and blanked the Audience tab
+- Audience tab hardening added on top of that fix:
+  - added `audienceError` state
+  - normalized the `/api/admin/audience` response before storing it in state
+  - now safely falls back to `{ totals: {}, rows: [] }` if the API response is partial or malformed
+  - the Audience table now treats `rows` defensively with `Array.isArray(...)`
+  - added a clean inline error banner when the audience API fails
+  - clean loading and empty states remain intact
+- the all-time new/returning visitor metrics added in the prior audience pass still render in the Audience tab:
+  - anonymous visitors
+  - new visitors
+  - returning visitors
+  - returning visitor rate
+  - repeat savers
+  - repeat saver rate
+- polished the Tonight's Move sponsor badge in `frontend/src/pages/TonightPage.jsx` without moving it above the title:
+  - kept it adjacent to `MOVE`
+  - slimmed the pill shape and reduced vertical bulk
+  - softened the lime border/glow
+  - tightened the logo/avatar treatment
+  - made the `SPONSORED BY` line smaller and the sponsor name cleaner with better spacing
+- local verification for this audience/sponsor-fix pass:
+  - `python3 -m unittest backend.tests.test_business_owner_contract backend.tests.test_analytics_contract backend.tests.test_saved_itinerary_contract backend.tests.test_locked_steps_contract backend.tests.test_tonight_page_contract backend.tests.test_city_events_filtering_contract backend.tests.test_ticketmaster_events_unit` passed (`105` tests)
+  - `cd frontend && npm run build` passed
+  - `cd frontend && CI=true npm test -- --watchAll=false` passed (`3` suites, `28` tests)
+
 Latest local visitor-stickness audience update:
 - added anonymous `visitor_id` tracking to the audience/email-capture stack using a browser-local UUID stored in `localStorage`
 - created `frontend/src/lib/visitor.js` so the public frontend now:
