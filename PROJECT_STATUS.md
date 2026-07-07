@@ -6,6 +6,35 @@ The repo is currently on branch `main`. The only known worktree changes outside 
 
 ## Latest Work Session
 
+Latest local audience / email captures update:
+- added `marketing_opt_in` to the Tonight's Move save flow so the locked-itinerary overlay still sends the saved move email either way, while optionally capturing consent for future Nashville picks and YourNotDown updates
+- `frontend/src/pages/TonightPage.jsx` now includes:
+  - an optional marketing opt-in checkbox in the `You're Locked In` overlay
+  - helper text clarifying that the saved move sends regardless of marketing preference
+  - no first-name, last-name, or phone fields
+- `backend/server.py` now:
+  - stores `marketing_opt_in` on `db.saved_itineraries`
+  - upserts `db.audience_contacts` by normalized lowercase email
+  - preserves `marketing_opt_in=true` once an email has opted in
+  - increments `saved_itinerary_count` on repeat saves
+  - tracks first/last vibe, first/last saved itinerary ids, locked slots, and last saved timestamp
+- added a new admin-only audience endpoint:
+  - `GET /api/admin/audience`
+  - returns summary totals plus audience rows
+  - supports email search and `all` / `opted_in` / `not_opted_in` filtering
+- `frontend/src/pages/AdminDashboardPage.jsx` now includes a new `Audience` tab with:
+  - summary cards for total contacts, marketing opted-in contacts, non-marketing contacts, saved itineraries, and recent captures
+  - search by email
+  - filter pills for all / marketing opted in / not opted in
+  - an audience table with email, opt-in status, city, last vibe, saved count, last saved date, and source
+- local verification for this audience-capture pass:
+  - `python3 -m unittest backend.tests.test_business_owner_contract backend.tests.test_analytics_contract backend.tests.test_saved_itinerary_contract backend.tests.test_locked_steps_contract backend.tests.test_tonight_page_contract backend.tests.test_city_events_filtering_contract backend.tests.test_ticketmaster_events_unit` passed (`103` tests)
+  - `cd frontend && npm run build` passed
+  - `cd frontend && CI=true npm test -- --watchAll=false` needed one source-contract assertion fix for JSX apostrophe escaping before passing locally
+- still unverified:
+  - manual admin QA of the new Audience tab against live saved-itinerary traffic
+  - any future CSV export, unsubscribe flow, or outbound marketing sends (not part of this chunk)
+
 Latest local revoke-flow polish update:
 - tightened the admin-side business-owner access panel so it re-reads the authoritative backend state after invite and revoke instead of trusting stale inline modal state
 - `frontend/src/pages/AdminDashboardPage.jsx` now has a shared `loadOwnerAccess()` helper and:

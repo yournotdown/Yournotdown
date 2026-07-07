@@ -114,6 +114,8 @@ class TestSavedItineraryContract(unittest.TestCase):
     def test_valid_save_request_persists_saved_itinerary_document(self):
         source = ast.get_source_segment(SERVER_SOURCE, named_function("save_itinerary"))
         self.assertIn('await db.saved_itineraries.insert_one(doc)', source)
+        self.assertIn('"marketing_opt_in": bool(payload.marketing_opt_in)', source)
+        self.assertIn('await _upsert_audience_contact(', source)
         self.assertIn('await db.analytics_events.insert_many(saved_step_events)', source)
         self.assertIn('await db.saved_itineraries.update_one(', source)
         self.assertIn('"source_itinerary_id": payload.source_itinerary_id', source)
@@ -122,6 +124,26 @@ class TestSavedItineraryContract(unittest.TestCase):
         self.assertIn('"delivery_channel": "email"', source)
         self.assertIn('"provider_message_id": delivery["provider_message_id"]', source)
         self.assertIn('"saved_itinerary_business"', source)
+
+    def test_audience_contact_upsert_tracks_repeat_saves_and_opt_in(self):
+        source = ast.get_source_segment(SERVER_SOURCE, named_function("_upsert_audience_contact"))
+        self.assertIn('"email_normalized": email_normalized', source)
+        self.assertIn('"marketing_opt_in": next_marketing_opt_in', source)
+        self.assertIn('"marketing_opt_in_at": marketing_opt_in_at', source)
+        self.assertIn('"saved_itinerary_count": int(existing.get("saved_itinerary_count", 0)) + 1', source)
+        self.assertIn('"first_saved_itinerary_id": saved_itinerary_id', source)
+        self.assertIn('"last_saved_itinerary_id": saved_itinerary_id', source)
+        self.assertIn('"source": "save_tonights_move"', source)
+
+    def test_admin_audience_endpoint_requires_admin_and_returns_totals_rows(self):
+        source = ast.get_source_segment(SERVER_SOURCE, named_function("admin_audience"))
+        self.assertIn("user=Depends(require_admin)", source)
+        self.assertIn('"total_contacts"', source)
+        self.assertIn('"marketing_opted_in_contacts"', source)
+        self.assertIn('"non_marketing_contacts"', source)
+        self.assertIn('"total_saved_itineraries"', source)
+        self.assertIn('"recent_captures"', source)
+        self.assertIn('"rows"', source)
 
     def test_invalid_email_is_rejected(self):
         self.assertTrue(VALID_EMAIL("traveler@example.com"))

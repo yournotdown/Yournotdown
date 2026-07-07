@@ -27,6 +27,14 @@ describe("TonightPage source contract", () => {
     expect(tonightPageSource).toContain("event_source: event.source");
   });
 
+  test("save overlay includes optional marketing opt-in and sends it in the request", () => {
+    expect(tonightPageSource).toContain("Send me occasional Nashville picks and YourNotDown updates.");
+    expect(tonightPageSource).toContain("We&apos;ll send your saved move either way. Updates are optional.");
+    expect(tonightPageSource).toContain("marketing_opt_in: marketingOptIn");
+    expect(tonightPageSource).not.toContain("First name");
+    expect(tonightPageSource).not.toContain("Last name");
+  });
+
   test("headline keeps sponsorship near MOVE instead of above the title", () => {
     expect(tonightPageSource).toContain('<span className="block">Tonight\'s</span>');
     expect(tonightPageSource).toContain('mt-2 flex flex-col items-start gap-3 sm:flex-row sm:items-end sm:gap-4');
@@ -68,6 +76,14 @@ describe("AdminDashboardPage source contract", () => {
     expect(adminDashboardSource).toContain("business-owner-invite-send");
     expect(adminDashboardSource).toContain("business-owner-revoke-access");
     expect(adminDashboardSource).toContain("const loadOwnerAccess = useCallback");
+  });
+
+  test("admin dashboard contains audience labels", () => {
+    expect(adminDashboardSource).toContain("Audience");
+    expect(adminDashboardSource).toContain("Email captures from Save Tonight&apos;s Move.");
+    expect(adminDashboardSource).toContain("Marketing Opted In");
+    expect(adminDashboardSource).toContain("Recent Captures");
+    expect(adminDashboardSource).toContain("Search by email");
   });
 });
 

@@ -40,6 +40,7 @@ export default function TonightPage() {
   const [saveOverlayOpen, setSaveOverlayOpen] = useState(false);
   const [saveOverlayDismissed, setSaveOverlayDismissed] = useState(false);
   const [email, setEmail] = useState("");
+  const [marketingOptIn, setMarketingOptIn] = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState("");
   const [saveError, setSaveError] = useState("");
@@ -114,6 +115,7 @@ export default function TonightPage() {
     setSaveOverlayOpen(false);
     setSaveOverlayDismissed(false);
     setEmail("");
+    setMarketingOptIn(false);
     setSaveLoading(false);
     setSaveSuccess("");
     setSaveError("");
@@ -190,6 +192,7 @@ export default function TonightPage() {
         .filter((slot) => Boolean(lockedSteps[slot]));
       const r = await api.post("/itinerary/save", {
         email,
+        marketing_opt_in: marketingOptIn,
         city_slug: citySlug,
         vibe,
         source_itinerary_id: itinerary?.id,
@@ -454,6 +457,25 @@ export default function TonightPage() {
                     className="mt-6 w-full border border-white/15 bg-black px-4 py-3 text-sm text-white placeholder:text-white/30 focus:border-[#C6FF00] focus:outline-none"
                     data-testid="tonight-save-email-input"
                   />
+                  <label className="mt-4 block" data-testid="tonight-marketing-opt-in-field">
+                    <div className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        checked={marketingOptIn}
+                        onChange={(e) => setMarketingOptIn(e.target.checked)}
+                        className="mt-0.5 h-4 w-4 accent-[#C6FF00]"
+                        data-testid="tonight-marketing-opt-in"
+                      />
+                      <div>
+                        <div className="text-sm text-white">
+                          Send me occasional Nashville picks and YourNotDown updates.
+                        </div>
+                        <div className="mt-1 text-xs text-white/45">
+                          We&apos;ll send your saved move either way. Updates are optional.
+                        </div>
+                      </div>
+                    </div>
+                  </label>
                   {saveError ? (
                     <div className="mt-3 text-sm text-[#FF8A8A]" data-testid="tonight-save-error">
                       {saveError}

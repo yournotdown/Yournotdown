@@ -1,5 +1,13 @@
 ## Immediate Follow-Up
 
+0. Manually QA the new admin `Audience` tab after the next deploy:
+   - save a locked Tonight's Move once without checking the marketing box and confirm the contact appears as `Not opted in`
+   - save again with the same email and the marketing box checked and confirm the same contact record is reused, `saved_itinerary_count` increments, and opt-in flips to `true`
+   - confirm a later save without the box checked does not turn `marketing_opt_in` back to `false`
+   - verify search by email and the `All` / `Marketing opted in` / `Not opted in` filters
+0. Decide whether the admin audience section needs a lightweight CSV export in a future chunk; it was intentionally left out here to keep the first pass low-risk.
+0. Decide whether `recent captures` should stay on a rolling 7-day definition or become date-range aware once the audience tab gets broader filtering.
+0. If outbound marketing is added later, build it on top of `audience_contacts` and `unsubscribed_at` rather than repurposing `saved_itineraries`.
 0. After the next deploy, verify the admin revoke flow specifically:
    - owner panel flips to `Portal inactive`
    - owner email display becomes `—`

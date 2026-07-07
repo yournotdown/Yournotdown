@@ -95,6 +95,12 @@ export default function AdminDashboardPage() {
     slot: "all",
   });
   const [importSummary, setImportSummary] = useState(null);
+  const [audience, setAudience] = useState(null);
+  const [audienceLoading, setAudienceLoading] = useState(false);
+  const [audienceFilters, setAudienceFilters] = useState({
+    q: "",
+    filter: "all",
+  });
   const [featuredLiveMusic, setFeaturedLiveMusic] = useState(emptyFeaturedLiveMusic);
   const [tonightMoveSponsorship, setTonightMoveSponsorship] = useState(emptyTonightMoveSponsorship);
   const [selectedImports, setSelectedImports] = useState([]);
@@ -175,6 +181,26 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     if (user) loadAnalytics();
   }, [user, loadAnalytics]);
+
+  const loadAudience = useCallback(async () => {
+    if (!user) return;
+    setAudienceLoading(true);
+    try {
+      const params = {};
+      if (audienceFilters.q.trim()) params.q = audienceFilters.q.trim();
+      if (audienceFilters.filter !== "all") params.filter = audienceFilters.filter;
+      const response = await api.get("/admin/audience", { params });
+      setAudience(response.data);
+    } catch (e) {
+      toast.error("Failed to load audience");
+    } finally {
+      setAudienceLoading(false);
+    }
+  }, [audienceFilters.filter, audienceFilters.q, user]);
+
+  useEffect(() => {
+    if (user) loadAudience();
+  }, [user, loadAudience]);
 
   const loadOwnerAccess = useCallback(async (businessId, fallbackEmail = "") => {
     if (!businessId) {
@@ -464,6 +490,7 @@ export default function AdminDashboardPage() {
             { id: "sponsorships", label: "Sponsorships", icon: Star },
             { id: "imports", label: `Import Review${importSummary?.pending ? ` (${importSummary.pending})` : ""}`, icon: ClipboardCheck },
             { id: "analytics", label: "Analytics", icon: BarChart3 },
+            { id: "audience", label: "Audience", icon: Mail },
           ].map((t) => (
             <button
               key={t.id}
@@ -529,6 +556,14 @@ export default function AdminDashboardPage() {
             onApprove={() => handleBulkImportReview("approved")}
             onReject={() => handleBulkImportReview("rejected")}
             onEdit={openEdit}
+          />
+        )}
+        {tab === "audience" && (
+          <AudiencePanel
+            audience={audience}
+            audienceLoading={audienceLoading}
+            filters={audienceFilters}
+            onFiltersChange={setAudienceFilters}
           />
         )}
       </div>
@@ -1937,6 +1972,101 @@ function AnalyticsPanel({ analytics, analyticsLoading, filters, onFiltersChange,
             </tbody>
           </table>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function AudiencePanel({ audience, audienceLoading, filters, onFiltersChange }) {
+  const totals = audience?.totals || {};
+  const rows = audience?.rows || [];
+
+  return (
+    <div className="space-y-8" data-testid="admin-audience-panel">
+      <div className="flex items-end justify-between gap-4 flex-wrap">
+        <div>
+          <h2 className="font-display text-3xl font-bold">Audience</h2>
+          <p className="text-sm text-[#A1A1AA] mt-1">Email captures from Save Tonight&apos;s Move.</p>
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          {[
+            { value: "all", label: "All" },
+            { value: "opted_in", label: "Marketing opted in" },
+            { value: "not_opted_in", label: "Not opted in" },
+          ].map((option) => (
+            <button
+              key={option.value}
+              onClick={() => onFiltersChange((prev) => ({ ...prev, filter: option.value }))}
+              className={`px-3 py-2 rounded-full border text-xs font-bold ${
+                filters.filter === option.value
+                  ? "border-[#7C3AED] text-white bg-[#7C3AED]/15"
+                  : "border-white/10 text-[#A1A1AA]"
+              }`}
+              data-testid={`admin-audience-filter-${option.value}`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <Input
+        value={filters.q}
+        onChange={(e) => onFiltersChange((prev) => ({ ...prev, q: e.target.value }))}
+        placeholder="Search by email"
+        className="max-w-md bg-[#1A1A22] border-white/10 text-white"
+        data-testid="admin-audience-search"
+      />
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
+        <AnalyticsStatCard label="Total Contacts" value={totals.total_contacts || 0} icon={Mail} />
+        <AnalyticsStatCard label="Marketing Opted In" value={totals.marketing_opted_in_contacts || 0} icon={CheckCircle} />
+        <AnalyticsStatCard label="Non-Marketing" value={totals.non_marketing_contacts || 0} icon={XCircle} accent="text-white" />
+        <AnalyticsStatCard label="Saved Itineraries" value={totals.total_saved_itineraries || 0} icon={ClipboardCheck} />
+        <AnalyticsStatCard label="Recent Captures" value={totals.recent_captures || 0} icon={TrendingUp} />
+      </div>
+
+      <div className="bg-[#121218] rounded-3xl border border-white/10 overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-xs uppercase tracking-wide text-[#A1A1AA]">
+              <th className="px-5 py-4">Email</th>
+              <th className="px-3 py-4">Status</th>
+              <th className="px-3 py-4">City</th>
+              <th className="px-3 py-4">Last vibe</th>
+              <th className="px-3 py-4">Saved count</th>
+              <th className="px-3 py-4">Last saved</th>
+              <th className="px-5 py-4">Source</th>
+            </tr>
+          </thead>
+          <tbody>
+            {audienceLoading ? (
+              <tr>
+                <td colSpan={7} className="px-5 py-12 text-center text-[#A1A1AA]">Loading audience…</td>
+              </tr>
+            ) : rows.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="px-5 py-12 text-center text-[#A1A1AA]">No email captures yet.</td>
+              </tr>
+            ) : rows.map((row) => (
+              <tr key={row.email} className="border-t border-white/5" data-testid={`admin-audience-row-${row.email}`}>
+                <td className="px-5 py-4 font-medium text-white">{row.email}</td>
+                <td className="px-3 py-4">
+                  <span className={`inline-flex rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] ${
+                    row.marketing_opt_in ? "bg-[#C6FF00]/10 text-[#D7FF6B]" : "bg-white/5 text-white/55"
+                  }`}>
+                    {row.marketing_opt_in ? "Opted in" : "Not opted in"}
+                  </span>
+                </td>
+                <td className="px-3 py-4 text-[#A1A1AA]">{row.city_slug || "—"}</td>
+                <td className="px-3 py-4 text-[#A1A1AA]">{row.last_vibe || "—"}</td>
+                <td className="px-3 py-4 text-white">{row.saved_itinerary_count || 0}</td>
+                <td className="px-3 py-4 text-[#A1A1AA]">{row.last_saved_at || "—"}</td>
+                <td className="px-5 py-4 text-[#A1A1AA]">{row.source || "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );

@@ -3,6 +3,7 @@ import asyncio
 import hashlib
 import os
 import logging
+import re
 import secrets
 import uuid
 from pathlib import Path
@@ -357,6 +358,7 @@ class SaveItineraryRequest(BaseModel):
     source_itinerary_id: Optional[str] = None
     steps: List[dict] = Field(default_factory=list)
     locked_slots: List[str] = Field(default_factory=list)
+    marketing_opt_in: bool = False
 
 
 class BusinessOwnerInviteCreate(BaseModel):
@@ -417,6 +419,7 @@ async def _apply_startup_maintenance():
     await db.businesses.create_index("normalized_name_address", unique=True, sparse=True)
     await db.city_events.create_index([("city_slug", 1), ("local_date", 1)])
     await db.city_events.create_index([("source", 1), ("external_event_id", 1)], unique=True)
+    await db.audience_contacts.create_index("email_normalized", unique=True)
 
     # Seed cities
     for c in CITIES:
@@ -940,6 +943,85 @@ def _valid_email(value: str) -> bool:
     return True
 
 
+def _normalize_email(value: str) -> str:
+    return (value or "").strip().lower()
+
+
+async def _upsert_audience_contact(
+    *,
+    email: str,
+    city_slug: str,
+    vibe: str,
+    marketing_opt_in: bool,
+    saved_itinerary_id: str,
+    locked_slots: List[str],
+) -> dict:
+    email_normalized = _normalize_email(email)
+    now = now_iso()
+    existing = await db.audience_contacts.find_one({"email_normalized": email_normalized}, {"_id": 0})
+
+    if existing:
+        next_marketing_opt_in = bool(existing.get("marketing_opt_in")) or bool(marketing_opt_in)
+        marketing_opt_in_at = existing.get("marketing_opt_in_at")
+        if not marketing_opt_in_at and marketing_opt_in:
+            marketing_opt_in_at = now
+        updated = {
+            **existing,
+            "email": email_normalized,
+            "email_normalized": email_normalized,
+            "marketing_opt_in": next_marketing_opt_in,
+            "marketing_opt_in_at": marketing_opt_in_at,
+            "source": "save_tonights_move",
+            "city_slug": city_slug,
+            "last_vibe": vibe,
+            "last_saved_itinerary_id": saved_itinerary_id,
+            "saved_itinerary_count": int(existing.get("saved_itinerary_count", 0)) + 1,
+            "locked_slots": locked_slots,
+            "last_saved_at": now,
+            "updated_at": now,
+        }
+        await db.audience_contacts.update_one(
+            {"email_normalized": email_normalized},
+            {"$set": {
+                "email": updated["email"],
+                "email_normalized": updated["email_normalized"],
+                "marketing_opt_in": updated["marketing_opt_in"],
+                "marketing_opt_in_at": updated["marketing_opt_in_at"],
+                "source": updated["source"],
+                "city_slug": updated["city_slug"],
+                "last_vibe": updated["last_vibe"],
+                "last_saved_itinerary_id": updated["last_saved_itinerary_id"],
+                "saved_itinerary_count": updated["saved_itinerary_count"],
+                "locked_slots": updated["locked_slots"],
+                "last_saved_at": updated["last_saved_at"],
+                "updated_at": updated["updated_at"],
+            }},
+        )
+        return updated
+
+    created = {
+        "id": str(uuid.uuid4()),
+        "email": email_normalized,
+        "email_normalized": email_normalized,
+        "marketing_opt_in": bool(marketing_opt_in),
+        "marketing_opt_in_at": now if marketing_opt_in else None,
+        "source": "save_tonights_move",
+        "city_slug": city_slug,
+        "first_vibe": vibe,
+        "last_vibe": vibe,
+        "first_saved_itinerary_id": saved_itinerary_id,
+        "last_saved_itinerary_id": saved_itinerary_id,
+        "saved_itinerary_count": 1,
+        "locked_slots": locked_slots,
+        "last_saved_at": now,
+        "created_at": now,
+        "updated_at": now,
+        "unsubscribed_at": None,
+    }
+    await db.audience_contacts.insert_one(created)
+    return created
+
+
 def _email_delivery_result() -> dict:
     resend_api_key = os.environ.get("RESEND_API_KEY", "").strip()
     resend_from_email = os.environ.get("RESEND_FROM_EMAIL", "").strip()
@@ -1418,6 +1500,7 @@ async def save_itinerary(payload: SaveItineraryRequest, request: Request):
         "city_slug": payload.city_slug,
         "vibe": payload.vibe,
         "email": email,
+        "marketing_opt_in": bool(payload.marketing_opt_in),
         "steps": safe_steps,
         "locked_slots": safe_locked_slots,
         "delivery_channel": "email",
@@ -1429,6 +1512,14 @@ async def save_itinerary(payload: SaveItineraryRequest, request: Request):
         "sent_at": delivery["sent_at"],
     }
     await db.saved_itineraries.insert_one(doc)
+    await _upsert_audience_contact(
+        email=email,
+        city_slug=doc["city_slug"],
+        vibe=doc["vibe"],
+        marketing_opt_in=bool(payload.marketing_opt_in),
+        saved_itinerary_id=doc["id"],
+        locked_slots=safe_locked_slots,
+    )
     saved_step_events = [
         _business_event_doc(
             "saved_itinerary_business",
@@ -1482,6 +1573,65 @@ async def save_itinerary(payload: SaveItineraryRequest, request: Request):
         "email_provider": doc["email_provider"],
         "provider_message_id": doc["provider_message_id"],
         "sent_at": doc["sent_at"],
+    }
+
+
+@api_router.get("/admin/audience")
+async def admin_audience(
+    q: str = "",
+    filter: str = "all",
+    user=Depends(require_admin),
+):
+    if filter not in {"all", "opted_in", "not_opted_in"}:
+        raise HTTPException(status_code=400, detail="Invalid filter")
+
+    query = {}
+    if filter == "opted_in":
+        query["marketing_opt_in"] = True
+    elif filter == "not_opted_in":
+        query["marketing_opt_in"] = {"$ne": True}
+    if q.strip():
+        query["email_normalized"] = {"$regex": re.escape(q.strip().lower())}
+
+    rows = await db.audience_contacts.find(query, {"_id": 0}).sort([("last_saved_at", -1)]).to_list(500)
+    now = datetime.now(timezone.utc)
+    total_contacts = len(rows)
+    marketing_opted_in_contacts = sum(1 for row in rows if row.get("marketing_opt_in"))
+    non_marketing_contacts = total_contacts - marketing_opted_in_contacts
+    total_saved_itineraries = sum(int(row.get("saved_itinerary_count", 0)) for row in rows)
+    recent_cutoff = now - timedelta(days=7)
+    recent_captures = 0
+    for row in rows:
+      saved_at_raw = row.get("last_saved_at")
+      if not saved_at_raw:
+          continue
+      saved_at = datetime.fromisoformat(saved_at_raw)
+      if saved_at.tzinfo is None:
+          saved_at = saved_at.replace(tzinfo=timezone.utc)
+      if saved_at >= recent_cutoff:
+          recent_captures += 1
+    payload_rows = [
+        {
+            "id": row.get("id"),
+            "email": row.get("email", ""),
+            "marketing_opt_in": bool(row.get("marketing_opt_in")),
+            "city_slug": row.get("city_slug", ""),
+            "last_vibe": row.get("last_vibe", ""),
+            "saved_itinerary_count": int(row.get("saved_itinerary_count", 0)),
+            "last_saved_at": row.get("last_saved_at"),
+            "source": row.get("source", "save_tonights_move"),
+        }
+        for row in rows
+    ]
+    return {
+        "totals": {
+            "total_contacts": total_contacts,
+            "marketing_opted_in_contacts": marketing_opted_in_contacts,
+            "non_marketing_contacts": non_marketing_contacts,
+            "total_saved_itineraries": total_saved_itineraries,
+            "recent_captures": recent_captures,
+        },
+        "rows": payload_rows,
     }
 
 
