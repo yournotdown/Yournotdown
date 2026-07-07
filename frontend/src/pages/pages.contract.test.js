@@ -11,7 +11,7 @@ const indexHtmlSource = fs.readFileSync(path.join(__dirname, "..", "..", "public
 const visitorHelperSource = fs.readFileSync(path.join(__dirname, "..", "lib", "visitor.js"), "utf8");
 
 describe("TonightPage source contract", () => {
-  test("Another Night scrolls to the top after a successful reroll", () => {
+  test("Run It Back scrolls to the top after a successful reroll", () => {
     expect(tonightPageSource).toContain("scrollToTopOnSuccess = false");
     expect(tonightPageSource).toContain("scrollToTopOnSuccess: true");
     expect(tonightPageSource).toContain('window.scrollTo({ top: 0, behavior: "smooth" })');

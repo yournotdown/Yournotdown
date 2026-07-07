@@ -416,7 +416,7 @@ export default function TonightPage() {
                   ↺
                 </span>
               )}
-              Another night<span className="lime-dot">.</span>
+              Run It Back<span className="lime-dot">.</span>
             </span>
           </motion.button>
           <div className="mt-3 text-[10px] uppercase tracking-[0.3em] text-white/40">
@@ -632,7 +632,7 @@ function StepCard({ step, idx, total, locked, onLock, onUnlock, onAction, direct
           <>
             <button
               type="button"
-              className="inline-flex items-center gap-2 px-4 py-3 border border-[#C6FF00] bg-[#C6FF00] text-black uppercase text-[10px] tracking-[0.22em] font-bold"
+              className="inline-flex items-center gap-2 px-4 py-3 border border-[#C6FF00] bg-[#C6FF00] text-black uppercase text-[10px] tracking-[0.22em] font-bold shadow-[0_0_18px_rgba(198,255,0,0.12)]"
               data-testid={`tonight-lock-${step.slot}`}
             >
               Locked in
@@ -640,7 +640,7 @@ function StepCard({ step, idx, total, locked, onLock, onUnlock, onAction, direct
             <button
               type="button"
               onClick={() => onUnlock(step.slot)}
-              className="inline-flex items-center gap-2 px-4 py-3 border border-white/20 text-white uppercase text-[10px] tracking-[0.22em] font-bold transition-colors hover:border-[#C6FF00] hover:text-[#C6FF00]"
+              className="inline-flex items-center gap-2 px-4 py-3 border border-white/15 bg-white/[0.03] text-white/82 uppercase text-[10px] tracking-[0.22em] font-bold transition-colors hover:border-white/30 hover:text-white"
               data-testid={`tonight-unlock-${step.slot}`}
             >
               Unlock
@@ -650,7 +650,7 @@ function StepCard({ step, idx, total, locked, onLock, onUnlock, onAction, direct
           <button
             type="button"
             onClick={() => onLock(step)}
-            className="inline-flex items-center gap-2 px-4 py-3 border border-white/20 text-white uppercase text-[10px] tracking-[0.22em] font-bold transition-colors hover:border-[#C6FF00] hover:text-[#C6FF00]"
+            className="inline-flex items-center gap-2 px-4 py-3 border border-[#C6FF00] bg-[#C6FF00] text-black uppercase text-[10px] tracking-[0.22em] font-bold shadow-[0_0_18px_rgba(198,255,0,0.12)] transition-colors hover:bg-white hover:border-white"
             data-testid={`tonight-lock-${step.slot}`}
           >
             Lock this in
@@ -710,7 +710,7 @@ function StepCard({ step, idx, total, locked, onLock, onUnlock, onAction, direct
   );
 }
 
-function ActionBtn({ children, href, target, onClick, testid, icon, primary }) {
+function ActionBtn({ children, href, target, onClick, testid, icon }) {
   return (
     <a
       href={href}
@@ -718,11 +718,7 @@ function ActionBtn({ children, href, target, onClick, testid, icon, primary }) {
       rel={target ? "noopener noreferrer" : undefined}
       onClick={onClick}
       data-testid={testid}
-      className={`inline-flex items-center gap-2 px-4 py-3 border uppercase text-[10px] tracking-[0.22em] font-bold transition-colors active:scale-95 ${
-        primary
-          ? "bg-[#C6FF00] text-black border-[#C6FF00] hover:bg-white hover:border-white"
-          : "border-white/20 text-white hover:border-[#C6FF00] hover:text-[#C6FF00]"
-      }`}
+      className="inline-flex items-center gap-2 px-4 py-3 border border-white/15 bg-white/[0.03] uppercase text-[10px] tracking-[0.22em] font-bold text-white/82 transition-colors active:scale-95 hover:border-white/30 hover:text-white hover:bg-white/[0.06]"
     >
       {icon}
       <span>{children}</span>

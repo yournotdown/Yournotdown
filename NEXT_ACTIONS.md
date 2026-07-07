@@ -1,5 +1,13 @@
 ## Immediate Follow-Up
 
+0. Manually QA the Tonight's Move card CTA hierarchy after the next deploy:
+   - confirm `Lock This In` is visually dominant on unlocked cards
+   - confirm Website, Directions, Call, and Buy Tickets remain usable but clearly secondary
+   - confirm locked cards still show an active lime `Locked in` state with a secondary `Unlock` action
+0. Manually QA the renamed Tonight's Move reroll CTA after the next deploy:
+   - confirm the button now reads `Run it back.`
+   - confirm the reroll behavior is unchanged
+   - confirm any event logging still uses the existing `another_night_click` backend/frontend naming
 0. Manually QA the repaired admin `Audience` tab after the next deploy:
    - confirm the tab no longer blanks when opening Audience
    - confirm a failed `/api/admin/audience` request shows the new inline error state instead of crashing the page

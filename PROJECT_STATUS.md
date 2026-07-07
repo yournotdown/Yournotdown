@@ -6,6 +6,32 @@ The repo is currently on branch `main`. The only known worktree changes outside 
 
 ## Latest Work Session
 
+Latest local Tonight's Move card CTA hierarchy polish:
+- made `Lock This In` the clear primary action on itinerary cards in `frontend/src/pages/TonightPage.jsx`
+- unlocked state:
+  - `Lock This In` is now lime-filled and visually dominant
+  - utility actions like Website, Directions, Call, and Buy Tickets are now subdued secondary pills
+- locked state:
+  - `Locked in` remains lime-filled and visually active
+  - `Unlock` remains available as a secondary control
+- no analytics names, routing, lock/save/email behavior, or itinerary generation logic changed
+- local verification for this styling-only pass:
+  - `cd frontend && npm run build` passed
+  - `cd frontend && CI=true npm test -- --watchAll=false` passed
+
+Latest local Tonight's Move CTA copy tweak:
+- changed the visible Tonight page reroll CTA from `Another night.` to `Run it back.`
+- kept product naming as `Tonight's Move`
+- did not change:
+  - analytics event names such as `another_night_click`
+  - handler/function names
+  - routing
+  - itinerary generation behavior
+  - lock/save/email behavior
+- local verification for this copy-only pass:
+  - `cd frontend && npm run build` passed
+  - `cd frontend && CI=true npm test -- --watchAll=false` passed
+
 Latest local admin audience + sponsor-badge polish fix:
 - fixed a real admin Audience tab blank-screen bug in `frontend/src/pages/AdminDashboardPage.jsx`
 - root cause:
