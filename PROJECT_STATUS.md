@@ -6,6 +6,64 @@ The repo is currently on branch `main`. The only known worktree changes outside 
 
 ## Latest Work Session
 
+Latest local Hotel QR tracking + Audience simplification update:
+- simplified the admin `Audience` tab so the top-line cards now answer the five main questions more directly:
+  - `Email Captures`
+  - `Marketing Opt-ins`
+  - `Saved Moves`
+  - `Returning Visitor Rate`
+  - `Repeat Savers`
+- kept the existing audience search, `All / Marketing opted in / Not opted in` filters, audience table, visitor status badges, and hardened empty/error states
+- added Hotel QR tracking foundation without changing Tonight's Move generation logic:
+  - `frontend/src/lib/qr.js` now captures a `qr` query param, stores `qr_slug` locally, and ensures `hotel_qr_scan` only fires once per session per slug
+  - `frontend/src/lib/api.js` now automatically attaches `qr_slug` to analytics events alongside `visitor_id`
+  - `frontend/src/pages/HomePage.jsx` now detects `?qr=<slug>` on the Nashville landing page, persists it, and fires `hotel_qr_scan`
+  - `frontend/src/pages/TonightPage.jsx` now includes `qr_slug` on `POST /api/itinerary/save`
+  - `backend/server.py` now accepts/stores `qr_slug` on:
+    - `POST /api/analytics/track`
+    - `POST /api/itinerary/save`
+    - `saved_itineraries`
+    - `audience_contacts`
+    - `visitor_profiles`
+- added admin-managed Hotel QR records in `db.hotel_qr_codes` with:
+  - `id`
+  - `name`
+  - `slug`
+  - `city_slug`
+  - `destination_url`
+  - `hotel_name`
+  - `location_label`
+  - `notes`
+  - `active`
+  - `created_at`
+  - `updated_at`
+  - `created_by_user_id`
+- added admin Hotel QR endpoints:
+  - `GET /api/admin/hotel-qr`
+  - `POST /api/admin/hotel-qr`
+  - `PATCH /api/admin/hotel-qr/{id}`
+  - `POST /api/admin/hotel-qr/{id}/deactivate`
+- Hotel QR admin analytics now summarize per slug:
+  - scans
+  - unique visitors
+  - Tonight's Move views
+  - Lock This In clicks
+  - saved moves
+  - email captures
+  - marketing opt-ins
+  - conversion rate from scan to saved move
+- added a new `Hotel QR` admin tab in `frontend/src/pages/AdminDashboardPage.jsx` with:
+  - create form
+  - generated URL list
+  - Copy URL actions
+  - low-risk tracking-first approach without adding QR image generation yet
+- current QR destination format:
+  - `https://www.yournotdown.com/nashville?qr=<qr_slug>`
+- local verification for this Hotel QR + Audience simplification pass:
+  - `python3 -m unittest backend.tests.test_business_owner_contract backend.tests.test_analytics_contract backend.tests.test_saved_itinerary_contract backend.tests.test_locked_steps_contract backend.tests.test_tonight_page_contract backend.tests.test_city_events_filtering_contract backend.tests.test_ticketmaster_events_unit` passed (`110` tests)
+  - `cd frontend && npm run build` passed
+  - `cd frontend && CI=true npm test -- --watchAll=false` passed (`3` suites, `31` tests)
+
 Latest local Tonight's Move card CTA hierarchy polish:
 - made `Lock This In` the clear primary action on itinerary cards in `frontend/src/pages/TonightPage.jsx`
 - unlocked state:

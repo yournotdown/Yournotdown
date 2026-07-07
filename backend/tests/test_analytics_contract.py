@@ -33,6 +33,7 @@ class TestAnalyticsContract(unittest.TestCase):
         source = ast.get_source_segment(SERVER_SOURCE, named_function("track_event"))
         self.assertIn("event.event_type in BUSINESS_SCOPED_EVENT_TYPES", source)
         self.assertIn('"visitor_id": _normalize_visitor_id(event.visitor_id) or None', source)
+        self.assertIn('"qr_slug": _normalize_qr_slug(event.qr_slug) or None', source)
         self.assertIn('"slot": event.slot', source)
         self.assertIn('"event_id": event.event_id', source)
         self.assertIn('"event_source": event.event_source', source)
@@ -51,11 +52,42 @@ class TestAnalyticsContract(unittest.TestCase):
         self.assertIn("if not visitor_id:", source)
         self.assertIn("return None", source)
 
+    def test_visitor_profile_helper_tracks_qr_slug_when_present(self):
+        source = ast.get_source_segment(SERVER_SOURCE, named_function("_upsert_visitor_profile"))
+        self.assertIn('"first_qr_slug": qr_slug or ""', source)
+        self.assertIn('"last_qr_slug": qr_slug or existing.get("last_qr_slug", "")', source)
+
     def test_save_itinerary_writes_saved_business_analytics_events(self):
         source = ast.get_source_segment(SERVER_SOURCE, named_function("save_itinerary"))
         self.assertIn('"saved_itinerary_business"', source)
         self.assertIn('await db.analytics_events.insert_many(saved_step_events)', source)
         self.assertIn('logger.warning("saved_itinerary_business analytics write failed: %s", exc)', source)
+
+    def test_hotel_qr_admin_endpoints_exist_and_require_admin(self):
+        source = SERVER_SOURCE
+        self.assertIn('@api_router.get("/admin/hotel-qr")', source)
+        self.assertIn('@api_router.post("/admin/hotel-qr")', source)
+        self.assertIn('@api_router.patch("/admin/hotel-qr/{qr_id}")', source)
+        self.assertIn('@api_router.post("/admin/hotel-qr/{qr_id}/deactivate")', source)
+        self.assertIn("user=Depends(require_admin)", ast.get_source_segment(SERVER_SOURCE, named_function("admin_create_hotel_qr_code")))
+        self.assertIn("user=Depends(require_admin)", ast.get_source_segment(SERVER_SOURCE, named_function("admin_list_hotel_qr_codes")))
+
+    def test_hotel_qr_slug_generation_and_destination_url_are_safe(self):
+        slug_source = ast.get_source_segment(SERVER_SOURCE, named_function("_slugify_qr_name"))
+        unique_source = ast.get_source_segment(SERVER_SOURCE, named_function("_unique_hotel_qr_slug"))
+        destination_source = ast.get_source_segment(SERVER_SOURCE, named_function("_hotel_qr_destination_url"))
+        self.assertIn("re.sub", slug_source)
+        self.assertIn('candidate = f"{slug}-{suffix}"', unique_source)
+        self.assertIn('return f"{base}/{city_slug}?qr={qr_slug}"', destination_source)
+
+    def test_hotel_qr_analytics_summary_includes_scans_saves_and_lock_clicks(self):
+        source = ast.get_source_segment(SERVER_SOURCE, named_function("admin_list_hotel_qr_codes"))
+        self.assertIn('"hotel_qr_scan"', source)
+        self.assertIn('"step_locked"', source)
+        self.assertIn('"saved_moves": saved_moves', source)
+        self.assertIn('"email_captures": len(stats.get("emails", set()))', source)
+        self.assertIn('"marketing_opt_ins": len(stats.get("marketing_emails", set()))', source)
+        self.assertIn('"conversion_rate": round(saved_moves / scans, 4) if scans else 0', source)
 
     def test_admin_summary_supports_filters_and_leaderboards(self):
         source = ast.get_source_segment(SERVER_SOURCE, named_function("admin_analytics_summary"))

@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Phone, Navigation, Globe, RotateCw, ExternalLink } from "lucide-react";
 import { api, formatEventTime, trackEvent, resolveImageUrl } from "../lib/api";
 import { getVisitorId } from "../lib/visitor";
+import { getCurrentQrSlug } from "../lib/qr";
 import { activeCitySlug, cityPath } from "../lib/cities";
 
 const VIBE_LABELS = {
@@ -195,6 +196,7 @@ export default function TonightPage() {
         email,
         marketing_opt_in: marketingOptIn,
         visitor_id: getVisitorId(),
+        qr_slug: getCurrentQrSlug(),
         city_slug: citySlug,
         vibe,
         source_itinerary_id: itinerary?.id,

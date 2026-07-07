@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import {
   Plus, Pencil, Trash2, Star, ArrowUp, ArrowDown, Upload,
   LogOut, BarChart3, Store, LayoutGrid, Image as ImageIcon, TrendingUp,
-  ClipboardCheck, CheckCircle, XCircle, ExternalLink, Globe, Phone, Navigation, Ticket, Lock, Mail, RotateCw,
+  ClipboardCheck, CheckCircle, XCircle, ExternalLink, Globe, Phone, Navigation, Ticket, Lock, Mail, RotateCw, Building2, Copy,
 } from "lucide-react";
 import { api, resolveImageUrl } from "../lib/api";
 import { Button } from "@/components/ui/button";
@@ -101,6 +101,17 @@ export default function AdminDashboardPage() {
   const [audienceFilters, setAudienceFilters] = useState({
     q: "",
     filter: "all",
+  });
+  const [hotelQrRows, setHotelQrRows] = useState([]);
+  const [hotelQrLoading, setHotelQrLoading] = useState(false);
+  const [hotelQrError, setHotelQrError] = useState("");
+  const [hotelQrSaving, setHotelQrSaving] = useState(false);
+  const [hotelQrForm, setHotelQrForm] = useState({
+    name: "",
+    hotel_name: "",
+    location_label: "",
+    city_slug: "nashville",
+    notes: "",
   });
   const [featuredLiveMusic, setFeaturedLiveMusic] = useState(emptyFeaturedLiveMusic);
   const [tonightMoveSponsorship, setTonightMoveSponsorship] = useState(emptyTonightMoveSponsorship);
@@ -208,6 +219,26 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     if (user) loadAudience();
   }, [user, loadAudience]);
+
+  const loadHotelQr = useCallback(async () => {
+    if (!user) return;
+    setHotelQrLoading(true);
+    setHotelQrError("");
+    try {
+      const response = await api.get("/admin/hotel-qr");
+      setHotelQrRows(Array.isArray(response?.data?.rows) ? response.data.rows : []);
+    } catch (e) {
+      setHotelQrRows([]);
+      setHotelQrError(e?.response?.data?.detail || "Couldn’t load Hotel QR codes right now.");
+      toast.error("Failed to load Hotel QR");
+    } finally {
+      setHotelQrLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (user) loadHotelQr();
+  }, [user, loadHotelQr]);
 
   const loadOwnerAccess = useCallback(async (businessId, fallbackEmail = "") => {
     if (!businessId) {
@@ -448,6 +479,49 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const handleCreateHotelQr = async () => {
+    if (!hotelQrForm.name.trim()) {
+      toast.error("Name is required");
+      return;
+    }
+    setHotelQrSaving(true);
+    try {
+      await api.post("/admin/hotel-qr", hotelQrForm);
+      setHotelQrForm({
+        name: "",
+        hotel_name: "",
+        location_label: "",
+        city_slug: "nashville",
+        notes: "",
+      });
+      await loadHotelQr();
+      toast.success("Hotel QR created");
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Failed to create Hotel QR");
+    } finally {
+      setHotelQrSaving(false);
+    }
+  };
+
+  const handleDeactivateHotelQr = async (qrId) => {
+    try {
+      await api.post(`/admin/hotel-qr/${qrId}/deactivate`);
+      await loadHotelQr();
+      toast.success("Hotel QR deactivated");
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Failed to deactivate Hotel QR");
+    }
+  };
+
+  const handleCopyHotelQrUrl = async (value) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      toast.success("URL copied");
+    } catch (e) {
+      toast.error("Couldn’t copy URL");
+    }
+  };
+
   if (authChecking) {
     return (
       <div className="min-h-screen bg-[#050505] flex items-center justify-center text-[#A1A1AA]">
@@ -498,6 +572,7 @@ export default function AdminDashboardPage() {
             { id: "imports", label: `Import Review${importSummary?.pending ? ` (${importSummary.pending})` : ""}`, icon: ClipboardCheck },
             { id: "analytics", label: "Analytics", icon: BarChart3 },
             { id: "audience", label: "Audience", icon: Mail },
+            { id: "hotel-qr", label: "Hotel QR", icon: Building2 },
           ].map((t) => (
             <button
               key={t.id}
@@ -572,6 +647,19 @@ export default function AdminDashboardPage() {
             audienceError={audienceError}
             filters={audienceFilters}
             onFiltersChange={setAudienceFilters}
+          />
+        )}
+        {tab === "hotel-qr" && (
+          <HotelQrPanel
+            rows={hotelQrRows}
+            loading={hotelQrLoading}
+            error={hotelQrError}
+            form={hotelQrForm}
+            onFormChange={setHotelQrForm}
+            onCreate={handleCreateHotelQr}
+            onDeactivate={handleDeactivateHotelQr}
+            onCopyUrl={handleCopyHotelQrUrl}
+            saving={hotelQrSaving}
           />
         )}
       </div>
@@ -1595,7 +1683,7 @@ function MetricCell({ row, field }) {
   return <span className="text-[#A1A1AA]">{(row?.[field] || 0).toLocaleString()}</span>;
 }
 
-function AnalyticsStatCard({ label, value, icon: Icon, accent = "text-[#C6FF00]" }) {
+function AnalyticsStatCard({ label, value, icon: Icon, accent = "text-[#C6FF00]", helper = "" }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -1609,6 +1697,7 @@ function AnalyticsStatCard({ label, value, icon: Icon, accent = "text-[#C6FF00]"
       <div className="font-display text-4xl font-black mt-4 tracking-tight">
         {(value || 0).toLocaleString()}
       </div>
+      {helper ? <div className="mt-2 text-xs text-[#7C7C87]">{helper}</div> : null}
     </motion.div>
   );
 }
@@ -1988,6 +2077,13 @@ function AnalyticsPanel({ analytics, analyticsLoading, filters, onFiltersChange,
 function AudiencePanel({ audience, audienceLoading, audienceError, filters, onFiltersChange }) {
   const totals = audience?.totals || {};
   const rows = Array.isArray(audience?.rows) ? audience.rows : [];
+  const statCards = [
+    { label: "Email Captures", value: totals.total_contacts || 0, icon: Mail, helper: "Unique emails collected from saved moves." },
+    { label: "Marketing Opt-ins", value: totals.marketing_opted_in_contacts || 0, icon: CheckCircle, helper: "Contacts who asked for occasional Nashville picks." },
+    { label: "Saved Moves", value: totals.total_saved_itineraries || 0, icon: ClipboardCheck, helper: "Total Tonight’s Move saves tied to captured emails." },
+    { label: "Returning Visitor Rate", value: `${(((totals.returning_visitor_rate || 0) * 100)).toFixed(1)}%`, icon: RotateCw, helper: `${(totals.returning_visitors || 0).toLocaleString()} returning visitors from stored visitor IDs.` },
+    { label: "Repeat Savers", value: totals.repeat_savers || 0, icon: TrendingUp, helper: `${(((totals.repeat_saver_rate || 0) * 100)).toFixed(1)}% of captured contacts or visitors saved more than once.` },
+  ];
 
   return (
     <div className="space-y-8" data-testid="admin-audience-panel">
@@ -2027,33 +2123,16 @@ function AudiencePanel({ audience, audienceLoading, audienceError, filters, onFi
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
-        <AnalyticsStatCard label="Total Contacts" value={totals.total_contacts || 0} icon={Mail} />
-        <AnalyticsStatCard label="Marketing Opted In" value={totals.marketing_opted_in_contacts || 0} icon={CheckCircle} />
-        <AnalyticsStatCard label="Non-Marketing" value={totals.non_marketing_contacts || 0} icon={XCircle} accent="text-white" />
-        <AnalyticsStatCard label="Saved Itineraries" value={totals.total_saved_itineraries || 0} icon={ClipboardCheck} />
-        <AnalyticsStatCard label="Recent Captures" value={totals.recent_captures || 0} icon={TrendingUp} />
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <AnalyticsStatCard label="Anonymous Visitors" value={totals.total_anonymous_visitors || 0} icon={Globe} />
-        <AnalyticsStatCard label="New Visitors" value={totals.new_visitors || 0} icon={Plus} accent="text-white" />
-        <AnalyticsStatCard label="Returning Visitors" value={totals.returning_visitors || 0} icon={RotateCw} />
-        <AnalyticsStatCard label="Repeat Savers" value={totals.repeat_savers || 0} icon={TrendingUp} />
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="bg-[#121218] border border-white/10 rounded-3xl p-5">
-          <div className="text-xs uppercase tracking-[0.22em] text-[#A1A1AA] font-bold">Returning Visitor Rate</div>
-          <div className="font-display text-4xl font-black mt-4 tracking-tight">
-            {`${(((totals.returning_visitor_rate || 0) * 100)).toFixed(1)}%`}
-          </div>
-        </div>
-        <div className="bg-[#121218] border border-white/10 rounded-3xl p-5">
-          <div className="text-xs uppercase tracking-[0.22em] text-[#A1A1AA] font-bold">Repeat Saver Rate</div>
-          <div className="font-display text-4xl font-black mt-4 tracking-tight">
-            {`${(((totals.repeat_saver_rate || 0) * 100)).toFixed(1)}%`}
-          </div>
-        </div>
+        {statCards.map((card) => (
+          <AnalyticsStatCard
+            key={card.label}
+            label={card.label}
+            value={card.value}
+            icon={card.icon}
+            helper={card.helper}
+            accent={card.label === "Returning Visitor Rate" ? "text-white" : "text-[#C6FF00]"}
+          />
+        ))}
       </div>
 
       {audienceError ? (
@@ -2068,7 +2147,7 @@ function AudiencePanel({ audience, audienceLoading, audienceError, filters, onFi
             <tr className="text-left text-xs uppercase tracking-wide text-[#A1A1AA]">
               <th className="px-5 py-4">Email</th>
               <th className="px-3 py-4">Visitor</th>
-              <th className="px-3 py-4">Status</th>
+              <th className="px-3 py-4">Marketing</th>
               <th className="px-3 py-4">City</th>
               <th className="px-3 py-4">Last vibe</th>
               <th className="px-3 py-4">Saved count</th>
@@ -2115,6 +2194,185 @@ function AudiencePanel({ audience, audienceLoading, audienceError, filters, onFi
             ))}
           </tbody>
         </table>
+      </div>
+    </div>
+  );
+}
+
+function HotelQrPanel({ rows, loading, error, form, onFormChange, onCreate, onDeactivate, onCopyUrl, saving }) {
+  return (
+    <div className="space-y-8" data-testid="admin-hotel-qr-panel">
+      <div className="flex items-end justify-between gap-4 flex-wrap">
+        <div>
+          <h2 className="font-display text-3xl font-bold">Hotel QR</h2>
+          <p className="text-sm text-[#A1A1AA] mt-1">
+            Create trackable hotel and partner QR destinations for the start of the Nashville flow.
+          </p>
+        </div>
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-[420px,minmax(0,1fr)]">
+        <div className="bg-[#121218] border border-white/10 rounded-3xl p-5 sm:p-6 space-y-4">
+          <div>
+            <h3 className="font-display text-xl font-bold">Create Hotel QR</h3>
+            <p className="mt-1 text-sm text-[#A1A1AA]">Generate a trackable URL for a hotel lobby, front desk, or partner placement.</p>
+          </div>
+          <Field label="Name">
+            <Input
+              value={form.name}
+              onChange={(e) => onFormChange((prev) => ({ ...prev, name: e.target.value }))}
+              placeholder="The Russell Lobby"
+              className="bg-[#1A1A22] border-white/10 text-white"
+              data-testid="hotel-qr-form-name"
+            />
+          </Field>
+          <Field label="Hotel name">
+            <Input
+              value={form.hotel_name}
+              onChange={(e) => onFormChange((prev) => ({ ...prev, hotel_name: e.target.value }))}
+              placeholder="The Russell"
+              className="bg-[#1A1A22] border-white/10 text-white"
+              data-testid="hotel-qr-form-hotel-name"
+            />
+          </Field>
+          <Field label="Location label">
+            <Input
+              value={form.location_label}
+              onChange={(e) => onFormChange((prev) => ({ ...prev, location_label: e.target.value }))}
+              placeholder="Front desk"
+              className="bg-[#1A1A22] border-white/10 text-white"
+              data-testid="hotel-qr-form-location-label"
+            />
+          </Field>
+          <Field label="City">
+            <Select
+              value={form.city_slug}
+              onValueChange={(value) => onFormChange((prev) => ({ ...prev, city_slug: value }))}
+            >
+              <SelectTrigger className="bg-[#1A1A22] border-white/10 text-white" data-testid="hotel-qr-form-city">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-[#121218] border-white/10 text-white">
+                <SelectItem value="nashville" className="focus:bg-white/10 focus:text-white">Nashville</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="Notes">
+            <Textarea
+              value={form.notes}
+              onChange={(e) => onFormChange((prev) => ({ ...prev, notes: e.target.value }))}
+              rows={3}
+              placeholder="Optional partner or placement notes"
+              className="bg-[#1A1A22] border-white/10 text-white"
+              data-testid="hotel-qr-form-notes"
+            />
+          </Field>
+          <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-[#A1A1AA]">
+            URL and tracking go live immediately after create. QR image download can be added in a follow-up pass if needed.
+          </div>
+          <Button
+            onClick={onCreate}
+            disabled={saving}
+            className="w-full bg-[#C6FF00] text-black hover:bg-[#D7FF6B] font-bold"
+            data-testid="hotel-qr-create-button"
+          >
+            {saving ? "Creating…" : "Create Hotel QR"}
+          </Button>
+        </div>
+
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+            <AnalyticsStatCard label="Active QR Codes" value={rows.filter((row) => row.active !== false).length} icon={Building2} helper="Placements currently able to collect hotel traffic." />
+            <AnalyticsStatCard label="QR Scans" value={rows.reduce((sum, row) => sum + (row.analytics?.scans || 0), 0)} icon={Globe} helper="First landing scans tracked from hotel or partner QR links." />
+            <AnalyticsStatCard label="Saved Moves" value={rows.reduce((sum, row) => sum + (row.analytics?.saved_moves || 0), 0)} icon={ClipboardCheck} helper="Saved Tonight’s Move emails attributed to Hotel QR traffic." />
+            <AnalyticsStatCard label="Marketing Opt-ins" value={rows.reduce((sum, row) => sum + (row.analytics?.marketing_opt_ins || 0), 0)} icon={CheckCircle} helper="Captured emails that opted into occasional Nashville picks." />
+          </div>
+
+          {error ? (
+            <div className="rounded-3xl border border-red-400/15 bg-red-500/[0.06] px-5 py-4 text-sm text-red-100" data-testid="admin-hotel-qr-error">
+              {error}
+            </div>
+          ) : null}
+
+          <div className="bg-[#121218] rounded-3xl border border-white/10 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs uppercase tracking-wide text-[#A1A1AA]">
+                  <th className="px-5 py-4">Placement</th>
+                  <th className="px-3 py-4">URL</th>
+                  <th className="px-3 py-4">Scans</th>
+                  <th className="px-3 py-4">Visitors</th>
+                  <th className="px-3 py-4">Tonight Views</th>
+                  <th className="px-3 py-4">Lock Clicks</th>
+                  <th className="px-3 py-4">Saved Moves</th>
+                  <th className="px-3 py-4">Email Captures</th>
+                  <th className="px-3 py-4">Opt-ins</th>
+                  <th className="px-3 py-4">Conversion</th>
+                  <th className="px-5 py-4">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={11} className="px-5 py-12 text-center text-[#A1A1AA]">Loading Hotel QR…</td>
+                  </tr>
+                ) : rows.length === 0 ? (
+                  <tr>
+                    <td colSpan={11} className="px-5 py-12 text-center text-[#A1A1AA]">No Hotel QR codes yet.</td>
+                  </tr>
+                ) : rows.map((row) => (
+                  <tr key={row.id} className="border-t border-white/5" data-testid={`admin-hotel-qr-row-${row.slug}`}>
+                    <td className="px-5 py-4">
+                      <div className="font-medium text-white">{row.name}</div>
+                      <div className="mt-1 text-xs text-[#A1A1AA]">
+                        {[row.hotel_name, row.location_label].filter(Boolean).join(" · ") || "Hotel or partner placement"}
+                      </div>
+                      <div className="mt-2 inline-flex rounded-full border border-white/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-white/60">
+                        {row.active === false ? "Inactive" : "Active"}
+                      </div>
+                    </td>
+                    <td className="px-3 py-4 max-w-[240px]">
+                      <div className="truncate text-[#A1A1AA]">{row.destination_url}</div>
+                    </td>
+                    <td className="px-3 py-4 text-white">{row.analytics?.scans || 0}</td>
+                    <td className="px-3 py-4 text-[#A1A1AA]">{row.analytics?.unique_visitors || 0}</td>
+                    <td className="px-3 py-4 text-[#A1A1AA]">{row.analytics?.tonight_move_views || 0}</td>
+                    <td className="px-3 py-4 text-[#A1A1AA]">{row.analytics?.lock_clicks || 0}</td>
+                    <td className="px-3 py-4 text-white">{row.analytics?.saved_moves || 0}</td>
+                    <td className="px-3 py-4 text-[#A1A1AA]">{row.analytics?.email_captures || 0}</td>
+                    <td className="px-3 py-4 text-[#A1A1AA]">{row.analytics?.marketing_opt_ins || 0}</td>
+                    <td className="px-3 py-4 text-[#A1A1AA]">{`${(((row.analytics?.conversion_rate || 0) * 100)).toFixed(1)}%`}</td>
+                    <td className="px-5 py-4">
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => onCopyUrl(row.destination_url)}
+                          className="border-white/10 bg-[#1A1A22] hover:bg-[#222] text-white"
+                          data-testid={`hotel-qr-copy-${row.slug}`}
+                        >
+                          <Copy className="mr-2 h-3.5 w-3.5" />
+                          Copy URL
+                        </Button>
+                        {row.active !== false ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => onDeactivate(row.id)}
+                            className="border-white/10 bg-transparent text-white/70 hover:bg-white/5 hover:text-white"
+                            data-testid={`hotel-qr-deactivate-${row.slug}`}
+                          >
+                            Deactivate
+                          </Button>
+                        ) : null}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
   );

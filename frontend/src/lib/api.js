@@ -1,5 +1,6 @@
 import axios from "axios";
 import { getVisitorId } from "./visitor";
+import { getCurrentQrSlug } from "./qr";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 export const API = `${BACKEND_URL}/api`;
@@ -17,7 +18,7 @@ export const trackEvent = (event_type, extra = {}) => {
   };
   try {
     api
-      .post("/analytics/track", { event_type, visitor_id: getVisitorId(), ...extra })
+      .post("/analytics/track", { event_type, visitor_id: getVisitorId(), qr_slug: getCurrentQrSlug(), ...extra })
       .catch((err) => warn("[analytics] track failed:", err));
   } catch (e) {
     warn("[analytics] track threw:", e);

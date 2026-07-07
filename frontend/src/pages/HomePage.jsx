@@ -1,20 +1,26 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { trackEvent } from "../lib/api";
 import { activeCitySlug, cityDisplayName, cityPath } from "../lib/cities";
+import { rememberQrSlugFromSearch } from "../lib/qr";
 
 const MARQUEE = "NO BORING NIGHTS";
 
 export default function HomePage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { citySlug: routeCitySlug } = useParams();
   const citySlug = activeCitySlug(routeCitySlug);
   const [crashing, setCrashing] = useState(false);
 
   useEffect(() => {
+    const { qrSlug, shouldTrackScan } = rememberQrSlugFromSearch(location.search);
+    if (shouldTrackScan && qrSlug) {
+      trackEvent("hotel_qr_scan", { city_slug: citySlug, qr_slug: qrSlug });
+    }
     trackEvent("homepage_visit", { city_slug: citySlug });
-  }, [citySlug]);
+  }, [citySlug, location.search]);
 
   const handleClick = () => {
     if (crashing) return;

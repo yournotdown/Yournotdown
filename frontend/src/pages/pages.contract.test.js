@@ -9,6 +9,7 @@ const businessDashboardSource = fs.readFileSync(path.join(__dirname, "BusinessDa
 const appSource = fs.readFileSync(path.join(__dirname, "..", "App.js"), "utf8");
 const indexHtmlSource = fs.readFileSync(path.join(__dirname, "..", "..", "public", "index.html"), "utf8");
 const visitorHelperSource = fs.readFileSync(path.join(__dirname, "..", "lib", "visitor.js"), "utf8");
+const qrHelperSource = fs.readFileSync(path.join(__dirname, "..", "lib", "qr.js"), "utf8");
 
 describe("TonightPage source contract", () => {
   test("Run It Back scrolls to the top after a successful reroll", () => {
@@ -33,6 +34,7 @@ describe("TonightPage source contract", () => {
     expect(tonightPageSource).toContain("We&apos;ll send your saved move either way. Updates are optional.");
     expect(tonightPageSource).toContain("marketing_opt_in: marketingOptIn");
     expect(tonightPageSource).toContain("visitor_id: getVisitorId()");
+    expect(tonightPageSource).toContain("qr_slug: getCurrentQrSlug()");
     expect(tonightPageSource).not.toContain("First name");
     expect(tonightPageSource).not.toContain("Last name");
   });
@@ -84,13 +86,23 @@ describe("AdminDashboardPage source contract", () => {
   test("admin dashboard contains audience labels", () => {
     expect(adminDashboardSource).toContain("Audience");
     expect(adminDashboardSource).toContain("Email captures from Save Tonight&apos;s Move.");
-    expect(adminDashboardSource).toContain("Anonymous Visitors");
-    expect(adminDashboardSource).toContain("New Visitors");
-    expect(adminDashboardSource).toContain("Returning Visitors");
+    expect(adminDashboardSource).toContain("Email Captures");
+    expect(adminDashboardSource).toContain("Marketing Opt-ins");
+    expect(adminDashboardSource).toContain("Saved Moves");
+    expect(adminDashboardSource).toContain("Returning Visitor Rate");
     expect(adminDashboardSource).toContain("Repeat Savers");
-    expect(adminDashboardSource).toContain("Marketing Opted In");
-    expect(adminDashboardSource).toContain("Recent Captures");
+    expect(adminDashboardSource).toContain("returning visitors from stored visitor IDs.");
     expect(adminDashboardSource).toContain("Search by email");
+  });
+
+  test("admin dashboard contains Hotel QR tab and create form labels", () => {
+    expect(adminDashboardSource).toContain('{ id: "hotel-qr", label: "Hotel QR", icon: Building2 }');
+    expect(adminDashboardSource).toContain("Hotel QR");
+    expect(adminDashboardSource).toContain("Create Hotel QR");
+    expect(adminDashboardSource).toContain("Hotel name");
+    expect(adminDashboardSource).toContain("Location label");
+    expect(adminDashboardSource).toContain('data-testid="hotel-qr-form-name"');
+    expect(adminDashboardSource).toContain("Copy URL");
   });
 
   test("audience panel defends against missing data and exposes a clean error state", () => {
@@ -150,5 +162,20 @@ describe("Visitor tracking contract", () => {
   test("api analytics tracking includes visitor ids", () => {
     const apiSource = fs.readFileSync(path.join(__dirname, "..", "lib", "api.js"), "utf8");
     expect(apiSource).toContain('visitor_id: getVisitorId()');
+    expect(apiSource).toContain('qr_slug: getCurrentQrSlug()');
+  });
+
+  test("qr helper detects qr params and persists them", () => {
+    expect(qrHelperSource).toContain('const QR_SLUG_KEY = "ynd_qr_slug"');
+    expect(qrHelperSource).toContain("new URLSearchParams(search || \"\")");
+    expect(qrHelperSource).toContain("params.get(\"qr\")");
+    expect(qrHelperSource).toContain("window.localStorage?.setItem(QR_SLUG_KEY, qrSlug)");
+    expect(qrHelperSource).toContain('window.sessionStorage?.setItem(seenKey, "1")');
+  });
+
+  test("homepage stores qr slug and fires the hotel qr scan event", () => {
+    const homePageSource = fs.readFileSync(path.join(__dirname, "HomePage.jsx"), "utf8");
+    expect(homePageSource).toContain("rememberQrSlugFromSearch(location.search)");
+    expect(homePageSource).toContain('trackEvent("hotel_qr_scan", { city_slug: citySlug, qr_slug: qrSlug })');
   });
 });

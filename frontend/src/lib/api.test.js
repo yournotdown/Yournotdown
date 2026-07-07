@@ -48,6 +48,7 @@ describe("event helpers", () => {
   beforeEach(() => {
     getPostMock().mockClear();
     window.localStorage.clear();
+    window.sessionStorage.clear();
     Object.defineProperty(window, "crypto", {
       value: {
         randomUUID: jest.fn(() => "visitor-123"),
@@ -78,12 +79,14 @@ describe("event helpers", () => {
     ).toEqual([event]);
   });
 
-  test("analytics tracking includes visitor_id", async () => {
+  test("analytics tracking includes visitor_id and qr_slug when present", async () => {
+    window.localStorage.setItem("ynd_qr_slug", "russell-lobby");
     trackEvent("homepage_visit", { city_slug: "nashville" });
     await Promise.resolve();
     expect(getPostMock()).toHaveBeenCalledWith("/analytics/track", {
       event_type: "homepage_visit",
       visitor_id: "visitor-123",
+      qr_slug: "russell-lobby",
       city_slug: "nashville",
     });
   });

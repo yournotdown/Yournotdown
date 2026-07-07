@@ -115,6 +115,7 @@ class TestSavedItineraryContract(unittest.TestCase):
         source = ast.get_source_segment(SERVER_SOURCE, named_function("save_itinerary"))
         self.assertIn('await db.saved_itineraries.insert_one(doc)', source)
         self.assertIn('"visitor_id": visitor_id or None', source)
+        self.assertIn('"qr_slug": qr_slug or None', source)
         self.assertIn('"marketing_opt_in": bool(payload.marketing_opt_in)', source)
         self.assertIn('await _upsert_audience_contact(', source)
         self.assertIn("await _upsert_visitor_profile(", source)
@@ -131,6 +132,9 @@ class TestSavedItineraryContract(unittest.TestCase):
         source = ast.get_source_segment(SERVER_SOURCE, named_function("_upsert_audience_contact"))
         self.assertIn('"email_normalized": email_normalized', source)
         self.assertIn('"visitor_id": visitor_id or existing.get("visitor_id", "")', source)
+        self.assertIn('"last_qr_slug": qr_slug or existing.get("last_qr_slug", "")', source)
+        self.assertIn('if qr_slug and not existing.get("first_qr_slug")', source)
+        self.assertIn('updated["first_qr_slug"] = qr_slug', source)
         self.assertIn('"marketing_opt_in": next_marketing_opt_in', source)
         self.assertIn('"marketing_opt_in_at": marketing_opt_in_at', source)
         self.assertIn('"saved_itinerary_count": int(existing.get("saved_itinerary_count", 0)) + 1', source)
@@ -154,6 +158,11 @@ class TestSavedItineraryContract(unittest.TestCase):
         self.assertIn('"recent_captures"', source)
         self.assertIn('"visitor_status"', source)
         self.assertIn('"rows"', source)
+
+    def test_save_itinerary_links_qr_slug_into_contact_and_visitor_updates(self):
+        source = ast.get_source_segment(SERVER_SOURCE, named_function("save_itinerary"))
+        self.assertIn("qr_slug = _normalize_qr_slug(payload.qr_slug)", source)
+        self.assertIn("qr_slug=qr_slug", source)
 
     def test_invalid_email_is_rejected(self):
         self.assertTrue(VALID_EMAIL("traveler@example.com"))

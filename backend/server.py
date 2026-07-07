@@ -266,6 +266,7 @@ class BulkImportReviewPayload(BaseModel):
 class AnalyticsEvent(BaseModel):
     event_type: str
     visitor_id: Optional[str] = None
+    qr_slug: Optional[str] = None
     business_id: Optional[str] = None
     category_slug: Optional[str] = None
     slot: Optional[str] = None
@@ -355,6 +356,7 @@ class LeadCreate(BaseModel):
 class SaveItineraryRequest(BaseModel):
     email: str
     visitor_id: Optional[str] = None
+    qr_slug: Optional[str] = None
     city_slug: str = "nashville"
     vibe: str = ""
     source_itinerary_id: Optional[str] = None
@@ -369,6 +371,23 @@ class BusinessOwnerInviteCreate(BaseModel):
 
 class BusinessOwnerClaimRequest(BaseModel):
     token: str
+
+
+class HotelQrCodeCreate(BaseModel):
+    name: str
+    city_slug: str = "nashville"
+    hotel_name: str = ""
+    location_label: str = ""
+    notes: str = ""
+
+
+class HotelQrCodeUpdate(BaseModel):
+    name: Optional[str] = None
+    city_slug: Optional[str] = None
+    hotel_name: Optional[str] = None
+    location_label: Optional[str] = None
+    notes: Optional[str] = None
+    active: Optional[bool] = None
 
 
 # ------------- App -------------
@@ -423,6 +442,7 @@ async def _apply_startup_maintenance():
     await db.city_events.create_index([("source", 1), ("external_event_id", 1)], unique=True)
     await db.audience_contacts.create_index("email_normalized", unique=True)
     await db.visitor_profiles.create_index("visitor_id", unique=True)
+    await db.hotel_qr_codes.create_index("slug", unique=True)
 
     # Seed cities
     for c in CITIES:
@@ -899,6 +919,8 @@ def _business_event_doc(
     event_type: str,
     business: Optional[dict],
     *,
+    visitor_id: str = "",
+    qr_slug: str = "",
     slot: str = "",
     category_slug: str = "",
     city_slug: str = "",
@@ -916,7 +938,8 @@ def _business_event_doc(
     return {
         "id": str(uuid.uuid4()),
         "event_type": event_type,
-        "visitor_id": None,
+        "visitor_id": _normalize_visitor_id(visitor_id) or None,
+        "qr_slug": _normalize_qr_slug(qr_slug) or None,
         "business_id": payload_business.get("id"),
         "category_slug": category_slug or payload_business.get("category_slug"),
         "slot": slot,
@@ -955,6 +978,50 @@ def _normalize_visitor_id(value: Optional[str]) -> str:
     return (value or "").strip()
 
 
+def _normalize_qr_slug(value: Optional[str]) -> str:
+    return re.sub(r"[^a-z0-9-]+", "", (value or "").strip().lower())
+
+
+def _slugify_qr_name(value: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", (value or "").strip().lower()).strip("-")
+    return slug or "hotel-qr"
+
+
+async def _unique_hotel_qr_slug(base_slug: str, *, exclude_id: Optional[str] = None) -> str:
+    slug = _slugify_qr_name(base_slug)
+    if exclude_id:
+        existing = await db.hotel_qr_codes.find_one(
+            {"slug": slug, "id": {"$ne": exclude_id}},
+            {"_id": 0, "id": 1},
+        )
+    else:
+        existing = await db.hotel_qr_codes.find_one({"slug": slug}, {"_id": 0, "id": 1})
+    if not existing:
+        return slug
+    suffix = 2
+    while True:
+        candidate = f"{slug}-{suffix}"
+        if exclude_id:
+            existing = await db.hotel_qr_codes.find_one(
+                {"slug": candidate, "id": {"$ne": exclude_id}},
+                {"_id": 0, "id": 1},
+            )
+        else:
+            existing = await db.hotel_qr_codes.find_one({"slug": candidate}, {"_id": 0, "id": 1})
+        if not existing:
+            return candidate
+        suffix += 1
+
+
+def _hotel_qr_destination_url(city_slug: str, qr_slug: str) -> str:
+    base = (
+        os.environ.get("PUBLIC_SITE_URL", "").strip()
+        or os.environ.get("FRONTEND_PUBLIC_URL", "").strip()
+        or "https://www.yournotdown.com"
+    ).rstrip("/")
+    return f"{base}/{city_slug}?qr={qr_slug}"
+
+
 async def _upsert_visitor_profile(
     *,
     visitor_id: str,
@@ -962,6 +1029,7 @@ async def _upsert_visitor_profile(
     vibe: str = "",
     saved_itinerary_id: Optional[str] = None,
     email_normalized: str = "",
+    qr_slug: str = "",
     increment_saved_itinerary: bool = False,
 ) -> Optional[dict]:
     visitor_id = _normalize_visitor_id(visitor_id)
@@ -981,12 +1049,15 @@ async def _upsert_visitor_profile(
             "saved_itinerary_count": int(existing.get("saved_itinerary_count", 0)) + (1 if increment_saved_itinerary else 0),
             "last_saved_itinerary_id": saved_itinerary_id or existing.get("last_saved_itinerary_id"),
             "email_normalized": email_normalized or existing.get("email_normalized", ""),
+            "last_qr_slug": qr_slug or existing.get("last_qr_slug", ""),
             "updated_at": now,
         }
         if increment_saved_itinerary and not existing.get("first_saved_itinerary_id"):
             updated["first_saved_itinerary_id"] = saved_itinerary_id
         if email_normalized and not existing.get("first_email_captured_at"):
             updated["first_email_captured_at"] = now
+        if qr_slug and not existing.get("first_qr_slug"):
+            updated["first_qr_slug"] = qr_slug
         await db.visitor_profiles.update_one(
             {"visitor_id": visitor_id},
             {"$set": {
@@ -997,9 +1068,11 @@ async def _upsert_visitor_profile(
                 "saved_itinerary_count": updated["saved_itinerary_count"],
                 "last_saved_itinerary_id": updated["last_saved_itinerary_id"],
                 "email_normalized": updated["email_normalized"],
+                "last_qr_slug": updated["last_qr_slug"],
                 "updated_at": updated["updated_at"],
                 "first_saved_itinerary_id": updated.get("first_saved_itinerary_id", existing.get("first_saved_itinerary_id")),
                 "first_email_captured_at": updated.get("first_email_captured_at", existing.get("first_email_captured_at")),
+                "first_qr_slug": updated.get("first_qr_slug", existing.get("first_qr_slug")),
             }},
         )
         return updated
@@ -1019,6 +1092,8 @@ async def _upsert_visitor_profile(
         "last_saved_itinerary_id": saved_itinerary_id if increment_saved_itinerary else None,
         "first_email_captured_at": now if email_normalized else None,
         "email_normalized": email_normalized,
+        "first_qr_slug": qr_slug or "",
+        "last_qr_slug": qr_slug or "",
         "created_at": now,
         "updated_at": now,
     }
@@ -1030,6 +1105,7 @@ async def _upsert_audience_contact(
     *,
     email: str,
     visitor_id: str = "",
+    qr_slug: str = "",
     city_slug: str,
     vibe: str,
     marketing_opt_in: bool,
@@ -1050,6 +1126,7 @@ async def _upsert_audience_contact(
             "email": email_normalized,
             "email_normalized": email_normalized,
             "visitor_id": visitor_id or existing.get("visitor_id", ""),
+            "last_qr_slug": qr_slug or existing.get("last_qr_slug", ""),
             "marketing_opt_in": next_marketing_opt_in,
             "marketing_opt_in_at": marketing_opt_in_at,
             "source": "save_tonights_move",
@@ -1061,12 +1138,15 @@ async def _upsert_audience_contact(
             "last_saved_at": now,
             "updated_at": now,
         }
+        if qr_slug and not existing.get("first_qr_slug"):
+            updated["first_qr_slug"] = qr_slug
         await db.audience_contacts.update_one(
             {"email_normalized": email_normalized},
             {"$set": {
                 "email": updated["email"],
                 "email_normalized": updated["email_normalized"],
                 "visitor_id": updated["visitor_id"],
+                "last_qr_slug": updated["last_qr_slug"],
                 "marketing_opt_in": updated["marketing_opt_in"],
                 "marketing_opt_in_at": updated["marketing_opt_in_at"],
                 "source": updated["source"],
@@ -1077,6 +1157,7 @@ async def _upsert_audience_contact(
                 "locked_slots": updated["locked_slots"],
                 "last_saved_at": updated["last_saved_at"],
                 "updated_at": updated["updated_at"],
+                "first_qr_slug": updated.get("first_qr_slug", existing.get("first_qr_slug")),
             }},
         )
         return updated
@@ -1086,6 +1167,8 @@ async def _upsert_audience_contact(
         "email": email_normalized,
         "email_normalized": email_normalized,
         "visitor_id": visitor_id,
+        "first_qr_slug": qr_slug or "",
+        "last_qr_slug": qr_slug or "",
         "marketing_opt_in": bool(marketing_opt_in),
         "marketing_opt_in_at": now if marketing_opt_in else None,
         "source": "save_tonights_move",
@@ -1533,6 +1616,7 @@ async def track_event(event: AnalyticsEvent, request: Request):
         "id": str(uuid.uuid4()),
         "event_type": event.event_type,
         "visitor_id": _normalize_visitor_id(event.visitor_id) or None,
+        "qr_slug": _normalize_qr_slug(event.qr_slug) or None,
         "business_id": event.business_id,
         "category_slug": event.category_slug,
         "slot": event.slot,
@@ -1555,6 +1639,7 @@ async def track_event(event: AnalyticsEvent, request: Request):
     await db.analytics_events.insert_one(doc)
     await _upsert_visitor_profile(
         visitor_id=event.visitor_id or "",
+        qr_slug=_normalize_qr_slug(event.qr_slug),
         city_slug=event.city_slug or "",
         vibe=event.vibe or "",
     )
@@ -1577,6 +1662,7 @@ async def save_itinerary(payload: SaveItineraryRequest, request: Request):
     if not _valid_email(email):
         raise HTTPException(status_code=400, detail="Enter a valid email.")
     visitor_id = _normalize_visitor_id(payload.visitor_id)
+    qr_slug = _normalize_qr_slug(payload.qr_slug)
 
     safe_steps = _safe_saved_itinerary_steps(payload.steps)
     safe_locked_slots = [
@@ -1591,6 +1677,7 @@ async def save_itinerary(payload: SaveItineraryRequest, request: Request):
         "vibe": payload.vibe,
         "email": email,
         "visitor_id": visitor_id or None,
+        "qr_slug": qr_slug or None,
         "marketing_opt_in": bool(payload.marketing_opt_in),
         "steps": safe_steps,
         "locked_slots": safe_locked_slots,
@@ -1606,6 +1693,7 @@ async def save_itinerary(payload: SaveItineraryRequest, request: Request):
     await _upsert_audience_contact(
         email=email,
         visitor_id=visitor_id,
+        qr_slug=qr_slug,
         city_slug=doc["city_slug"],
         vibe=doc["vibe"],
         marketing_opt_in=bool(payload.marketing_opt_in),
@@ -1614,6 +1702,7 @@ async def save_itinerary(payload: SaveItineraryRequest, request: Request):
     )
     await _upsert_visitor_profile(
         visitor_id=visitor_id,
+        qr_slug=qr_slug,
         city_slug=doc["city_slug"],
         vibe=doc["vibe"],
         saved_itinerary_id=doc["id"],
@@ -1624,6 +1713,8 @@ async def save_itinerary(payload: SaveItineraryRequest, request: Request):
         _business_event_doc(
             "saved_itinerary_business",
             step.get("business"),
+            visitor_id=visitor_id,
+            qr_slug=qr_slug,
             slot=step.get("slot", ""),
             category_slug=(step.get("business") or {}).get("category_slug", ""),
             city_slug=doc["city_slug"],
@@ -1774,6 +1865,137 @@ async def admin_audience(
         },
         "rows": payload_rows,
     }
+
+
+@api_router.get("/admin/hotel-qr")
+async def admin_list_hotel_qr_codes(user=Depends(require_admin)):
+    rows = await db.hotel_qr_codes.find({}, {"_id": 0}).sort([("created_at", -1)]).to_list(1000)
+    slugs = [row.get("slug") for row in rows if row.get("slug")]
+    analytics_docs = []
+    saved_docs = []
+    if slugs:
+        analytics_docs = await db.analytics_events.find(
+            {"qr_slug": {"$in": slugs}},
+            {"_id": 0, "qr_slug": 1, "event_type": 1, "visitor_id": 1},
+        ).to_list(20000)
+        saved_docs = await db.saved_itineraries.find(
+            {"qr_slug": {"$in": slugs}},
+            {"_id": 0, "qr_slug": 1, "email": 1, "marketing_opt_in": 1},
+        ).to_list(10000)
+
+    analytics_by_slug: Dict[str, dict] = {}
+    for slug in slugs:
+        analytics_by_slug[slug] = {
+            "scans": 0,
+            "visitor_ids": set(),
+            "tonight_move_views": 0,
+            "lock_clicks": 0,
+            "saved_moves": 0,
+            "emails": set(),
+            "marketing_emails": set(),
+        }
+
+    for doc in analytics_docs:
+        slug = doc.get("qr_slug")
+        if slug not in analytics_by_slug:
+            continue
+        bucket = analytics_by_slug[slug]
+        if doc.get("event_type") == "hotel_qr_scan":
+            bucket["scans"] += 1
+        if doc.get("event_type") == "itinerary_view":
+            bucket["tonight_move_views"] += 1
+        if doc.get("event_type") == "step_locked":
+            bucket["lock_clicks"] += 1
+        if doc.get("visitor_id"):
+            bucket["visitor_ids"].add(doc["visitor_id"])
+
+    for doc in saved_docs:
+        slug = doc.get("qr_slug")
+        if slug not in analytics_by_slug:
+            continue
+        bucket = analytics_by_slug[slug]
+        bucket["saved_moves"] += 1
+        if doc.get("email"):
+            bucket["emails"].add(doc["email"])
+            if doc.get("marketing_opt_in"):
+                bucket["marketing_emails"].add(doc["email"])
+
+    payload_rows = []
+    for row in rows:
+        stats = analytics_by_slug.get(row.get("slug"), {})
+        scans = stats.get("scans", 0)
+        saved_moves = stats.get("saved_moves", 0)
+        payload_rows.append({
+            **row,
+            "analytics": {
+                "scans": scans,
+                "unique_visitors": len(stats.get("visitor_ids", set())),
+                "tonight_move_views": stats.get("tonight_move_views", 0),
+                "lock_clicks": stats.get("lock_clicks", 0),
+                "saved_moves": saved_moves,
+                "email_captures": len(stats.get("emails", set())),
+                "marketing_opt_ins": len(stats.get("marketing_emails", set())),
+                "conversion_rate": round(saved_moves / scans, 4) if scans else 0,
+            },
+        })
+    return {"rows": payload_rows}
+
+
+@api_router.post("/admin/hotel-qr")
+async def admin_create_hotel_qr_code(body: HotelQrCodeCreate, user=Depends(require_admin)):
+    if not body.name.strip():
+        raise HTTPException(status_code=400, detail="Name is required")
+    slug = await _unique_hotel_qr_slug(body.name)
+    now = now_iso()
+    doc = {
+        "id": str(uuid.uuid4()),
+        "name": body.name.strip(),
+        "slug": slug,
+        "city_slug": body.city_slug or "nashville",
+        "destination_url": _hotel_qr_destination_url(body.city_slug or "nashville", slug),
+        "hotel_name": body.hotel_name.strip(),
+        "location_label": body.location_label.strip(),
+        "notes": body.notes.strip(),
+        "active": True,
+        "created_at": now,
+        "updated_at": now,
+        "created_by_user_id": user["user_id"],
+    }
+    await db.hotel_qr_codes.insert_one(doc)
+    return doc
+
+
+@api_router.patch("/admin/hotel-qr/{qr_id}")
+async def admin_update_hotel_qr_code(qr_id: str, body: HotelQrCodeUpdate, user=Depends(require_admin)):
+    existing = await db.hotel_qr_codes.find_one({"id": qr_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Hotel QR not found")
+    update = {k: v for k, v in body.model_dump().items() if v is not None}
+    if "name" in update:
+        update["name"] = update["name"].strip()
+        if not update["name"]:
+            raise HTTPException(status_code=400, detail="Name is required")
+        update["slug"] = await _unique_hotel_qr_slug(update["name"], exclude_id=qr_id)
+    for key in ("hotel_name", "location_label", "notes"):
+        if key in update:
+            update[key] = (update[key] or "").strip()
+    city_slug = update.get("city_slug", existing.get("city_slug", "nashville"))
+    slug = update.get("slug", existing.get("slug"))
+    update["destination_url"] = _hotel_qr_destination_url(city_slug, slug)
+    update["updated_at"] = now_iso()
+    await db.hotel_qr_codes.update_one({"id": qr_id}, {"$set": update})
+    return await db.hotel_qr_codes.find_one({"id": qr_id}, {"_id": 0})
+
+
+@api_router.post("/admin/hotel-qr/{qr_id}/deactivate")
+async def admin_deactivate_hotel_qr_code(qr_id: str, user=Depends(require_admin)):
+    result = await db.hotel_qr_codes.update_one(
+        {"id": qr_id},
+        {"$set": {"active": False, "updated_at": now_iso()}},
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Hotel QR not found")
+    return await db.hotel_qr_codes.find_one({"id": qr_id}, {"_id": 0})
 
 
 # ------------- Auth -------------

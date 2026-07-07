@@ -1,5 +1,28 @@
 ## Immediate Follow-Up
 
+0. Manually QA the simplified admin `Audience` tab after the next deploy:
+   - confirm the five main cards read clearly as:
+     - `Email Captures`
+     - `Marketing Opt-ins`
+     - `Saved Moves`
+     - `Returning Visitor Rate`
+     - `Repeat Savers`
+   - confirm the page still handles empty data with a clean `No email captures yet.` state
+   - confirm a failed `/api/admin/audience` response shows the inline error banner instead of crashing the page
+   - confirm the table/search/filter behavior is unchanged
+0. Manually QA the new `Hotel QR` admin tab after the next deploy:
+   - create a QR code such as `The Russell Lobby`
+   - confirm the generated destination URL uses `https://www.yournotdown.com/nashville?qr=<slug>`
+   - confirm `Copy URL` works
+   - confirm deactivate flips the placement inactive without deleting history
+0. Manually QA end-to-end Hotel QR attribution after the next deploy:
+   - open the public site with a real `?qr=<slug>` URL
+   - confirm one `hotel_qr_scan` is recorded for the session
+   - confirm later `homepage_visit`, `vibe_click`, `itinerary_view`, `step_locked`, and `save_itinerary` activity inherit the same `qr_slug`
+   - save a locked move and confirm the Hotel QR row reflects scans, lock clicks, saved moves, email captures, and marketing opt-ins
+0. Decide whether to add QR image preview/download in a later chunk; this pass intentionally shipped the tracking URL + copy + analytics foundation first, without adding a QR rendering dependency.
+0. Decide whether `PATCH /api/admin/hotel-qr/{id}` should keep the slug stable on future metadata edits or intentionally regenerate it when the placement name changes; the current implementation regenerates the slug when `name` changes.
+
 0. Manually QA the Tonight's Move card CTA hierarchy after the next deploy:
    - confirm `Lock This In` is visually dominant on unlocked cards
    - confirm Website, Directions, Call, and Buy Tickets remain usable but clearly secondary
