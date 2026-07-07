@@ -69,8 +69,10 @@ class TestAnalyticsContract(unittest.TestCase):
         self.assertIn('@api_router.post("/admin/hotel-qr")', source)
         self.assertIn('@api_router.patch("/admin/hotel-qr/{qr_id}")', source)
         self.assertIn('@api_router.post("/admin/hotel-qr/{qr_id}/deactivate")', source)
+        self.assertIn('@api_router.delete("/admin/hotel-qr/{qr_id}")', source)
         self.assertIn("user=Depends(require_admin)", ast.get_source_segment(SERVER_SOURCE, named_function("admin_create_hotel_qr_code")))
         self.assertIn("user=Depends(require_admin)", ast.get_source_segment(SERVER_SOURCE, named_function("admin_list_hotel_qr_codes")))
+        self.assertIn("user=Depends(require_admin)", ast.get_source_segment(SERVER_SOURCE, named_function("admin_delete_hotel_qr_code")))
 
     def test_hotel_qr_slug_generation_and_destination_url_are_safe(self):
         slug_source = ast.get_source_segment(SERVER_SOURCE, named_function("_slugify_qr_name"))
@@ -100,10 +102,19 @@ class TestAnalyticsContract(unittest.TestCase):
         create_source = ast.get_source_segment(SERVER_SOURCE, named_function("admin_create_hotel_qr_code"))
         update_source = ast.get_source_segment(SERVER_SOURCE, named_function("admin_update_hotel_qr_code"))
         deactivate_source = ast.get_source_segment(SERVER_SOURCE, named_function("admin_deactivate_hotel_qr_code"))
+        delete_source = ast.get_source_segment(SERVER_SOURCE, named_function("admin_delete_hotel_qr_code"))
         self.assertIn("await db.hotel_qr_codes.insert_one(doc)", create_source)
         self.assertIn("return _hotel_qr_response(doc)", create_source)
         self.assertIn("return _hotel_qr_response(await db.hotel_qr_codes.find_one", update_source)
         self.assertIn("return _hotel_qr_response(await db.hotel_qr_codes.find_one", deactivate_source)
+        self.assertIn('"deleted": _hotel_qr_response(existing)', delete_source)
+
+    def test_hotel_qr_delete_removes_only_config_row_and_handles_missing(self):
+        source = ast.get_source_segment(SERVER_SOURCE, named_function("admin_delete_hotel_qr_code"))
+        self.assertIn('await db.hotel_qr_codes.delete_one({"id": qr_id})', source)
+        self.assertIn('raise HTTPException(status_code=404, detail="Hotel QR not found")', source)
+        self.assertNotIn("analytics_events.delete", source)
+        self.assertNotIn("saved_itineraries.delete", source)
 
     def test_admin_summary_supports_filters_and_leaderboards(self):
         source = ast.get_source_segment(SERVER_SOURCE, named_function("admin_analytics_summary"))

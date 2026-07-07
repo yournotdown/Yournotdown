@@ -104,8 +104,16 @@ describe("AdminDashboardPage source contract", () => {
     expect(adminDashboardSource).toContain('data-testid="hotel-qr-form-name"');
     expect(adminDashboardSource).toContain("Copy URL");
     expect(adminDashboardSource).toContain("Download QR");
+    expect(adminDashboardSource).toContain("Delete");
     expect(adminDashboardSource).toContain("HotelQrCodePreview");
     expect(adminDashboardSource).toContain("QRCode.toDataURL");
+  });
+
+  test("hotel qr delete uses confirmation and calls the delete endpoint", () => {
+    expect(adminDashboardSource).toContain("Delete this Hotel QR? This removes it from the admin list but does not delete historical analytics events.");
+    expect(adminDashboardSource).toContain('.delete(`/admin/hotel-qr/${qrId}`)');
+    expect(adminDashboardSource).toContain("await loadHotelQr()");
+    expect(adminDashboardSource).toContain('data-testid={`hotel-qr-delete-${row.slug}`}');
   });
 
   test("audience panel defends against missing data and exposes a clean error state", () => {

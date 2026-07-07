@@ -43,6 +43,7 @@ Latest local Hotel QR tracking + Audience simplification update:
   - `POST /api/admin/hotel-qr`
   - `PATCH /api/admin/hotel-qr/{id}`
   - `POST /api/admin/hotel-qr/{id}/deactivate`
+  - `DELETE /api/admin/hotel-qr/{id}`
 - Hotel QR admin analytics now summarize per slug:
   - scans
   - unique visitors
@@ -63,6 +64,10 @@ Latest local Hotel QR tracking + Audience simplification update:
   - each row now shows a QR preview
   - each row has a `Download QR` button that saves a PNG
   - no separate backend QR image endpoint was needed
+- added admin delete for Hotel QR config rows:
+  - keeps `Deactivate`
+  - adds `Delete` with confirmation copy explaining that historical analytics are not deleted
+  - delete only removes the `hotel_qr_codes` row and then refreshes the admin list
 - homepage QR attribution still works with the root URL format because:
   - `/` preserves `location.search` when redirecting into the Nashville flow
   - `frontend/src/pages/HomePage.jsx` still captures `?qr=<slug>` on the destination page

@@ -2029,6 +2029,18 @@ async def admin_deactivate_hotel_qr_code(qr_id: str, user=Depends(require_admin)
     return _hotel_qr_response(await db.hotel_qr_codes.find_one({"id": qr_id}, {"_id": 0}))
 
 
+@api_router.delete("/admin/hotel-qr/{qr_id}")
+async def admin_delete_hotel_qr_code(qr_id: str, user=Depends(require_admin)):
+    existing = await db.hotel_qr_codes.find_one({"id": qr_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Hotel QR not found")
+    await db.hotel_qr_codes.delete_one({"id": qr_id})
+    return {
+        "ok": True,
+        "deleted": _hotel_qr_response(existing),
+    }
+
+
 # ------------- Auth -------------
 @api_router.post("/auth/session")
 async def auth_session(request: Request, response: Response):

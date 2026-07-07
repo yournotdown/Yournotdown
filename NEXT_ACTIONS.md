@@ -18,6 +18,7 @@
    - confirm QR previews render
    - confirm `Download QR` saves a usable PNG
    - confirm deactivate flips the placement inactive without deleting history
+   - confirm delete removes the QR from the admin list after confirmation but leaves historical analytics untouched
 0. Manually QA end-to-end Hotel QR attribution after the next deploy:
    - open the public site with a real `?qr=<slug>` URL
    - confirm the root homepage URL redirects into Nashville without losing the `qr` param

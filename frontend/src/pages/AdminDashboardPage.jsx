@@ -514,6 +514,19 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const handleDeleteHotelQr = async (qrId) => {
+    if (!window.confirm("Delete this Hotel QR? This removes it from the admin list but does not delete historical analytics events.")) {
+      return;
+    }
+    try {
+      await api.delete(`/admin/hotel-qr/${qrId}`);
+      await loadHotelQr();
+      toast.success("Hotel QR deleted");
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Failed to delete Hotel QR");
+    }
+  };
+
   const handleCopyHotelQrUrl = async (value) => {
     try {
       await navigator.clipboard.writeText(value);
@@ -659,6 +672,7 @@ export default function AdminDashboardPage() {
             onFormChange={setHotelQrForm}
             onCreate={handleCreateHotelQr}
             onDeactivate={handleDeactivateHotelQr}
+            onDelete={handleDeleteHotelQr}
             onCopyUrl={handleCopyHotelQrUrl}
             saving={hotelQrSaving}
           />
@@ -2200,7 +2214,7 @@ function AudiencePanel({ audience, audienceLoading, audienceError, filters, onFi
   );
 }
 
-function HotelQrPanel({ rows, loading, error, form, onFormChange, onCreate, onDeactivate, onCopyUrl, saving }) {
+function HotelQrPanel({ rows, loading, error, form, onFormChange, onCreate, onDeactivate, onDelete, onCopyUrl, saving }) {
   return (
     <div className="space-y-8" data-testid="admin-hotel-qr-panel">
       <div className="flex items-end justify-between gap-4 flex-wrap">
@@ -2377,6 +2391,16 @@ function HotelQrPanel({ rows, loading, error, form, onFormChange, onCreate, onDe
                             Deactivate
                           </Button>
                         ) : null}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => onDelete(row.id)}
+                          className="border-red-500/20 bg-transparent text-red-200/80 hover:bg-red-500/10 hover:text-red-100"
+                          data-testid={`hotel-qr-delete-${row.slug}`}
+                        >
+                          <Trash2 className="mr-2 h-3.5 w-3.5" />
+                          Delete
+                        </Button>
                       </div>
                     </td>
                   </tr>
