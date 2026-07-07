@@ -1,5 +1,10 @@
 ## Immediate Follow-Up
 
+0. If Blake approves the latest vibe-card typography polish, manually QA the Vibe page after deploy:
+   - confirm `See Where It Goes` and `Make It Count` keep clear spacing between words on mobile and desktop
+   - confirm the cards still feel premium and balanced with the emoji-first layout
+   - confirm no regressions in the two-column card grid or hover/tap behavior
+
 0. If Blake approves the latest vibe-label pass, manually QA the public copy after deploy:
    - confirm the vibe picker shows `Take It Easy`, `See Where It Goes`, `Make It Count`, and `No Regrets`
    - confirm Tonight's Move `Curated for` copy uses the new labels while the URL/query slugs still remain `just-vibing`, `down`, `very-down`, and `send-it`

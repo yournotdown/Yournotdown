@@ -113,7 +113,7 @@ export default function VibePage() {
               </motion.span>
 
               {/* Small caption */}
-              <span className="relative mt-2 font-flyer text-[11px] uppercase tracking-[0.18em] text-white group-hover:text-[#C6FF00] transition-colors text-center leading-tight sm:mt-3 sm:text-sm lg:mt-1.5 lg:text-[0.82rem]">
+              <span className="relative mt-2 max-w-[13ch] text-balance font-flyer text-[12px] uppercase tracking-[0.1em] text-white group-hover:text-[#C6FF00] transition-colors text-center leading-[1.18] sm:mt-3 sm:max-w-[14ch] sm:text-[0.92rem] lg:mt-1.5 lg:max-w-[15ch] lg:text-[0.92rem]">
                 {v.label}
               </span>
             </motion.button>
