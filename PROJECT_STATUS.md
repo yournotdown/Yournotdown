@@ -6,6 +6,20 @@ The repo is currently on branch `main`. The only known worktree changes outside 
 
 ## Latest Work Session
 
+Latest local revoke-flow polish update:
+- tightened the admin-side business-owner access panel so it re-reads the authoritative backend state after invite and revoke instead of trusting stale inline modal state
+- `frontend/src/pages/AdminDashboardPage.jsx` now has a shared `loadOwnerAccess()` helper and:
+  - re-fetches `/api/admin/businesses/{business_id}/owner-access` after sending an invite
+  - re-fetches `/api/admin/businesses/{business_id}/owner-access` immediately after revoke
+  - clears the invite email field after revoke so the panel no longer appears to retain an active/pending owner by mistake
+- backend revoke/summary behavior remains aligned with the prior fix:
+  - `_owner_access_summary()` only returns pending invites and active owners
+  - revoke marks active owners as revoked, revokes pending invites, and revokes active owner sessions
+- local verification for this revoke-flow pass:
+  - `python3 -m unittest backend.tests.test_business_owner_contract backend.tests.test_analytics_contract backend.tests.test_saved_itinerary_contract backend.tests.test_locked_steps_contract backend.tests.test_tonight_page_contract backend.tests.test_city_events_filtering_contract backend.tests.test_ticketmaster_events_unit` passed (`101` tests)
+  - `cd frontend && npm run build` passed
+  - `cd frontend && CI=true npm test -- --watchAll=false` passed (`3` suites, `22` tests)
+
 Latest local owner-access follow-up update:
 - fixed a real revoke-state bug in the business-owner scaffold:
   - `backend/server.py` `_owner_access_summary()` now only returns pending invites and active owners

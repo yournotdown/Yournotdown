@@ -125,6 +125,16 @@ class TestBusinessOwnerContract(unittest.TestCase):
         self.assertIn('"status": "revoked"', source)
         self.assertIn('"revoked_at": revoked_at', source)
 
+    def test_revoke_endpoint_is_idempotent(self):
+        source = ast.get_source_segment(SERVER_SOURCE, named_function("admin_revoke_business_owner_access"))
+        self.assertIn("update_many", source)
+        self.assertNotIn("raise HTTPException(status_code=409", source)
+
+    def test_fresh_invite_can_be_sent_again_after_revoke(self):
+        source = ast.get_source_segment(SERVER_SOURCE, named_function("admin_business_owner_invite"))
+        self.assertIn('{"business_id": business_id, "email": email, "status": "pending"}', source)
+        self.assertIn('await db.business_owner_invites.insert_one(doc)', source)
+
     def test_provider_unconfigured_when_resend_env_missing(self):
         previous = {
             "RESEND_API_KEY": os.environ.get("RESEND_API_KEY"),

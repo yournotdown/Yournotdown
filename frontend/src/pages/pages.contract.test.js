@@ -67,6 +67,7 @@ describe("AdminDashboardPage source contract", () => {
     expect(adminDashboardSource).toContain("Invite Owner");
     expect(adminDashboardSource).toContain("business-owner-invite-send");
     expect(adminDashboardSource).toContain("business-owner-revoke-access");
+    expect(adminDashboardSource).toContain("const loadOwnerAccess = useCallback");
   });
 });
 
@@ -95,6 +96,7 @@ describe("Business owner routes source contract", () => {
 
   test("admin revoke action is immediate and clears the local owner email field", () => {
     expect(adminDashboardSource).toContain('.post(`/admin/businesses/${editing.id}/owner-access/revoke`)');
+    expect(adminDashboardSource).toContain("await loadOwnerAccess(editing.id, \"\")");
     expect(adminDashboardSource).toContain('setOwnerInviteEmail("")');
   });
 });

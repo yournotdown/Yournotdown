@@ -1,5 +1,10 @@
 ## Immediate Follow-Up
 
+0. After the next deploy, verify the admin revoke flow specifically:
+   - owner panel flips to `Portal inactive`
+   - owner email display becomes `—`
+   - invite status becomes `Invite none`
+   - a fresh invite to the same email works again
 0. Before expecting the business-owner portal to work reliably across Safari/mobile browsers, put the backend behind a same-site custom domain such as `api.yournotdown.com`, then point the frontend `REACT_APP_BACKEND_URL` at that domain and re-run the fresh invite QA for `lansingblake@gmail.com`.
 0. After the next owner-access deploy, send a fresh invite to `lansingblake@gmail.com` and confirm:
    - the admin panel clears owner email / pending invite state immediately after revoke

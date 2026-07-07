@@ -176,6 +176,26 @@ export default function AdminDashboardPage() {
     if (user) loadAnalytics();
   }, [user, loadAnalytics]);
 
+  const loadOwnerAccess = useCallback(async (businessId, fallbackEmail = "") => {
+    if (!businessId) {
+      setOwnerAccess(null);
+      setOwnerInviteEmail(fallbackEmail);
+      return null;
+    }
+    setOwnerAccessLoading(true);
+    try {
+      const response = await api.get(`/admin/businesses/${businessId}/owner-access`);
+      setOwnerAccess(response.data);
+      setOwnerInviteEmail(response.data?.invite?.email || response.data?.owner?.email || fallbackEmail);
+      return response.data;
+    } catch (e) {
+      toast.error("Failed to load owner access");
+      throw e;
+    } finally {
+      setOwnerAccessLoading(false);
+    }
+  }, []);
+
   const openCreate = () => {
     setEditing(null);
     setForm({ ...empty, category_slug: categories[0]?.slug || "drinks", order: businesses.length });
@@ -188,17 +208,7 @@ export default function AdminDashboardPage() {
     setEditing(b);
     setForm({ ...empty, ...b });
     setOwnerInviteEmail("");
-    setOwnerAccessLoading(true);
-    api
-      .get(`/admin/businesses/${b.id}/owner-access`)
-      .then((r) => {
-        setOwnerAccess(r.data);
-        setOwnerInviteEmail(r.data?.invite?.email || r.data?.owner?.email || "");
-      })
-      .catch(() => {
-        toast.error("Failed to load owner access");
-      })
-      .finally(() => setOwnerAccessLoading(false));
+    loadOwnerAccess(b.id, "");
     setOpen(true);
   };
 
@@ -374,13 +384,12 @@ export default function AdminDashboardPage() {
     if (!editing?.id) return;
     setOwnerInviteSending(true);
     try {
-      const response = await api.post(`/admin/businesses/${editing.id}/owner-invite`, {
+      await api.post(`/admin/businesses/${editing.id}/owner-invite`, {
         email: ownerInviteEmail,
       });
-      setOwnerAccess(response.data);
-      setOwnerInviteEmail(response.data?.invite?.email || response.data?.owner?.email || "");
+      const refreshed = await loadOwnerAccess(editing.id, ownerInviteEmail);
       toast.success(
-        response.data?.invite?.delivery_status === "provider_unconfigured"
+        refreshed?.invite?.delivery_status === "provider_unconfigured"
           ? "Invite saved, but email sending is not configured."
           : "Owner invite sent"
       );
@@ -395,8 +404,8 @@ export default function AdminDashboardPage() {
     if (!editing?.id) return;
     setOwnerRevoking(true);
     try {
-      const response = await api.post(`/admin/businesses/${editing.id}/owner-access/revoke`);
-      setOwnerAccess(response.data);
+      await api.post(`/admin/businesses/${editing.id}/owner-access/revoke`);
+      await loadOwnerAccess(editing.id, "");
       setOwnerInviteEmail("");
       toast.success("Owner access revoked");
     } catch (e) {
