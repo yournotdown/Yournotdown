@@ -9,8 +9,8 @@ import { activeCitySlug, cityPath } from "../lib/cities";
 
 const VIBE_LABELS = {
   "just-vibing": { emoji: "😇", label: "Take It Easy" },
-  down: { emoji: "😏", label: "Let's See Where This Goes" },
-  "very-down": { emoji: "🔥", label: "Let's Make It Count" },
+  down: { emoji: "😏", label: "See Where It Goes" },
+  "very-down": { emoji: "🔥", label: "Make It Count" },
   "send-it": { emoji: "🚀", label: "No Regrets" },
 };
 

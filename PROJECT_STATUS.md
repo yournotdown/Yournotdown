@@ -6,6 +6,32 @@ The repo is currently on branch `main`. The only known worktree changes outside 
 
 ## Latest Work Session
 
+Latest local vibe label + placard copy update:
+- updated public-facing vibe labels without changing any internal slugs:
+  - `just-vibing` stays `Take It Easy`
+  - `down` now displays as `See Where It Goes`
+  - `very-down` now displays as `Make It Count`
+  - `send-it` stays `No Regrets`
+- updated the public vibe label surfaces in:
+  - `frontend/src/pages/VibePage.jsx`
+  - `frontend/src/pages/TonightPage.jsx` for the `Curated for` label
+  - `backend/saved_itinerary_email.py` for saved-move email copy
+  - `frontend/src/pages/AdminDashboardPage.jsx` for admin vibe filters and vibe displays
+- confirmed the internal vibe slugs, route/query params, analytics event names, and scoring keys remain unchanged
+- searched the repo for an editable hotel QR placard/design source and did not find one
+- added `docs/hotel-qr/placard_copy.md` with the approved placard copy:
+  - `HOW DOWN / ARE YOU?`
+  - `01 TAKE IT EASY`
+  - `02 SEE WHERE IT GOES`
+  - `03 MAKE IT COUNT`
+  - `04 NO REGRETS`
+  - `SCAN TO FIND TONIGHT'S MOVE`
+- updated source and backend contract tests to assert the new public wording and to assert the old `Let's ...` copy is gone from the vibe page
+- local verification for this vibe-copy pass:
+  - `python3 -m unittest backend.tests.test_business_owner_contract backend.tests.test_analytics_contract backend.tests.test_saved_itinerary_contract backend.tests.test_locked_steps_contract backend.tests.test_tonight_page_contract backend.tests.test_city_events_filtering_contract backend.tests.test_ticketmaster_events_unit` passed
+  - `cd frontend && npm run build` passed
+  - `cd frontend && CI=true npm test -- --watchAll=false` passed
+
 Latest local Hotel QR tracking + Audience simplification update:
 - simplified the admin `Audience` tab so the top-line cards now answer the five main questions more directly:
   - `Email Captures`

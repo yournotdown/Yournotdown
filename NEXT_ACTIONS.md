@@ -1,5 +1,12 @@
 ## Immediate Follow-Up
 
+0. If Blake approves the latest vibe-label pass, manually QA the public copy after deploy:
+   - confirm the vibe picker shows `Take It Easy`, `See Where It Goes`, `Make It Count`, and `No Regrets`
+   - confirm Tonight's Move `Curated for` copy uses the new labels while the URL/query slugs still remain `just-vibing`, `down`, `very-down`, and `send-it`
+   - confirm the saved-itinerary email uses `See Where It Goes` / `Make It Count` instead of the old `Let's ...` phrasing
+   - confirm admin vibe filters and vibe tables show the new friendly wording rather than raw slugs
+0. There is still no editable hotel placard design source in the repo; if Blake wants a printable placard next, use `docs/hotel-qr/placard_copy.md` as the approved copy baseline for design work.
+
 0. Manually QA the simplified admin `Audience` tab after the next deploy:
    - confirm the five main cards read clearly as:
      - `Email Captures`

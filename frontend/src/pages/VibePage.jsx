@@ -6,8 +6,8 @@ import { activeCitySlug, cityPath } from "../lib/cities";
 
 const VIBES = [
   { slug: "just-vibing", emoji: "😇", label: "Take It Easy" },
-  { slug: "down", emoji: "😏", label: "Let's See Where This Goes" },
-  { slug: "very-down", emoji: "🔥", label: "Let's Make It Count" },
+  { slug: "down", emoji: "😏", label: "See Where It Goes" },
+  { slug: "very-down", emoji: "🔥", label: "Make It Count" },
   { slug: "send-it", emoji: "🚀", label: "No Regrets" },
 ];
 

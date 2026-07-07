@@ -51,9 +51,20 @@ describe("TonightPage source contract", () => {
 describe("VibePage source contract", () => {
   test("still renders all four vibe options", () => {
     expect(vibePageSource).toContain('{ slug: "just-vibing", emoji: "😇", label: "Take It Easy" }');
-    expect(vibePageSource).toContain('{ slug: "down", emoji: "😏", label: "Let\'s See Where This Goes" }');
-    expect(vibePageSource).toContain('{ slug: "very-down", emoji: "🔥", label: "Let\'s Make It Count" }');
+    expect(vibePageSource).toContain('{ slug: "down", emoji: "😏", label: "See Where It Goes" }');
+    expect(vibePageSource).toContain('{ slug: "very-down", emoji: "🔥", label: "Make It Count" }');
     expect(vibePageSource).toContain('{ slug: "send-it", emoji: "🚀", label: "No Regrets" }');
+    expect(vibePageSource).not.toContain("Let's See Where This Goes");
+    expect(vibePageSource).not.toContain("Let's Make It Count");
+  });
+
+  test("keeps internal vibe slugs and tonight route behavior unchanged", () => {
+    expect(vibePageSource).toContain('slug: "just-vibing"');
+    expect(vibePageSource).toContain('slug: "down"');
+    expect(vibePageSource).toContain('slug: "very-down"');
+    expect(vibePageSource).toContain('slug: "send-it"');
+    expect(vibePageSource).toContain('navigate(`${cityPath(citySlug, "tonight")}?vibe=${vibe.slug}`)');
+    expect(tonightPageSource).toContain('const vibe = searchParams.get("vibe") || "down";');
   });
 
   test("uses compact desktop grid sizing", () => {

@@ -289,7 +289,7 @@ class TestSavedItineraryContract(unittest.TestCase):
         self.assertIn("YOURNOTDOWN", text_body)
         self.assertIn("Tonight's Move", text_body)
         self.assertIn("City: Nashville", text_body)
-        self.assertIn("Vibe: 🔥 Let's Make It Count", text_body)
+        self.assertIn("Vibe: 🔥 Make It Count", text_body)
         self.assertIn("04 LATE NIGHT", text_body)
         self.assertIn("Schulman's", text_body)
         self.assertIn("1201 Porter Rd", text_body)

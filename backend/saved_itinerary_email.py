@@ -7,8 +7,8 @@ from urllib.parse import quote_plus
 
 VIBE_META = {
     "just-vibing": "😇 Take It Easy",
-    "down": "😏 Let's See Where This Goes",
-    "very-down": "🔥 Let's Make It Count",
+    "down": "😏 See Where It Goes",
+    "very-down": "🔥 Make It Count",
     "send-it": "🚀 No Regrets",
 }
 

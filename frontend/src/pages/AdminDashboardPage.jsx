@@ -78,6 +78,17 @@ const ITINERARY_BUCKET_META = {
   late_night: { label: "Late Night", className: "bg-fuchsia-500/10 text-fuchsia-300" },
 };
 
+const VIBE_DISPLAY = {
+  "just-vibing": "Take It Easy",
+  down: "See Where It Goes",
+  "very-down": "Make It Count",
+  "send-it": "No Regrets",
+};
+
+function vibeLabel(slug) {
+  return VIBE_DISPLAY[slug] || slug || "—";
+}
+
 export default function AdminDashboardPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -1865,8 +1876,8 @@ function AnalyticsPanel({ analytics, analyticsLoading, filters, onFiltersChange,
             <SelectContent className="bg-[#121218] border-white/10 text-white">
               <SelectItem value="all" className="focus:bg-white/10 focus:text-white">All vibes</SelectItem>
               <SelectItem value="just-vibing" className="focus:bg-white/10 focus:text-white">Take It Easy</SelectItem>
-              <SelectItem value="down" className="focus:bg-white/10 focus:text-white">Let&apos;s See Where This Goes</SelectItem>
-              <SelectItem value="very-down" className="focus:bg-white/10 focus:text-white">Let&apos;s Make It Count</SelectItem>
+              <SelectItem value="down" className="focus:bg-white/10 focus:text-white">See Where It Goes</SelectItem>
+              <SelectItem value="very-down" className="focus:bg-white/10 focus:text-white">Make It Count</SelectItem>
               <SelectItem value="send-it" className="focus:bg-white/10 focus:text-white">No Regrets</SelectItem>
             </SelectContent>
           </Select>
@@ -2021,7 +2032,7 @@ function AnalyticsPanel({ analytics, analyticsLoading, filters, onFiltersChange,
               ) : (
                 vibeBreakdown.map((row) => (
                   <tr key={row.vibe} className="border-t border-white/5">
-                    <td className="px-5 py-3 font-medium">{row.vibe}</td>
+                    <td className="px-5 py-3 font-medium">{vibeLabel(row.vibe)}</td>
                     <td className="px-3 py-3 text-[#A1A1AA]">{(row.appearances || 0).toLocaleString()}</td>
                     <td className="px-3 py-3 text-[#A1A1AA]">{(row.locked_in || 0).toLocaleString()}</td>
                     <td className="px-3 py-3 text-[#A1A1AA]">{(row.saved_in_final_move || 0).toLocaleString()}</td>
@@ -2201,7 +2212,7 @@ function AudiencePanel({ audience, audienceLoading, audienceError, filters, onFi
                   </span>
                 </td>
                 <td className="px-3 py-4 text-[#A1A1AA]">{row.city_slug || "—"}</td>
-                <td className="px-3 py-4 text-[#A1A1AA]">{row.last_vibe || "—"}</td>
+                <td className="px-3 py-4 text-[#A1A1AA]">{vibeLabel(row.last_vibe)}</td>
                 <td className="px-3 py-4 text-white">{row.saved_itinerary_count || 0}</td>
                 <td className="px-3 py-4 text-[#A1A1AA]">{row.last_saved_at || "—"}</td>
                 <td className="px-5 py-4 text-[#A1A1AA]">{row.source || "—"}</td>
