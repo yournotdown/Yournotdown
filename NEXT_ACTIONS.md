@@ -1,5 +1,25 @@
 ## Immediate Follow-Up
 
+0. If Blake approves the latest production-readiness P0D tooling/docs pass, run the new harness locally first:
+   - `python3 scripts/load_test_ynd.py --target http://localhost:8000 --users 10 --concurrency 10 --duration 60 --ramp-up 10 --city nashville --vibe down`
+   - confirm the script refuses `yournotdown.com` targets unless `--allow-production` is passed
+   - confirm the output includes total requests, success/failure counts, average latency, p95, p99, and grouped endpoint/status errors
+0. Before any production smoke test, use the staged plan in `docs/production/load_test_plan.md`:
+   - local correctness first
+   - non-production/staging traffic ramp next
+   - tiny production smoke only (`1-5` users, `30s`, save disabled) and only with explicit approval
+0. Keep `/api/itinerary/save` disabled for the first production smoke:
+   - avoid unnecessary Resend traffic
+   - avoid testing email volume before the read-heavy path is understood
+   - if save testing is ever enabled later, use a dedicated test inbox only and keep concurrency very low
+0. The new harness intentionally does not cover image bandwidth, browser asset loading, or admin flows:
+   - if launch confidence later requires image-heavy or frontend-render pressure, plan that as a separate controlled pass instead of broadening the first API harness
+0. Use the new load-test tooling only after the already-landed hardening passes are present in the target environment:
+   - P0A Mongo indexes/query hardening
+   - P0B image/bandwidth optimization
+   - P0C admin analytics query hardening
+   - then compare Railway/Mongo metrics stage by stage instead of jumping directly to a 500-user run
+
 0. If Blake approves the latest `Run It Back` repeat-prevention pass, manually QA Tonight’s Move rerolls after deploy:
    - confirm a business seen in `Dinner` does not reappear in `Dinner` during the same page session until the slot pool is exhausted
    - confirm the same rule holds for `Drinks`, `Entertainment` fallback businesses, and `Late Night`

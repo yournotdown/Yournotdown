@@ -6,6 +6,44 @@ The repo is currently on branch `main`. The only known worktree changes outside 
 
 ## Latest Work Session
 
+Latest local production-readiness P0D load-test planning pass:
+- added a production-safe load-test plan in `docs/production/load_test_plan.md`
+- added a lightweight reusable harness in `scripts/load_test_ynd.py`
+- this pass does **not** change app runtime behavior; it is documentation + tooling only
+- the new plan documents:
+  - local-first and staging-first progression
+  - tiny production smoke guidance only
+  - explicit production guardrails around Resend, Ticketmaster sync, admin writes, and destructive endpoints
+  - the public endpoints that are safe to exercise
+  - which exercised endpoints still write to Mongo
+  - Railway/Mongo metrics to watch
+  - staged traffic progression toward a later 500-concurrent test
+- the new script:
+  - defaults to a local target (`http://localhost:8000`) unless a different target or env var is provided
+  - refuses `yournotdown.com` targets unless `--allow-production` is explicitly passed
+  - exercises only the public API path:
+    - `GET /api/health`
+    - `GET /api/businesses`
+    - `POST /api/analytics/track` (`homepage_visit`, `vibe_click`)
+    - `POST /api/itinerary/generate`
+    - optional `POST /api/itinerary/save` only when `--enable-save` is explicitly provided
+  - intentionally leaves save/email testing disabled by default so the harness does not spam Resend
+  - reports:
+    - total requests
+    - success count
+    - failure count
+    - average latency
+    - p95 latency
+    - p99 latency
+    - errors grouped by endpoint/status
+- local verification for this tooling/docs pass:
+  - `python3 -m unittest backend.tests.test_business_owner_contract backend.tests.test_analytics_contract backend.tests.test_saved_itinerary_contract backend.tests.test_locked_steps_contract backend.tests.test_tonight_page_contract backend.tests.test_city_events_filtering_contract backend.tests.test_ticketmaster_events_unit` passed
+  - `cd frontend && npm run build` passed
+  - `cd frontend && CI=true npm test -- --watchAll=false` passed
+- still unverified:
+  - the harness itself has not yet been used for a real staging or production smoke run in this pass
+  - no image/asset load, browser-render load, or save-email load testing is included yet by design
+
 Latest local production-readiness P0C admin-query hardening pass:
 - hardened the admin reporting endpoints identified in `docs/production/production_readiness_audit.md` without changing public user behavior
 - `backend/server.py` now applies safer bounds to the heavy admin analytics surfaces:
