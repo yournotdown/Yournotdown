@@ -24,6 +24,7 @@ from google_places_photos import (
     describe_google_places_request_error,
     fetch_google_places_photo,
     google_places_photo_media_url,
+    normalize_google_places_photo_width,
 )
 from featured_live_music import (
     FEATURED_LIVE_MUSIC_SLOT,
@@ -1636,7 +1637,11 @@ async def list_today_events(city: str = "nashville"):
 
 # ------------- Google Places photos (public proxy) -------------
 @api_router.get("/google-places/photo")
-async def google_places_photo(photo_name: Optional[str] = None, business_id: Optional[str] = None):
+async def google_places_photo(
+    photo_name: Optional[str] = None,
+    business_id: Optional[str] = None,
+    max_width: Optional[int] = None,
+):
     if bool(photo_name) == bool(business_id):
         raise HTTPException(status_code=400, detail="Provide exactly one of photo_name or business_id")
     if photo_name:
@@ -1662,8 +1667,9 @@ async def google_places_photo(photo_name: Optional[str] = None, business_id: Opt
             raise HTTPException(status_code=404, detail="Business has no Google Places photos")
         photo_name = photo_names[0]
     upstream = None
+    safe_max_width = normalize_google_places_photo_width(max_width)
     try:
-        upstream = await run_in_threadpool(fetch_google_places_photo, photo_name)
+        upstream = await run_in_threadpool(fetch_google_places_photo, photo_name, safe_max_width)
         upstream.raise_for_status()
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -1681,7 +1687,7 @@ async def google_places_photo(photo_name: Optional[str] = None, business_id: Opt
     return StreamingResponse(
         upstream.iter_content(chunk_size=64 * 1024),
         media_type=upstream.headers.get("content-type", "image/jpeg"),
-        headers={"Cache-Control": "public, max-age=86400"},
+        headers={"Cache-Control": "public, max-age=604800, stale-while-revalidate=86400"},
         background=BackgroundTask(upstream.close),
     )
 
@@ -1693,7 +1699,11 @@ async def serve_file(path: str):
         data, content_type = get_object(path)
     except requests.HTTPError as e:
         raise HTTPException(status_code=404, detail=f"File not found: {e}")
-    return FastResponse(content=data, media_type=content_type, headers={"Cache-Control": "public, max-age=86400"})
+    return FastResponse(
+        content=data,
+        media_type=content_type,
+        headers={"Cache-Control": "public, max-age=604800, stale-while-revalidate=86400"},
+    )
 
 
 # ------------- Analytics -------------

@@ -11,6 +11,7 @@ import requests
 
 GOOGLE_PLACES_API_URL = "https://places.googleapis.com/v1"
 GOOGLE_PLACES_PHOTO_MAX_WIDTH = 1200
+GOOGLE_PLACES_PHOTO_MIN_WIDTH = 240
 PHOTO_NAME_PATTERN = re.compile(r"^places/[A-Za-z0-9_-]+/photos/[A-Za-z0-9_-]+$")
 
 
@@ -21,14 +22,25 @@ def google_places_photo_media_url(photo_name: str) -> str:
     return f"{GOOGLE_PLACES_API_URL}/{quote(photo_name, safe='/')}/media"
 
 
-def fetch_google_places_photo(photo_name: str):
+def normalize_google_places_photo_width(max_width_px=None) -> int:
+    """Clamp requested Google photo widths to a safe backend-served range."""
+    if max_width_px in (None, ""):
+        return GOOGLE_PLACES_PHOTO_MAX_WIDTH
+    try:
+        width = int(max_width_px)
+    except (TypeError, ValueError):
+        return GOOGLE_PLACES_PHOTO_MAX_WIDTH
+    return max(GOOGLE_PLACES_PHOTO_MIN_WIDTH, min(width, GOOGLE_PLACES_PHOTO_MAX_WIDTH))
+
+
+def fetch_google_places_photo(photo_name: str, max_width_px=None):
     """Fetch a Google Places photo while keeping the API key on the backend."""
     api_key = os.environ.get("GOOGLE_PLACES_API_KEY")
     if not api_key:
         raise RuntimeError("GOOGLE_PLACES_API_KEY is not configured")
     return requests.get(
         google_places_photo_media_url(photo_name),
-        params={"maxWidthPx": GOOGLE_PLACES_PHOTO_MAX_WIDTH, "key": api_key},
+        params={"maxWidthPx": normalize_google_places_photo_width(max_width_px), "key": api_key},
         stream=True,
         timeout=15,
     )

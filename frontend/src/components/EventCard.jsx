@@ -20,6 +20,8 @@ export default function EventCard({ event, index }) {
             alt={event.title}
             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
             loading="lazy"
+            decoding="async"
+            sizes="(min-width: 768px) 768px, 100vw"
           />
         </div>
       )}

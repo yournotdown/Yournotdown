@@ -39,6 +39,12 @@ describe("resolveImageUrl", () => {
       .toBe(`${API}/google-places/photo?photo_name=${encodeURIComponent(photoName)}`);
   });
 
+  test("supports narrower google photo widths for card and admin thumbnails", () => {
+    const photoName = "places/ChIJ_example/photos/reference";
+    expect(resolveImageUrl({ google_photo_names: [photoName] }, { maxWidth: 320 }))
+      .toBe(`${API}/google-places/photo?photo_name=${encodeURIComponent(photoName)}&max_width=320`);
+  });
+
   test("returns an empty string when no image source exists", () => {
     expect(resolveImageUrl({})).toBe("");
   });

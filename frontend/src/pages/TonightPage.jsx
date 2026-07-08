@@ -535,7 +535,7 @@ export default function TonightPage() {
 function StepCard({ step, idx, total, locked, onLock, onUnlock, onAction, directionsUrl }) {
   const b = step.business || {};
   const event = step.event;
-  const imageUrl = resolveImageUrl(b) || event?.image_url;
+  const imageUrl = resolveImageUrl(b, { maxWidth: 960 }) || event?.image_url;
   const sponsored = b.sponsor_tier && b.sponsor_tier !== "none";
   const title = SLOT_TITLES[step.slot] || step.label.toUpperCase();
   const number = String(idx + 1).padStart(2, "0");
@@ -601,6 +601,9 @@ function StepCard({ step, idx, total, locked, onLock, onUnlock, onAction, direct
             alt={b.name}
             className="w-full h-full object-cover grayscale-[12%] hover:grayscale-0 transition-all duration-700"
             loading="lazy"
+            decoding="async"
+            fetchPriority={idx === 0 ? "high" : "low"}
+            sizes="(min-width: 1024px) 960px, 100vw"
           />
         )}
       </div>

@@ -129,6 +129,7 @@ export default function CategoryDetailPage() {
                 <div className="space-y-8">
                   {businesses.map((b, i) => {
                     const eventSchedule = formatEventSchedule(b.event);
+                    const businessImageUrl = resolveImageUrl(b, { maxWidth: 960 });
                     return (
                     <motion.div
                       key={b.id}
@@ -139,12 +140,14 @@ export default function CategoryDetailPage() {
                       data-testid={`business-card-${b.id}`}
                     >
                       <div className="relative w-full h-72 bg-[#1A1A22] overflow-hidden">
-                        {resolveImageUrl(b) && (
+                        {businessImageUrl && (
                           <img
-                            src={resolveImageUrl(b)}
+                            src={businessImageUrl}
                             alt={b.name}
                             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                             loading="lazy"
+                            decoding="async"
+                            sizes="(min-width: 768px) 768px, 100vw"
                           />
                         )}
                         {b.featured && (

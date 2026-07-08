@@ -46,6 +46,13 @@ describe("TonightPage source contract", () => {
     expect(tonightPageSource).toContain("Sponsored by");
     expect(tonightPageSource).toContain("rounded-full border border-[#C6FF00]/20");
   });
+
+  test("tonight images request narrower google photos and lazy-load card media", () => {
+    expect(tonightPageSource).toContain('resolveImageUrl(b, { maxWidth: 960 })');
+    expect(tonightPageSource).toContain('loading="lazy"');
+    expect(tonightPageSource).toContain('decoding="async"');
+    expect(tonightPageSource).toContain('sizes="(min-width: 1024px) 960px, 100vw"');
+  });
 });
 
 describe("VibePage source contract", () => {
@@ -127,6 +134,13 @@ describe("AdminDashboardPage source contract", () => {
     expect(adminDashboardSource).toContain('data-testid={`hotel-qr-delete-${row.slug}`}');
   });
 
+  test("admin business imagery uses lighter previews and lazy loading", () => {
+    expect(adminDashboardSource).toContain('resolveImageUrl(form, { maxWidth: 640 })');
+    expect(adminDashboardSource).toContain('resolveImageUrl(b, { maxWidth: 240 })');
+    expect(adminDashboardSource).toContain('sizes="48px"');
+    expect(adminDashboardSource).toContain('decoding="async"');
+  });
+
   test("audience panel defends against missing data and exposes a clean error state", () => {
     expect(adminDashboardSource).toContain("const [audienceError, setAudienceError] = useState(\"\")");
     expect(adminDashboardSource).toContain("totals: response?.data?.totals || {}");
@@ -204,5 +218,15 @@ describe("Visitor tracking contract", () => {
   test("homepage qr links remain on the root url before redirecting into Nashville", () => {
     const serverSource = fs.readFileSync(path.join(__dirname, "..", "..", "..", "backend", "server.py"), "utf8");
     expect(serverSource).toContain('return f"{base}?qr={qr_slug}"');
+  });
+
+  test("google photo proxy supports bounded widths and longer cache headers", () => {
+    const serverSource = fs.readFileSync(path.join(__dirname, "..", "..", "..", "backend", "server.py"), "utf8");
+    const googlePhotoSource = fs.readFileSync(path.join(__dirname, "..", "..", "..", "backend", "google_places_photos.py"), "utf8");
+    expect(serverSource).toContain("max_width: Optional[int] = None");
+    expect(serverSource).toContain("safe_max_width = normalize_google_places_photo_width(max_width)");
+    expect(serverSource).toContain('"Cache-Control": "public, max-age=604800, stale-while-revalidate=86400"');
+    expect(googlePhotoSource).toContain("normalize_google_places_photo_width");
+    expect(googlePhotoSource).toContain('params={"maxWidthPx": normalize_google_places_photo_width(max_width_px), "key": api_key}');
   });
 });

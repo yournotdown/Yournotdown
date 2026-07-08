@@ -739,9 +739,12 @@ export default function AdminDashboardPage() {
                 {(form.image_path || form.image_url) && (
                   <div className="w-full h-40 rounded-2xl overflow-hidden bg-[#1A1A22]">
                     <img
-                      src={resolveImageUrl(form)}
+                      src={resolveImageUrl(form, { maxWidth: 640 })}
                       alt="preview"
                       className="w-full h-full object-cover"
+                      loading="lazy"
+                      decoding="async"
+                      sizes="640px"
                     />
                   </div>
                 )}
@@ -1604,8 +1607,15 @@ function BusinessesPanel({ businesses, categories, onCreate, onEdit, onDelete, o
               <tr key={b.id} className="border-t border-white/5 hover:bg-white/[0.02]" data-testid={`admin-business-row-${b.id}`}>
                 <td className="px-5 py-3">
                   <div className="w-12 h-12 rounded-xl overflow-hidden bg-[#1A1A22]">
-                    {resolveImageUrl(b) ? (
-                      <img src={resolveImageUrl(b)} alt="" className="w-full h-full object-cover" />
+                    {resolveImageUrl(b, { maxWidth: 240 }) ? (
+                      <img
+                        src={resolveImageUrl(b, { maxWidth: 240 })}
+                        alt=""
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                        decoding="async"
+                        sizes="48px"
+                      />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-white/30">
                         <ImageIcon className="w-5 h-5" />
@@ -2463,7 +2473,7 @@ function HotelQrCodePreview({ url, slug }) {
 
   return (
     <div className="rounded-2xl border border-white/10 bg-black p-2" data-testid={`hotel-qr-preview-${slug}`}>
-      <img src={dataUrl} alt={`QR for ${slug}`} className="h-20 w-20 rounded-lg" />
+      <img src={dataUrl} alt={`QR for ${slug}`} className="h-20 w-20 rounded-lg" loading="lazy" decoding="async" />
     </div>
   );
 }

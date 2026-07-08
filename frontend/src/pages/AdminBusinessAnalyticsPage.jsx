@@ -58,6 +58,7 @@ export default function AdminBusinessAnalyticsPage() {
   }
 
   const b = data.business;
+  const businessImageUrl = resolveImageUrl(b, { maxWidth: 720 });
   const totals = data.totals;
   const ctr =
     totals.business_appearance > 0
@@ -90,8 +91,15 @@ export default function AdminBusinessAnalyticsPage() {
         >
           <div className="flex flex-col md:flex-row">
             <div className="w-full md:w-72 h-56 md:h-auto bg-[#1A1A22] relative shrink-0">
-              {resolveImageUrl(b) ? (
-                <img src={resolveImageUrl(b)} alt={b.name} className="w-full h-full object-cover" />
+              {businessImageUrl ? (
+                <img
+                  src={businessImageUrl}
+                  alt={b.name}
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                  decoding="async"
+                  sizes="(min-width: 768px) 288px, 100vw"
+                />
               ) : null}
               {b.featured && (
                 <div className="absolute top-4 left-4 px-3 py-1.5 bg-[#7C3AED] text-white text-xs font-bold rounded-full flex items-center gap-1.5">

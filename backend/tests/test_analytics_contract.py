@@ -121,6 +121,15 @@ class TestAnalyticsContract(unittest.TestCase):
         self.assertIn("return _hotel_qr_response(await db.hotel_qr_codes.find_one", deactivate_source)
         self.assertIn('"deleted": _hotel_qr_response(existing)', delete_source)
 
+    def test_image_endpoints_use_bounded_google_widths_and_longer_cache_headers(self):
+        photo_source = ast.get_source_segment(SERVER_SOURCE, named_function("google_places_photo"))
+        files_source = ast.get_source_segment(SERVER_SOURCE, named_function("serve_file"))
+        self.assertIn("max_width: Optional[int] = None", photo_source)
+        self.assertIn("safe_max_width = normalize_google_places_photo_width(max_width)", photo_source)
+        self.assertIn('await run_in_threadpool(fetch_google_places_photo, photo_name, safe_max_width)', photo_source)
+        self.assertIn('"Cache-Control": "public, max-age=604800, stale-while-revalidate=86400"', photo_source)
+        self.assertIn('"Cache-Control": "public, max-age=604800, stale-while-revalidate=86400"', files_source)
+
     def test_duplicate_risk_indexes_remain_non_unique_except_existing_safe_keys(self):
         source = ast.get_source_segment(SERVER_SOURCE, named_function("_apply_startup_maintenance"))
         self.assertIn('await db.audience_contacts.create_index("email_normalized", unique=True)', source)

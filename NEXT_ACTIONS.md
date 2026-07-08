@@ -1,5 +1,23 @@
 ## Immediate Follow-Up
 
+0. If Blake approves the latest production-readiness P0B pass, manually QA image delivery after deploy:
+   - inspect a real Tonight’s Move session in DevTools and confirm Google-photo requests now carry bounded `max_width` values instead of always using the default full-size proxy path
+   - verify the first Tonight image still looks sharp enough while lower-priority/admin thumbnails request visibly smaller image payloads
+   - confirm no regressions in business-photo rendering on Tonight, category detail, admin business list, and per-business analytics pages
+0. Confirm the new longer cache headers are actually honored in the production path for:
+   - `/api/google-places/photo`
+   - `/api/files/{path}`
+   - if Railway or any edge layer ignores them, the next infra step should be a dedicated CDN/front-cache decision rather than more frontend tweaks
+0. P0B reduced bandwidth pressure, but it did not remove Railway from the image path:
+   - Google Places images still proxy through the backend because the key must stay server-side
+   - uploaded object-storage images still proxy through `/api/files`
+   - if launch monitoring shows image traffic is still the primary bottleneck, the next deeper follow-up is CDN/direct-public-asset work rather than more card-level styling changes
+0. Before claiming 500-user readiness, include image-heavy traffic in the future controlled load test:
+   - Tonight page with 4 business images
+   - category detail cards
+   - a small admin image mix
+   - capture Railway outbound bandwidth plus request concurrency, not just API latency
+
 0. If Blake approves the latest production-readiness P0A pass, manually inspect Mongo/railway behavior after deploy:
    - confirm startup maintenance completes instead of deferring
    - confirm no index-creation error appears for any newly indexed collection

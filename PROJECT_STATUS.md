@@ -6,6 +6,39 @@ The repo is currently on branch `main`. The only known worktree changes outside 
 
 ## Latest Work Session
 
+Latest local production-readiness P0B image/bandwidth hardening pass:
+- audited the current image flow and confirmed two distinct paths:
+  - uploaded admin-managed business images still resolve through `/api/files/{path}`
+  - Google Places business photos still resolve through `/api/google-places/photo?...`
+  - plain external `image_url` values already load directly in the browser without Railway proxying the image bytes
+- kept the Google Places backend proxy in place because it is still needed to avoid exposing the backend-only `GOOGLE_PLACES_API_KEY`
+- reduced the bandwidth cost of proxied Google photos by making the frontend request smaller widths per surface instead of always taking the default full card width:
+  - Tonight cards now request Google photos at `max_width=960`
+  - category detail venue cards now request `max_width=960`
+  - admin business list thumbnails now request `max_width=240`
+  - admin business form previews now request `max_width=640`
+  - admin business analytics header image now requests `max_width=720`
+- added safe backend width clamping in `backend/google_places_photos.py` and `backend/server.py` so Google photo requests stay within a bounded backend-served range instead of accepting arbitrary widths
+- strengthened cache headers on backend-served public image endpoints:
+  - `/api/google-places/photo`
+  - `/api/files/{path:path}`
+  - both now return `Cache-Control: public, max-age=604800, stale-while-revalidate=86400`
+- hardened the frontend image elements on the image-heavy surfaces without changing UX:
+  - `loading="lazy"` added where it was still missing on admin/business surfaces
+  - `decoding="async"` added to public/admin card imagery
+  - `sizes="..."` hints added on Tonight, category detail, event, and admin imagery so the browser has better information for responsive loading
+  - Tonight’s Move layout and business-photo fallback behavior remain unchanged
+- important current architecture note:
+  - Railway is still proxying Google Places image bytes and uploaded object-storage image bytes for `/api/google-places/photo` and `/api/files`
+  - this pass reduces bandwidth pressure and improves cacheability, but it does **not** eliminate Railway from the image path yet
+- local verification for this hardening pass:
+  - `python3 -m unittest backend.tests.test_business_owner_contract backend.tests.test_analytics_contract backend.tests.test_saved_itinerary_contract backend.tests.test_locked_steps_contract backend.tests.test_tonight_page_contract backend.tests.test_city_events_filtering_contract backend.tests.test_ticketmaster_events_unit` passed (`116` tests)
+  - `cd frontend && npm run build` passed
+  - `cd frontend && CI=true npm test -- --watchAll=false` passed (`3` suites, `38` tests)
+- still unverified:
+  - no browser DevTools/network capture was run yet to confirm the real image payload savings on production-like data
+  - no CDN/front-proxy caching behavior was tested; current gains rely on browser/cache-header behavior plus smaller requested Google photo widths
+
 Latest local production-readiness P0A hardening pass:
 - implemented the first backend-only follow-up from `docs/production/production_readiness_audit.md`: Mongo index coverage and hot-path query hardening in `backend/server.py`
 - expanded startup-managed index creation across the collections most likely to sit on the launch hot path:
