@@ -6,6 +6,38 @@ The repo is currently on branch `main`. The only known worktree changes outside 
 
 ## Latest Work Session
 
+Latest local Tonight's Move reroll repetition hardening pass:
+- fixed the same-session `Run It Back` repetition issue where a normal business could reappear in the same slot after only a few rerolls
+- `frontend/src/pages/TonightPage.jsx` now keeps slot-specific seen business history for the current page session via `seenIdsBySlot`
+- every successful itinerary now adds the selected business id for each slot into that slot’s seen set:
+  - `dinner`
+  - `drinks`
+  - `entertainment` fallback businesses
+  - `late-night`
+- `Run It Back` now sends `exclude_ids_by_slot` for unlocked slots only, instead of relying on the old flat reroll exclusion behavior
+- locked cards are still preserved and not rerolled
+- backend `backend/server.py` now accepts `exclude_ids_by_slot` on `ItineraryRequest`
+- itinerary generation now applies slot-specific history filtering after normal hard excludes are determined:
+  - hard excludes stay in place for duplicate prevention inside the current itinerary
+  - sponsor weighting still applies only after the eligible unseen pool is determined
+  - if a slot exhausts its unseen history pool, backend relaxes only that slot-history exclusion and still avoids duplicates within the same itinerary
+- Ticketmaster behavior was intentionally preserved:
+  - first load still requests `ticketmaster_preferred`
+  - every fourth `Run It Back` still requests `ticketmaster`
+  - Ticketmaster event-id rotation behavior is unchanged
+  - this session-repeat fix only targets business-id repetition by slot
+- updated source-contract coverage for:
+  - frontend reroll request shape
+  - backend slot-history exclusion support
+  - city-event itinerary generation contract expectations
+- local verification for this reroll pass:
+  - `python3 -m unittest backend.tests.test_business_owner_contract backend.tests.test_analytics_contract backend.tests.test_saved_itinerary_contract backend.tests.test_locked_steps_contract backend.tests.test_tonight_page_contract backend.tests.test_city_events_filtering_contract backend.tests.test_ticketmaster_events_unit` passed (`118` tests)
+  - `cd frontend && npm run build` passed
+  - `cd frontend && CI=true npm test -- --watchAll=false` passed (`3` suites, `38` tests)
+- still unverified:
+  - no browser/manual QA was run yet to confirm a long `Run It Back` streak behaves well across all four slots
+  - no production-like test has yet verified how quickly each slot falls back once a real slot pool is exhausted
+
 Latest local production-readiness P0B image/bandwidth hardening pass:
 - audited the current image flow and confirmed two distinct paths:
   - uploaded admin-managed business images still resolve through `/api/files/{path}`

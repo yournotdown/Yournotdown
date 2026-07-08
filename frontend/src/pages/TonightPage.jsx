@@ -23,6 +23,19 @@ const SLOT_TITLES = {
 
 const MARQUEE = "WHAT'S NEXT";
 
+function mergeSeenIdsBySlot(previous, steps = []) {
+  const next = { ...previous };
+  (steps || []).forEach((step) => {
+    const slot = step?.slot;
+    const businessId = step?.business?.id;
+    if (!slot || !businessId) return;
+    const existing = new Set(next[slot] || []);
+    existing.add(businessId);
+    next[slot] = Array.from(existing);
+  });
+  return next;
+}
+
 export default function TonightPage() {
   const navigate = useNavigate();
   const { citySlug: routeCitySlug } = useParams();
@@ -34,7 +47,7 @@ export default function TonightPage() {
   const [itinerary, setItinerary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [seenIds, setSeenIds] = useState([]);
+  const [seenIdsBySlot, setSeenIdsBySlot] = useState({});
   const [refreshCount, setRefreshCount] = useState(0);
   const [lastTicketmasterEventIds, setLastTicketmasterEventIds] = useState([]);
   const [lockedSteps, setLockedSteps] = useState({});
@@ -54,6 +67,7 @@ export default function TonightPage() {
   const generate = useCallback(
     async ({
       excludeIds = [],
+      excludeIdsBySlot = {},
       excludeEventIds = [],
       liveMusicEventMode = "normal",
       lockedStepsBySlot = {},
@@ -65,6 +79,7 @@ export default function TonightPage() {
           vibe,
           city: citySlug,
           exclude_ids: excludeIds,
+          exclude_ids_by_slot: excludeIdsBySlot,
           exclude_event_ids: excludeEventIds,
           live_music_event_mode: liveMusicEventMode,
           locked_steps: lockedStepsBySlot,
@@ -79,15 +94,11 @@ export default function TonightPage() {
           }
         });
         setLockedSteps(nextLockedSteps);
-        const newIds = r.data.steps
-          .filter((step) => !lockedSlots.has(step.slot))
-          .map((s) => s.business?.id)
-          .filter(Boolean);
+        setSeenIdsBySlot((prev) => mergeSeenIdsBySlot(prev, r.data.steps));
         const liveMusicStep = r.data.steps.find((step) => step.slot === "entertainment");
         const liveMusicEvent = liveMusicStep?.event;
         const liveMusicEventId = liveMusicEvent?.external_event_id || liveMusicEvent?.id;
         const entertainmentLocked = lockedSlots.has("entertainment");
-        setSeenIds(newIds);
         if (!entertainmentLocked && liveMusicEvent?.source === "ticketmaster" && liveMusicEventId) {
           setLastTicketmasterEventIds([liveMusicEventId]);
         } else if (!entertainmentLocked && liveMusicEventMode === "ticketmaster") {
@@ -110,7 +121,7 @@ export default function TonightPage() {
 
   useEffect(() => {
     setLoading(true);
-    setSeenIds([]);
+    setSeenIdsBySlot({});
     setRefreshCount(0);
     setLastTicketmasterEventIds([]);
     setLockedSteps({});
@@ -141,13 +152,14 @@ export default function TonightPage() {
     trackEvent("another_night_click", { vibe, city_slug: citySlug });
     const nextRefreshCount = refreshCount + 1;
     const liveMusicEventMode = nextRefreshCount % 4 === 0 ? "ticketmaster" : "normal";
-    const unlockedCurrentIds = (itinerary?.steps || [])
-      .filter((step) => !lockedSteps[step.slot])
-      .map((step) => step.business?.id)
-      .filter(Boolean);
+    const excludeIdsBySlot = Object.fromEntries(
+      (itinerary?.steps || [])
+        .filter((step) => !lockedSteps[step.slot] && step?.slot)
+        .map((step) => [step.slot, seenIdsBySlot[step.slot] || []])
+    );
     setRefreshCount(nextRefreshCount);
     generate({
-      excludeIds: unlockedCurrentIds.length > 0 ? unlockedCurrentIds : seenIds,
+      excludeIdsBySlot,
       excludeEventIds: liveMusicEventMode === "ticketmaster" ? lastTicketmasterEventIds : [],
       liveMusicEventMode,
       lockedStepsBySlot: lockedSteps,

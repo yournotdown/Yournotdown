@@ -1,5 +1,16 @@
 ## Immediate Follow-Up
 
+0. If Blake approves the latest `Run It Back` repeat-prevention pass, manually QA Tonight’s Move rerolls after deploy:
+   - confirm a business seen in `Dinner` does not reappear in `Dinner` during the same page session until the slot pool is exhausted
+   - confirm the same rule holds for `Drinks`, `Entertainment` fallback businesses, and `Late Night`
+   - confirm locked cards remain fixed while only unlocked slots reroll
+   - confirm exhausting a small slot pool gracefully allows a repeat only after the unseen slot history is exhausted
+0. Specifically QA the preserved Ticketmaster exception path after deploy:
+   - first load still prefers Ticketmaster when eligible
+   - every fourth `Run It Back` still requests Ticketmaster mode
+   - Ticketmaster event rotation still uses event-id exclusion behavior rather than the new business slot-history rule
+0. If future UX tuning is needed, decide whether same-session repeat prevention should eventually persist across full page reloads via `sessionStorage`; this pass intentionally keeps it in the current page/session state only and does not write reroll history to Mongo
+
 0. If Blake approves the latest production-readiness P0B pass, manually QA image delivery after deploy:
    - inspect a real Tonight’s Move session in DevTools and confirm Google-photo requests now carry bounded `max_width` values instead of always using the default full-size proxy path
    - verify the first Tonight image still looks sharp enough while lower-priority/admin thumbnails request visibly smaller image payloads

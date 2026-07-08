@@ -690,6 +690,7 @@ class ItineraryRequest(BaseModel):
     vibe: Optional[str] = None
     city: str = "nashville"
     exclude_ids: List[str] = Field(default_factory=list)
+    exclude_ids_by_slot: Dict[str, List[str]] = Field(default_factory=dict)
     exclude_event_ids: List[str] = Field(default_factory=list)
     live_music_event_mode: str = "normal"
     locked_steps: Dict[str, dict] = Field(default_factory=dict)
@@ -713,13 +714,20 @@ def _weighted_pick(
     candidates: list,
     exclude_ids: set,
     vibe: Optional[str],
+    historical_exclude_ids: Optional[set] = None,
 ) -> Optional[dict]:
     """Pick one business using mood-relevance × sponsor-tier weighted random.
 
-    If everything is excluded, relax the exclusion filter so the slot still fills."""
+    Keep hard excludes in place, but relax slot-history excludes if needed so the
+    slot can still fill after a reroll session exhausts the local pool."""
     pool = [b for b in candidates if b["id"] not in exclude_ids]
+    historical_exclude_ids = historical_exclude_ids or set()
+    if historical_exclude_ids:
+        filtered_pool = [b for b in pool if b["id"] not in historical_exclude_ids]
+        if filtered_pool:
+            pool = filtered_pool
     if not pool:
-        pool = candidates
+        pool = [b for b in candidates if b["id"] not in exclude_ids]
     if not pool:
         return None
     weights = []
@@ -1458,6 +1466,15 @@ async def generate_itinerary(req: ItineraryRequest, request: Request):
             by_slot.setdefault(slot, []).append(b)
 
     exclude = set(req.exclude_ids)
+    exclude_ids_by_slot = {
+        slot: {
+            business_id
+            for business_id in (ids or [])
+            if business_id
+        }
+        for slot, ids in (req.exclude_ids_by_slot or {}).items()
+        if slot
+    }
     exclude_event_ids = set(req.exclude_event_ids)
     locked_steps_by_slot = {
         slot: _safe_locked_step(slot, step)
@@ -1479,6 +1496,7 @@ async def generate_itinerary(req: ItineraryRequest, request: Request):
             steps.append(locked_step)
             continue
         candidates = by_slot.get(label["slot"], [])
+        slot_history_excludes = exclude_ids_by_slot.get(label["slot"], set())
         pick = None
         forced_event = None
         if label["slot"] == "entertainment":
@@ -1490,13 +1508,23 @@ async def generate_itinerary(req: ItineraryRequest, request: Request):
                 pick, forced_event = itinerary_event_pick(
                     event_candidates,
                     eligible_music_events,
-                    exclude | chosen_ids,
+                    exclude | chosen_ids | slot_history_excludes,
                     exclude_event_ids,
                 )
             if not pick:
-                pick = _weighted_pick(event_candidates or candidates, exclude | chosen_ids, req.vibe)
+                pick = _weighted_pick(
+                    event_candidates or candidates,
+                    exclude | chosen_ids,
+                    slot_history_excludes,
+                    req.vibe,
+                )
         elif not pick:
-            pick = _weighted_pick(candidates, exclude | chosen_ids, req.vibe)
+            pick = _weighted_pick(
+                candidates,
+                exclude | chosen_ids,
+                slot_history_excludes,
+                req.vibe,
+            )
         if pick:
             chosen_ids.add(pick["id"])
             step = {

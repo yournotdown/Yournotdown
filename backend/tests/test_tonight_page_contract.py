@@ -12,17 +12,21 @@ class TestTonightPageContract(unittest.TestCase):
         self.assertIn("exclude_event_ids: excludeEventIds", TONIGHT_PAGE_SOURCE)
         self.assertIn("live_music_event_mode: liveMusicEventMode", TONIGHT_PAGE_SOURCE)
         self.assertIn("locked_steps: lockedStepsBySlot", TONIGHT_PAGE_SOURCE)
+        self.assertIn("exclude_ids_by_slot: excludeIdsBySlot,", TONIGHT_PAGE_SOURCE)
+        self.assertIn("const [seenIdsBySlot, setSeenIdsBySlot] = useState({});", TONIGHT_PAGE_SOURCE)
+        self.assertIn("setSeenIdsBySlot((prev) => mergeSeenIdsBySlot(prev, r.data.steps));", TONIGHT_PAGE_SOURCE)
+        self.assertIn("const excludeIdsBySlot = Object.fromEntries(", TONIGHT_PAGE_SOURCE)
+        self.assertIn("seenIdsBySlot[step.slot] || []", TONIGHT_PAGE_SOURCE)
         self.assertIn('const liveMusicStep = r.data.steps.find((step) => step.slot === "entertainment");', TONIGHT_PAGE_SOURCE)
         self.assertIn("const liveMusicEvent = liveMusicStep?.event;", TONIGHT_PAGE_SOURCE)
         self.assertIn("const liveMusicEventId = liveMusicEvent?.external_event_id || liveMusicEvent?.id;", TONIGHT_PAGE_SOURCE)
         self.assertIn('const entertainmentLocked = lockedSlots.has("entertainment");', TONIGHT_PAGE_SOURCE)
-        self.assertIn("setSeenIds(newIds)", TONIGHT_PAGE_SOURCE)
         self.assertIn('if (!entertainmentLocked && liveMusicEvent?.source === "ticketmaster" && liveMusicEventId)', TONIGHT_PAGE_SOURCE)
         self.assertIn("setLastTicketmasterEventIds([liveMusicEventId]);", TONIGHT_PAGE_SOURCE)
         self.assertIn('} else if (!entertainmentLocked && liveMusicEventMode === "ticketmaster") {', TONIGHT_PAGE_SOURCE)
         self.assertIn("setLastTicketmasterEventIds([]);", TONIGHT_PAGE_SOURCE)
-        self.assertNotIn("new Set([...prev, ...newIds])", TONIGHT_PAGE_SOURCE)
-        self.assertNotIn("new Set([...prev, ...newEventIds])", TONIGHT_PAGE_SOURCE)
+        self.assertIn("function mergeSeenIdsBySlot(previous, steps = []) {", TONIGHT_PAGE_SOURCE)
+        self.assertIn("const existing = new Set(next[slot] || []);", TONIGHT_PAGE_SOURCE)
 
     def test_another_night_uses_ticketmaster_mode_every_fourth_refresh(self):
         self.assertIn("const [refreshCount, setRefreshCount] = useState(0);", TONIGHT_PAGE_SOURCE)
@@ -44,6 +48,10 @@ class TestTonightPageContract(unittest.TestCase):
         self.assertIn("Lock this in", TONIGHT_PAGE_SOURCE)
         self.assertIn("Locked in", TONIGHT_PAGE_SOURCE)
         self.assertIn("Unlock", TONIGHT_PAGE_SOURCE)
+
+    def test_seen_business_history_only_applies_to_unlocked_slots(self):
+        self.assertIn(".filter((step) => !lockedSteps[step.slot] && step?.slot)", TONIGHT_PAGE_SOURCE)
+        self.assertIn("lockedStepsBySlot: lockedSteps", TONIGHT_PAGE_SOURCE)
 
     def test_all_locked_overlay_and_save_call_exist(self):
         self.assertIn("You're Locked In", TONIGHT_PAGE_SOURCE)

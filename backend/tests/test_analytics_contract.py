@@ -41,6 +41,19 @@ class TestAnalyticsContract(unittest.TestCase):
         self.assertIn('slot=step.get("slot", "")', source)
         self.assertIn('source_surface="tonight_page"', source)
 
+    def test_itinerary_request_and_picker_support_slot_specific_seen_excludes(self):
+        request_source = ast.get_source_segment(SERVER_SOURCE, named_function("generate_itinerary"))
+        picker_source = ast.get_source_segment(SERVER_SOURCE, named_function("_weighted_pick"))
+        self.assertIn('exclude_ids_by_slot: Dict[str, List[str]] = Field(default_factory=dict)', SERVER_SOURCE)
+        self.assertIn("exclude_ids_by_slot = {", request_source)
+        self.assertIn('slot_history_excludes = exclude_ids_by_slot.get(label["slot"], set())', request_source)
+        self.assertIn("vibe: Optional[str],", picker_source)
+        self.assertIn("historical_exclude_ids: Optional[set] = None", picker_source)
+        self.assertIn('filtered_pool = [b for b in pool if b["id"] not in historical_exclude_ids]', picker_source)
+        self.assertIn('pool = [b for b in candidates if b["id"] not in exclude_ids]', picker_source)
+        self.assertIn("relevance = _relevance_score(b, vibe)", picker_source)
+        self.assertIn('sponsor_mult = SPONSOR_MULTIPLIERS.get(b.get("sponsor_tier", "none"), 1)', picker_source)
+
     def test_track_endpoint_stamps_sponsor_tier_for_business_scoped_events(self):
         source = ast.get_source_segment(SERVER_SOURCE, named_function("track_event"))
         self.assertIn("event.event_type in BUSINESS_SCOPED_EVENT_TYPES", source)
