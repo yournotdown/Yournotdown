@@ -159,12 +159,28 @@ class TestAnalyticsContract(unittest.TestCase):
         self.assertNotIn("analytics_events.delete", source)
         self.assertNotIn("saved_itineraries.delete", source)
 
+    def test_hotel_qr_list_is_bounded_and_supports_days_window(self):
+        source = ast.get_source_segment(SERVER_SOURCE, named_function("admin_list_hotel_qr_codes"))
+        self.assertIn('days: str = "30"', source)
+        self.assertIn('limit: int = ADMIN_HOTEL_QR_DEFAULT_LIMIT', source)
+        self.assertIn('offset: int = 0', source)
+        self.assertIn("limit, offset = _normalize_pagination(", source)
+        self.assertIn("since = _analytics_since(days)", source)
+        self.assertIn('skip(offset).limit(limit)', source)
+        self.assertIn('"meta": {', source)
+
     def test_admin_summary_supports_filters_and_leaderboards(self):
         source = ast.get_source_segment(SERVER_SOURCE, named_function("admin_analytics_summary"))
         self.assertIn('days: str = "30"', source)
         self.assertIn("city_slug: Optional[str] = None", source)
         self.assertIn("vibe: Optional[str] = None", source)
         self.assertIn("slot: Optional[str] = None", source)
+        self.assertIn("base_match = _analytics_match_query(days=days, city_slug=city_slug, vibe=vibe_filter)", source)
+        self.assertIn('{"$group": {"_id": "$business_id", **_event_count_group_fields()}}', source)
+        self.assertIn('ADMIN_ANALYTICS_BUSINESS_BREAKDOWN_LIMIT', source)
+        self.assertIn('ADMIN_ANALYTICS_LEADERBOARD_LIMIT', source)
+        self.assertIn('ADMIN_ANALYTICS_SLOT_LEADERBOARD_LIMIT', source)
+        self.assertIn('"limits": {', source)
         self.assertIn('"slot_leaderboards": slot_leaderboards', source)
         self.assertIn('"top_saved_in_final_move_businesses": top_saved_in_final_move_businesses', source)
         self.assertIn('"top_website_click_businesses": top_website_click_businesses', source)
@@ -174,6 +190,15 @@ class TestAnalyticsContract(unittest.TestCase):
         self.assertIn('"top_sponsor_businesses": top_sponsor_businesses', source)
         self.assertIn('"vibe_breakdown": vibe_breakdown', source)
         self.assertIn('"totals": totals', source)
+
+    def test_admin_business_analytics_defaults_to_bounded_window(self):
+        source = ast.get_source_segment(SERVER_SOURCE, named_function("admin_business_analytics"))
+        self.assertIn('days: str = "30"', source)
+        self.assertIn("since = _analytics_since(days)", source)
+        self.assertIn('totals_match = {"business_id": business_id}', source)
+        self.assertIn('if since:', source)
+        self.assertIn('ADMIN_ANALYTICS_BUSINESS_TIMELINE_LIMIT', source)
+        self.assertIn('"filters": {', source)
 
     def test_metric_aliases_define_total_engagement_and_safe_rate(self):
         source = ast.get_source_segment(SERVER_SOURCE, named_function("_metric_aliases"))

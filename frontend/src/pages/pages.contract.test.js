@@ -111,6 +111,8 @@ describe("AdminDashboardPage source contract", () => {
     expect(adminDashboardSource).toContain("Repeat Savers");
     expect(adminDashboardSource).toContain("returning visitors from stored visitor IDs.");
     expect(adminDashboardSource).toContain("Search by email");
+    expect(adminDashboardSource).toContain("Previous");
+    expect(adminDashboardSource).toContain("Next");
   });
 
   test("admin dashboard contains Hotel QR tab and create form labels", () => {
@@ -145,9 +147,13 @@ describe("AdminDashboardPage source contract", () => {
     expect(adminDashboardSource).toContain("const [audienceError, setAudienceError] = useState(\"\")");
     expect(adminDashboardSource).toContain("totals: response?.data?.totals || {}");
     expect(adminDashboardSource).toContain("rows: Array.isArray(response?.data?.rows) ? response.data.rows : []");
+    expect(adminDashboardSource).toContain("meta: response?.data?.meta || {}");
     expect(adminDashboardSource).toContain("const rows = Array.isArray(audience?.rows) ? audience.rows : []");
+    expect(adminDashboardSource).toContain("const meta = audience?.meta || {}");
     expect(adminDashboardSource).toContain('data-testid="admin-audience-error"');
     expect(adminDashboardSource).toContain("Couldn’t load audience right now.");
+    expect(adminDashboardSource).toContain('data-testid="admin-audience-prev"');
+    expect(adminDashboardSource).toContain('data-testid="admin-audience-next"');
   });
 });
 

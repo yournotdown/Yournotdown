@@ -912,6 +912,14 @@ LEADERBOARD_METRIC_EVENT_KEYS = [
 ]
 
 LEADERBOARD_SLOTS = ["dinner", "drinks", "entertainment", "late-night"]
+ADMIN_ANALYTICS_SLOT_LEADERBOARD_LIMIT = 10
+ADMIN_ANALYTICS_LEADERBOARD_LIMIT = 25
+ADMIN_ANALYTICS_BUSINESS_BREAKDOWN_LIMIT = 250
+ADMIN_ANALYTICS_BUSINESS_TIMELINE_LIMIT = 2000
+ADMIN_AUDIENCE_DEFAULT_LIMIT = 100
+ADMIN_AUDIENCE_MAX_LIMIT = 200
+ADMIN_HOTEL_QR_DEFAULT_LIMIT = 100
+ADMIN_HOTEL_QR_MAX_LIMIT = 250
 
 
 def _normalize_analytics_days(days: str) -> Optional[int]:
@@ -941,6 +949,27 @@ def _analytics_match_query(*, days: str = "30", city_slug: Optional[str] = None,
     if vibe:
         query["vibe"] = vibe
     return query
+
+
+def _normalize_pagination(limit: int, offset: int, *, default_limit: int, max_limit: int) -> tuple[int, int]:
+    safe_limit = max(1, min(int(limit or default_limit), max_limit))
+    safe_offset = max(0, int(offset or 0))
+    return safe_limit, safe_offset
+
+
+def _event_count_group_fields(event_type_field: str = "$event_type") -> dict:
+    return {
+        event_key: {
+            "$sum": {
+                "$cond": [
+                    {"$eq": [event_type_field, event_key]},
+                    1,
+                    0,
+                ]
+            }
+        }
+        for event_key in LEADERBOARD_METRIC_EVENT_KEYS
+    }
 
 
 def _metric_aliases(counts: dict) -> dict:
@@ -1896,10 +1925,18 @@ async def save_itinerary(payload: SaveItineraryRequest, request: Request):
 async def admin_audience(
     q: str = "",
     filter: str = "all",
+    limit: int = ADMIN_AUDIENCE_DEFAULT_LIMIT,
+    offset: int = 0,
     user=Depends(require_admin),
 ):
     if filter not in {"all", "opted_in", "not_opted_in"}:
         raise HTTPException(status_code=400, detail="Invalid filter")
+    limit, offset = _normalize_pagination(
+        limit,
+        offset,
+        default_limit=ADMIN_AUDIENCE_DEFAULT_LIMIT,
+        max_limit=ADMIN_AUDIENCE_MAX_LIMIT,
+    )
 
     query = {}
     if filter == "opted_in":
@@ -1909,55 +1946,70 @@ async def admin_audience(
     if q.strip():
         query["email_normalized"] = {"$regex": re.escape(q.strip().lower())}
 
-    rows = await db.audience_contacts.find(query, {"_id": 0}).sort([("last_saved_at", -1)]).to_list(500)
+    rows = await db.audience_contacts.find(query, {"_id": 0}).sort([("last_saved_at", -1)]).skip(offset).limit(limit).to_list(limit)
     visitor_ids = [row.get("visitor_id") for row in rows if row.get("visitor_id")]
     visitor_profiles = []
     if visitor_ids:
         visitor_profiles = await db.visitor_profiles.find(
             {"visitor_id": {"$in": visitor_ids}},
             {"_id": 0},
-        ).to_list(1000)
+        ).to_list(limit)
     visitor_profiles_by_id = {
         profile.get("visitor_id"): profile
         for profile in visitor_profiles
         if profile.get("visitor_id")
     }
     now = datetime.now(timezone.utc)
-    total_contacts = len(rows)
-    marketing_opted_in_contacts = sum(1 for row in rows if row.get("marketing_opt_in"))
-    non_marketing_contacts = total_contacts - marketing_opted_in_contacts
-    total_saved_itineraries = sum(int(row.get("saved_itinerary_count", 0)) for row in rows)
+    total_contacts = await db.audience_contacts.count_documents(query)
+    totals_pipeline = [
+        {"$match": query},
+        {
+            "$group": {
+                "_id": None,
+                "marketing_opted_in_contacts": {
+                    "$sum": {"$cond": [{"$eq": ["$marketing_opt_in", True]}, 1, 0]}
+                },
+                "total_saved_itineraries": {
+                    "$sum": {"$ifNull": ["$saved_itinerary_count", 0]}
+                },
+                "repeat_savers": {
+                    "$sum": {
+                        "$cond": [
+                            {"$gt": [{"$ifNull": ["$saved_itinerary_count", 0]}, 1]},
+                            1,
+                            0,
+                        ]
+                    }
+                },
+                "recent_captures": {
+                    "$sum": {
+                        "$cond": [
+                            {
+                                "$gte": [
+                                    "$last_saved_at",
+                                    (now - timedelta(days=7)).isoformat(),
+                                ]
+                            },
+                            1,
+                            0,
+                        ]
+                    }
+                },
+            }
+        },
+    ]
+    totals_row = await db.audience_contacts.aggregate(totals_pipeline).to_list(1)
+    totals_doc = totals_row[0] if totals_row else {}
+    marketing_opted_in_contacts = int(totals_doc.get("marketing_opted_in_contacts", 0))
+    non_marketing_contacts = max(total_contacts - marketing_opted_in_contacts, 0)
+    total_saved_itineraries = int(totals_doc.get("total_saved_itineraries", 0))
     total_anonymous_visitors = await db.visitor_profiles.count_documents({})
     new_visitors = await db.visitor_profiles.count_documents({"event_count": {"$lte": 1}})
     returning_visitors = max(total_anonymous_visitors - new_visitors, 0)
     returning_visitor_rate = round(returning_visitors / total_anonymous_visitors, 4) if total_anonymous_visitors else 0
-    repeat_saver_keys = set()
-    repeat_visitor_profiles = await db.visitor_profiles.find(
-        {"saved_itinerary_count": {"$gt": 1}},
-        {"_id": 0, "visitor_id": 1},
-    ).to_list(5000)
-    for profile in repeat_visitor_profiles:
-        if profile.get("visitor_id"):
-            repeat_saver_keys.add(f"visitor:{profile['visitor_id']}")
-    for row in rows:
-        if int(row.get("saved_itinerary_count", 0)) > 1:
-            if row.get("visitor_id"):
-                repeat_saver_keys.add(f"visitor:{row['visitor_id']}")
-            elif row.get("email_normalized"):
-                repeat_saver_keys.add(f"email:{row['email_normalized']}")
-    repeat_savers = len(repeat_saver_keys)
+    repeat_savers = int(totals_doc.get("repeat_savers", 0))
     repeat_saver_rate = round(repeat_savers / total_contacts, 4) if total_contacts else 0
-    recent_cutoff = now - timedelta(days=7)
-    recent_captures = 0
-    for row in rows:
-        saved_at_raw = row.get("last_saved_at")
-        if not saved_at_raw:
-            continue
-        saved_at = datetime.fromisoformat(saved_at_raw)
-        if saved_at.tzinfo is None:
-            saved_at = saved_at.replace(tzinfo=timezone.utc)
-        if saved_at >= recent_cutoff:
-            recent_captures += 1
+    recent_captures = int(totals_doc.get("recent_captures", 0))
     payload_rows = [
         {
             "id": row.get("id"),
@@ -1992,24 +2044,51 @@ async def admin_audience(
             "recent_captures": recent_captures,
         },
         "rows": payload_rows,
+        "meta": {
+            "limit": limit,
+            "offset": offset,
+            "total_rows": total_contacts,
+            "has_more": offset + len(payload_rows) < total_contacts,
+            "next_offset": offset + len(payload_rows) if offset + len(payload_rows) < total_contacts else None,
+            "prev_offset": max(offset - limit, 0) if offset > 0 else None,
+        },
     }
 
 
 @api_router.get("/admin/hotel-qr")
-async def admin_list_hotel_qr_codes(user=Depends(require_admin)):
-    rows = await db.hotel_qr_codes.find({}, {"_id": 0}).sort([("created_at", -1)]).to_list(1000)
+async def admin_list_hotel_qr_codes(
+    days: str = "30",
+    limit: int = ADMIN_HOTEL_QR_DEFAULT_LIMIT,
+    offset: int = 0,
+    user=Depends(require_admin),
+):
+    limit, offset = _normalize_pagination(
+        limit,
+        offset,
+        default_limit=ADMIN_HOTEL_QR_DEFAULT_LIMIT,
+        max_limit=ADMIN_HOTEL_QR_MAX_LIMIT,
+    )
+    since = _analytics_since(days)
+    rows = await db.hotel_qr_codes.find({}, {"_id": 0}).sort([("created_at", -1)]).skip(offset).limit(limit).to_list(limit)
+    total_rows = await db.hotel_qr_codes.count_documents({})
     slugs = [row.get("slug") for row in rows if row.get("slug")]
     analytics_docs = []
     saved_docs = []
     if slugs:
+        analytics_query = {"qr_slug": {"$in": slugs}}
+        if since:
+            analytics_query["timestamp"] = {"$gte": since}
         analytics_docs = await db.analytics_events.find(
-            {"qr_slug": {"$in": slugs}},
+            analytics_query,
             {"_id": 0, "qr_slug": 1, "event_type": 1, "visitor_id": 1},
-        ).to_list(20000)
-        saved_docs = await db.saved_itineraries.find(
-            {"qr_slug": {"$in": slugs}},
-            {"_id": 0, "qr_slug": 1, "email": 1, "marketing_opt_in": 1},
         ).to_list(10000)
+        saved_query = {"qr_slug": {"$in": slugs}}
+        if since:
+            saved_query["created_at"] = {"$gte": since}
+        saved_docs = await db.saved_itineraries.find(
+            saved_query,
+            {"_id": 0, "qr_slug": 1, "email": 1, "marketing_opt_in": 1},
+        ).to_list(5000)
 
     analytics_by_slug: Dict[str, dict] = {}
     for slug in slugs:
@@ -2066,7 +2145,18 @@ async def admin_list_hotel_qr_codes(user=Depends(require_admin)):
                 "conversion_rate": round(saved_moves / scans, 4) if scans else 0,
             },
         }))
-    return {"rows": payload_rows}
+    return {
+        "rows": payload_rows,
+        "meta": {
+            "days": "all" if _normalize_analytics_days(days) is None else str(_normalize_analytics_days(days)),
+            "limit": limit,
+            "offset": offset,
+            "total_rows": total_rows,
+            "has_more": offset + len(payload_rows) < total_rows,
+            "next_offset": offset + len(payload_rows) if offset + len(payload_rows) < total_rows else None,
+            "prev_offset": max(offset - limit, 0) if offset > 0 else None,
+        },
+    }
 
 
 @api_router.post("/admin/hotel-qr")
@@ -2680,23 +2770,27 @@ async def admin_list_tags(user=Depends(require_admin)):
 
 # ------------- Admin: analytics -------------
 @api_router.get("/admin/analytics/business/{business_id}")
-async def admin_business_analytics(business_id: str, days: int = 30, user=Depends(require_admin)):
+async def admin_business_analytics(business_id: str, days: str = "30", user=Depends(require_admin)):
     biz = await db.businesses.find_one({"id": business_id}, {"_id": 0})
     if not biz:
         raise HTTPException(status_code=404, detail="Business not found")
 
-    # Totals per event type (all time)
+    since = _analytics_since(days)
+    totals_match = {"business_id": business_id}
+    if since:
+        totals_match["timestamp"] = {"$gte": since}
+
+    # Totals per event type (bounded by selected window by default)
     pipeline = [
-        {"$match": {"business_id": business_id}},
+        {"$match": totals_match},
         {"$group": {"_id": "$event_type", "count": {"$sum": 1}}},
     ]
     rows = await db.analytics_events.aggregate(pipeline).to_list(100)
     totals = {r["_id"]: r["count"] for r in rows}
 
-    # Daily timeline for the last N days
-    since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    # Daily timeline for the selected range
     tl_pipeline = [
-        {"$match": {"business_id": business_id, "timestamp": {"$gte": since}}},
+        {"$match": totals_match},
         {
             "$group": {
                 "_id": {
@@ -2707,7 +2801,7 @@ async def admin_business_analytics(business_id: str, days: int = 30, user=Depend
             }
         },
     ]
-    tl_rows = await db.analytics_events.aggregate(tl_pipeline).to_list(10000)
+    tl_rows = await db.analytics_events.aggregate(tl_pipeline).to_list(ADMIN_ANALYTICS_BUSINESS_TIMELINE_LIMIT)
 
     # Build {day: {event_type: count}}
     by_day: dict = {}
@@ -2716,11 +2810,17 @@ async def admin_business_analytics(business_id: str, days: int = 30, user=Depend
         et = r["_id"]["event_type"]
         by_day.setdefault(day, {})[et] = r["count"]
 
-    # Fill missing days
     timeline = []
-    today = datetime.now(timezone.utc).date()
-    for i in range(days - 1, -1, -1):
-        d = (today - timedelta(days=i)).isoformat()
+    normalized_days = _normalize_analytics_days(days)
+    if normalized_days is None:
+        timeline_days = sorted(by_day.keys())
+    else:
+        today = datetime.now(timezone.utc).date()
+        timeline_days = [
+            (today - timedelta(days=i)).isoformat()
+            for i in range(normalized_days - 1, -1, -1)
+        ]
+    for d in timeline_days:
         row = by_day.get(d, {})
         timeline.append({
             "day": d,
@@ -2738,6 +2838,9 @@ async def admin_business_analytics(business_id: str, days: int = 30, user=Depend
 
     return {
         "business": biz,
+        "filters": {
+            "days": "all" if normalized_days is None else str(normalized_days),
+        },
         "totals": {
             "business_appearance": totals.get("business_appearance", 0),
             "business_view": totals.get("business_view", 0),
@@ -2797,37 +2900,43 @@ async def admin_analytics_summary(
         biz_match["slot"] = slot_filter
     biz_pipeline = [
         {"$match": biz_match},
-        {"$group": {"_id": {"business_id": "$business_id", "event_type": "$event_type"}, "count": {"$sum": 1}}},
+        {"$group": {"_id": "$business_id", **_event_count_group_fields()}},
     ]
-    biz_rows = await db.analytics_events.aggregate(biz_pipeline).to_list(5000)
+    biz_rows = await db.analytics_events.aggregate(biz_pipeline).to_list(ADMIN_ANALYTICS_BUSINESS_BREAKDOWN_LIMIT * 8)
     slot_pipeline = [
         {"$match": {**base_match, "business_id": {"$ne": None}, "slot": {"$in": LEADERBOARD_SLOTS}}},
-        {"$group": {"_id": {"business_id": "$business_id", "event_type": "$event_type", "slot": "$slot"}, "count": {"$sum": 1}}},
+        {"$group": {"_id": {"business_id": "$business_id", "slot": "$slot"}, **_event_count_group_fields()}},
     ]
-    slot_rows = await db.analytics_events.aggregate(slot_pipeline).to_list(10000)
+    slot_rows = await db.analytics_events.aggregate(slot_pipeline).to_list(ADMIN_ANALYTICS_BUSINESS_BREAKDOWN_LIMIT * len(LEADERBOARD_SLOTS) * 2)
     vibe_pipeline = [
         {"$match": {**base_match, "business_id": {"$ne": None}, "vibe": {"$nin": [None, ""]}}},
-        {"$group": {"_id": {"vibe": "$vibe", "event_type": "$event_type"}, "count": {"$sum": 1}}},
+        {"$group": {"_id": "$vibe", **_event_count_group_fields()}},
     ]
-    vibe_rows = await db.analytics_events.aggregate(vibe_pipeline).to_list(2000)
+    vibe_rows = await db.analytics_events.aggregate(vibe_pipeline).to_list(250)
     by_biz = {}
     for r in biz_rows:
-        bid = r["_id"]["business_id"]
-        et = r["_id"]["event_type"]
-        by_biz.setdefault(bid, {})[et] = r["count"]
+        bid = r["_id"]
+        by_biz[bid] = {
+            key: int(r.get(key, 0))
+            for key in LEADERBOARD_METRIC_EVENT_KEYS
+        }
     by_slot_business: dict = {slot_name: {} for slot_name in LEADERBOARD_SLOTS}
     for r in slot_rows:
         bid = r["_id"]["business_id"]
-        et = r["_id"]["event_type"]
         slot_name = r["_id"].get("slot")
         if slot_name not in by_slot_business:
             continue
-        by_slot_business[slot_name].setdefault(bid, {})[et] = r["count"]
+        by_slot_business[slot_name][bid] = {
+            key: int(r.get(key, 0))
+            for key in LEADERBOARD_METRIC_EVENT_KEYS
+        }
     by_vibe: dict = {}
     for r in vibe_rows:
-        vibe_name = r["_id"]["vibe"] or "unknown"
-        et = r["_id"]["event_type"]
-        by_vibe.setdefault(vibe_name, {})[et] = r["count"]
+        vibe_name = r["_id"] or "unknown"
+        by_vibe[vibe_name] = {
+            key: int(r.get(key, 0))
+            for key in LEADERBOARD_METRIC_EVENT_KEYS
+        }
 
     # attach business names + sponsor tier
     biz_ids = list(by_biz.keys())
@@ -2836,7 +2945,7 @@ async def admin_analytics_summary(
     ).to_list(1000)
     name_map = {b["id"]: b["name"] for b in businesses}
     tier_map = {b["id"]: b.get("sponsor_tier", "none") for b in businesses}
-    business_breakdown = [
+    all_business_breakdown = [
         _leaderboard_row(
             bid,
             counts,
@@ -2845,15 +2954,16 @@ async def admin_analytics_summary(
         )
         for bid, counts in by_biz.items()
     ]
-    business_breakdown.sort(key=lambda row: (-row.get("total_engagement", 0), -row.get("appearances", 0), row.get("name", "")))
+    all_business_breakdown.sort(key=lambda row: (-row.get("total_engagement", 0), -row.get("appearances", 0), row.get("name", "")))
+    business_breakdown = all_business_breakdown[:ADMIN_ANALYTICS_BUSINESS_BREAKDOWN_LIMIT]
     totals_source = {}
-    for row in business_breakdown:
+    for row in all_business_breakdown:
         for key in LEADERBOARD_METRIC_EVENT_KEYS:
             totals_source[key] = totals_source.get(key, 0) + row.get(key, 0)
     totals = _metric_aliases(totals_source)
 
     sponsor_rollup: dict = {}
-    for row in business_breakdown:
+    for row in all_business_breakdown:
         tier = row.get("sponsor_tier") or "none"
         counts = sponsor_rollup.setdefault(tier, {})
         for key in LEADERBOARD_METRIC_EVENT_KEYS:
@@ -2880,7 +2990,7 @@ async def admin_analytics_summary(
                 for bid, counts in slot_counts.items()
             ],
             key=lambda row: (-row.get("total_engagement", 0), -row.get("appearances", 0), row.get("name", "")),
-        )[:10]
+        )[:ADMIN_ANALYTICS_SLOT_LEADERBOARD_LIMIT]
         for slot_name, slot_counts in by_slot_business.items()
     }
     vibe_breakdown = sorted(
@@ -2895,38 +3005,38 @@ async def admin_analytics_summary(
         key=lambda row: (-row.get("total_engagement", 0), row.get("vibe", "")),
     )
     top_businesses_by_total_engagement = sorted(
-        business_breakdown,
+        all_business_breakdown,
         key=lambda row: (-row.get("total_engagement", 0), -row.get("business_appearance", 0), row.get("name", "")),
-    )[:25]
+    )[:ADMIN_ANALYTICS_LEADERBOARD_LIMIT]
     top_locked_in_businesses = sorted(
-        business_breakdown,
+        all_business_breakdown,
         key=lambda row: (-row.get("locked_in", 0), -row.get("total_engagement", 0), row.get("name", "")),
-    )[:25]
+    )[:ADMIN_ANALYTICS_LEADERBOARD_LIMIT]
     top_saved_in_final_move_businesses = sorted(
-        business_breakdown,
+        all_business_breakdown,
         key=lambda row: (-row.get("saved_in_final_move", 0), -row.get("total_engagement", 0), row.get("name", "")),
-    )[:25]
+    )[:ADMIN_ANALYTICS_LEADERBOARD_LIMIT]
     top_website_click_businesses = sorted(
-        business_breakdown,
+        all_business_breakdown,
         key=lambda row: (-row.get("website_clicks", 0), -row.get("total_engagement", 0), row.get("name", "")),
-    )[:25]
+    )[:ADMIN_ANALYTICS_LEADERBOARD_LIMIT]
     top_directions_click_businesses = sorted(
-        business_breakdown,
+        all_business_breakdown,
         key=lambda row: (-row.get("directions_clicks", 0), -row.get("total_engagement", 0), row.get("name", "")),
-    )[:25]
+    )[:ADMIN_ANALYTICS_LEADERBOARD_LIMIT]
     top_ticket_click_businesses = sorted(
-        business_breakdown,
+        all_business_breakdown,
         key=lambda row: (-row.get("ticket_clicks", 0), -row.get("total_engagement", 0), row.get("name", "")),
-    )[:25]
+    )[:ADMIN_ANALYTICS_LEADERBOARD_LIMIT]
     top_phone_click_businesses = sorted(
-        business_breakdown,
+        all_business_breakdown,
         key=lambda row: (-row.get("phone_clicks", 0), -row.get("total_engagement", 0), row.get("name", "")),
-    )[:25]
+    )[:ADMIN_ANALYTICS_LEADERBOARD_LIMIT]
     top_click_through_businesses = sorted(
-        business_breakdown,
+        all_business_breakdown,
         key=lambda row: (-row.get("total_click_through", 0), -row.get("total_engagement", 0), row.get("name", "")),
-    )[:25]
-    top_sponsor_businesses = [row for row in top_businesses_by_total_engagement if row.get("sponsor_tier") != "none"][:25]
+    )[:ADMIN_ANALYTICS_LEADERBOARD_LIMIT]
+    top_sponsor_businesses = [row for row in top_businesses_by_total_engagement if row.get("sponsor_tier") != "none"][:ADMIN_ANALYTICS_LEADERBOARD_LIMIT]
 
     return {
         "total_events": total_events,
@@ -2935,6 +3045,11 @@ async def admin_analytics_summary(
             "city_slug": city_slug or "",
             "vibe": vibe_filter or "",
             "slot": slot_filter or "",
+        },
+        "limits": {
+            "slot_leaderboards": ADMIN_ANALYTICS_SLOT_LEADERBOARD_LIMIT,
+            "leaderboards": ADMIN_ANALYTICS_LEADERBOARD_LIMIT,
+            "business_breakdown": ADMIN_ANALYTICS_BUSINESS_BREAKDOWN_LIMIT,
         },
         "by_event_type": summary,
         "totals": totals,

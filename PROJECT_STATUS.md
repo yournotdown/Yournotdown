@@ -6,6 +6,61 @@ The repo is currently on branch `main`. The only known worktree changes outside 
 
 ## Latest Work Session
 
+Latest local production-readiness P0C admin-query hardening pass:
+- hardened the admin reporting endpoints identified in `docs/production/production_readiness_audit.md` without changing public user behavior
+- `backend/server.py` now applies safer bounds to the heavy admin analytics surfaces:
+  - `GET /api/admin/analytics/summary`
+  - `GET /api/admin/analytics/business/{business_id}`
+  - `GET /api/admin/audience`
+  - `GET /api/admin/hotel-qr`
+- `admin_analytics_summary` improvements:
+  - kept the existing default `days=30` behavior and the existing `days=7|30|90|all` parser
+  - reduced Python-side work by grouping more of the per-business / per-slot / per-vibe counts directly in Mongo using conditional `$group` fields instead of returning large `business_id + event_type` row sets
+  - capped the response payload with explicit backend limits:
+    - slot leaderboards: `10`
+    - top leaderboards: `25`
+    - returned `by_business` table: `250`
+  - added a `limits` object to the response so the frontend/admin payload is self-describing
+- `admin_business_analytics` improvements:
+  - now defaults to a bounded `days="30"` window instead of mixing all-time totals with a bounded timeline
+  - totals and timeline now both honor the selected date window
+  - still supports `days=all` when explicitly requested, but keeps the timeline aggregation capped
+  - returns a `filters.days` value for clarity
+- `admin_audience` improvements:
+  - added simple pagination with `limit` / `offset`
+  - default page size is now `100`, capped at `200`
+  - response now includes `meta`:
+    - `limit`
+    - `offset`
+    - `total_rows`
+    - `has_more`
+    - `next_offset`
+    - `prev_offset`
+  - totals are now computed across the full filtered result set instead of just the visible page
+  - visitor-profile lookups are now limited to the current page’s visitor ids instead of broad scans
+- `admin_list_hotel_qr_codes` improvements:
+  - now defaults to `days=30` for QR analytics instead of scanning all-time data implicitly
+  - added `limit` / `offset` pagination with a default of `100` and cap of `250`
+  - analytics and saved-itinerary reads are now bounded to the current page of QR slugs plus the selected date window
+  - response now includes `meta` with the current date window and pagination info
+- `frontend/src/pages/AdminDashboardPage.jsx` was updated only for the admin Audience table:
+  - sends `limit` / `offset` to `/api/admin/audience`
+  - consumes `meta`
+  - adds simple `Previous` / `Next` paging controls
+  - resets audience pagination back to `offset=0` when the search query or opt-in filter changes
+- added/updated source-contract coverage for:
+  - bounded admin business analytics windows
+  - bounded Hotel QR list windows
+  - bounded audience pagination/meta
+  - capped analytics summary payloads and limit metadata
+- local verification for this hardening pass:
+  - `python3 -m unittest backend.tests.test_business_owner_contract backend.tests.test_analytics_contract backend.tests.test_saved_itinerary_contract backend.tests.test_locked_steps_contract backend.tests.test_tonight_page_contract backend.tests.test_city_events_filtering_contract backend.tests.test_ticketmaster_events_unit` passed (`125` tests)
+  - `cd frontend && npm run build` passed
+  - `cd frontend && CI=true npm test -- --watchAll=false` passed (`3` suites, `38` tests)
+- still unverified:
+  - no browser/manual QA has yet confirmed the new Audience `Previous` / `Next` flow against real admin data
+  - no real production explain-plan or timing capture has yet measured the before/after win on large analytics datasets
+
 Latest local Ticketmaster reroll-failure hotfix:
 - fixed a backend itinerary-generation crash that appeared after the Ticketmaster live-music rotation change when clicking `Run It Back`
 - root cause was not the new Ticketmaster event-pool picker itself; it was the fallback call into `_weighted_pick(...)` inside `backend/server.py`

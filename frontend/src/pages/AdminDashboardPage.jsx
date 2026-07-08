@@ -113,6 +113,8 @@ export default function AdminDashboardPage() {
   const [audienceFilters, setAudienceFilters] = useState({
     q: "",
     filter: "all",
+    limit: 100,
+    offset: 0,
   });
   const [hotelQrRows, setHotelQrRows] = useState([]);
   const [hotelQrLoading, setHotelQrLoading] = useState(false);
@@ -214,19 +216,22 @@ export default function AdminDashboardPage() {
       const params = {};
       if (audienceFilters.q.trim()) params.q = audienceFilters.q.trim();
       if (audienceFilters.filter !== "all") params.filter = audienceFilters.filter;
+      params.limit = audienceFilters.limit;
+      params.offset = audienceFilters.offset;
       const response = await api.get("/admin/audience", { params });
       setAudience({
         totals: response?.data?.totals || {},
         rows: Array.isArray(response?.data?.rows) ? response.data.rows : [],
+        meta: response?.data?.meta || {},
       });
     } catch (e) {
-      setAudience({ totals: {}, rows: [] });
+      setAudience({ totals: {}, rows: [], meta: {} });
       setAudienceError(e?.response?.data?.detail || "Couldn’t load audience right now.");
       toast.error("Failed to load audience");
     } finally {
       setAudienceLoading(false);
     }
-  }, [audienceFilters.filter, audienceFilters.q, user]);
+  }, [audienceFilters.filter, audienceFilters.limit, audienceFilters.offset, audienceFilters.q, user]);
 
   useEffect(() => {
     if (user) loadAudience();
@@ -2113,6 +2118,7 @@ function AnalyticsPanel({ analytics, analyticsLoading, filters, onFiltersChange,
 function AudiencePanel({ audience, audienceLoading, audienceError, filters, onFiltersChange }) {
   const totals = audience?.totals || {};
   const rows = Array.isArray(audience?.rows) ? audience.rows : [];
+  const meta = audience?.meta || {};
   const statCards = [
     { label: "Email Captures", value: totals.total_contacts || 0, icon: Mail, helper: "Unique emails collected from saved moves." },
     { label: "Marketing Opt-ins", value: totals.marketing_opted_in_contacts || 0, icon: CheckCircle, helper: "Contacts who asked for occasional Nashville picks." },
@@ -2136,7 +2142,7 @@ function AudiencePanel({ audience, audienceLoading, audienceError, filters, onFi
           ].map((option) => (
             <button
               key={option.value}
-              onClick={() => onFiltersChange((prev) => ({ ...prev, filter: option.value }))}
+              onClick={() => onFiltersChange((prev) => ({ ...prev, filter: option.value, offset: 0 }))}
               className={`px-3 py-2 rounded-full border text-xs font-bold ${
                 filters.filter === option.value
                   ? "border-[#7C3AED] text-white bg-[#7C3AED]/15"
@@ -2152,7 +2158,7 @@ function AudiencePanel({ audience, audienceLoading, audienceError, filters, onFi
 
       <Input
         value={filters.q}
-        onChange={(e) => onFiltersChange((prev) => ({ ...prev, q: e.target.value }))}
+        onChange={(e) => onFiltersChange((prev) => ({ ...prev, q: e.target.value, offset: 0 }))}
         placeholder="Search by email"
         className="max-w-md bg-[#1A1A22] border-white/10 text-white"
         data-testid="admin-audience-search"
@@ -2230,6 +2236,36 @@ function AudiencePanel({ audience, audienceLoading, audienceError, filters, onFi
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="text-xs text-[#A1A1AA]">
+          Showing {rows.length === 0 ? 0 : (meta.offset || 0) + 1}-{(meta.offset || 0) + rows.length} of {meta.total_rows || 0}
+        </div>
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={audienceLoading || (meta.prev_offset == null)}
+            onClick={() => onFiltersChange((prev) => ({ ...prev, offset: meta.prev_offset || 0 }))}
+            className="border-white/10 bg-transparent text-white/70 hover:bg-white/5 hover:text-white"
+            data-testid="admin-audience-prev"
+          >
+            Previous
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={audienceLoading || !meta.has_more}
+            onClick={() => onFiltersChange((prev) => ({ ...prev, offset: meta.next_offset || prev.offset }))}
+            className="border-white/10 bg-transparent text-white/70 hover:bg-white/5 hover:text-white"
+            data-testid="admin-audience-next"
+          >
+            Next
+          </Button>
+        </div>
       </div>
     </div>
   );
