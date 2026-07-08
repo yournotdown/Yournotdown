@@ -951,6 +951,53 @@ def _analytics_match_query(*, days: str = "30", city_slug: Optional[str] = None,
     return query
 
 
+async def _homepage_visit_usage_metrics(*, days: str = "30", city_slug: Optional[str] = None) -> dict:
+    match = _analytics_match_query(days=days, city_slug=city_slug)
+    match["event_type"] = "homepage_visit"
+    rows = await db.analytics_events.aggregate([
+        {"$match": match},
+        {
+            "$facet": {
+                "visits": [
+                    {"$count": "count"},
+                ],
+                "visitors": [
+                    {"$match": {"visitor_id": {"$nin": [None, ""]}}},
+                    {"$group": {"_id": "$visitor_id", "visit_count": {"$sum": 1}}},
+                    {
+                        "$group": {
+                            "_id": None,
+                            "unique_visitors": {"$sum": 1},
+                            "returning_visitors": {
+                                "$sum": {
+                                    "$cond": [
+                                        {"$gt": ["$visit_count", 1]},
+                                        1,
+                                        0,
+                                    ]
+                                }
+                            },
+                        }
+                    },
+                ],
+            }
+        },
+    ]).to_list(1)
+    usage = rows[0] if rows else {}
+    visit_row = (usage.get("visits") or [{}])[0]
+    visitor_row = (usage.get("visitors") or [{}])[0]
+    total_visits = int(visit_row.get("count", 0))
+    unique_visitors = int(visitor_row.get("unique_visitors", 0))
+    returning_visitors = int(visitor_row.get("returning_visitors", 0))
+    returning_visitor_rate = round(returning_visitors / unique_visitors, 4) if unique_visitors else 0
+    return {
+        "total_visits": total_visits,
+        "unique_visitors": unique_visitors,
+        "returning_visitors": returning_visitors,
+        "returning_visitor_rate": returning_visitor_rate,
+    }
+
+
 def _normalize_pagination(limit: int, offset: int, *, default_limit: int, max_limit: int) -> tuple[int, int]:
     safe_limit = max(1, min(int(limit or default_limit), max_limit))
     safe_offset = max(0, int(offset or 0))
@@ -2960,7 +3007,11 @@ async def admin_analytics_summary(
     for row in all_business_breakdown:
         for key in LEADERBOARD_METRIC_EVENT_KEYS:
             totals_source[key] = totals_source.get(key, 0) + row.get(key, 0)
-    totals = _metric_aliases(totals_source)
+    usage_totals = await _homepage_visit_usage_metrics(days=days, city_slug=city_slug)
+    totals = {
+        **_metric_aliases(totals_source),
+        **usage_totals,
+    }
 
     sponsor_rollup: dict = {}
     for row in all_business_breakdown:

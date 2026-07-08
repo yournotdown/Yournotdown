@@ -85,6 +85,19 @@ const VIBE_DISPLAY = {
   "send-it": "No Regrets",
 };
 
+const HOTEL_QR_CODE_COLORS = {
+  dark: "#FFFFFF",
+  light: "#000000",
+};
+
+function generateHotelQrDataUrl(url, width) {
+  return QRCode.toDataURL(url, {
+    width,
+    margin: 1,
+    color: HOTEL_QR_CODE_COLORS,
+  });
+}
+
 function vibeLabel(slug) {
   return VIBE_DISPLAY[slug] || slug || "—";
 }
@@ -1842,17 +1855,12 @@ function AnalyticsPanel({ analytics, analyticsLoading, filters, onFiltersChange,
   if (!analytics) {
     return <div className="text-[#A1A1AA]" data-testid="admin-analytics-loading">Loading analytics…</div>;
   }
-  const ev = analytics.by_event_type || {};
   const totals = analytics.totals || {};
   const cards = [
-    { label: "Appearances", value: totals.appearances || 0, icon: Store, accent: "text-[#C6FF00]" },
-    { label: "Locked In", value: totals.locked_in || 0, icon: Lock, accent: "text-[#FFD166]" },
-    { label: "Saved in Final Move", value: totals.saved_in_final_move || 0, icon: ClipboardCheck, accent: "text-sky-300" },
-    { label: "Website Clicks", value: totals.website_clicks || 0, icon: Globe, accent: "text-fuchsia-300" },
-    { label: "Directions Clicks", value: totals.directions_clicks || 0, icon: Navigation, accent: "text-cyan-300" },
-    { label: "Buy Tickets", value: totals.ticket_clicks || 0, icon: Ticket, accent: "text-orange-300" },
-    { label: "Phone Clicks", value: totals.phone_clicks || 0, icon: Phone, accent: "text-emerald-300" },
-    { label: "Total Engagement", value: totals.total_engagement || 0, icon: TrendingUp, accent: "text-white" },
+    { label: "Total Visits", value: totals.total_visits || 0, icon: BarChart3, accent: "text-white", helper: "Homepage visits tracked in the selected date range." },
+    { label: "Unique Visitors", value: totals.unique_visitors || 0, icon: Globe, accent: "text-[#C6FF00]", helper: "Distinct stored visitor IDs from homepage visits." },
+    { label: "Returning Visitors", value: totals.returning_visitors || 0, icon: RotateCw, accent: "text-[#FFD166]", helper: "Visitor IDs with more than one homepage visit in range." },
+    { label: "Returning Visitor Rate", value: `${(((totals.returning_visitor_rate || 0) * 100)).toFixed(1)}%`, icon: TrendingUp, accent: "text-sky-300", helper: "Returning visitors divided by unique visitors." },
   ];
   const catName = (slug) => categories.find((c) => c.slug === slug)?.name || slug;
   const sponsorPerf = analytics.sponsor_performance || [];
@@ -1864,7 +1872,7 @@ function AnalyticsPanel({ analytics, analyticsLoading, filters, onFiltersChange,
       <div className="flex items-end justify-between gap-4 flex-wrap">
         <div>
           <h2 className="font-display text-3xl font-bold">Analytics</h2>
-          <p className="text-sm text-[#A1A1AA] mt-1">Live engagement, no fluff.</p>
+          <p className="text-sm text-[#A1A1AA] mt-1">Homepage traffic uses `visitor_id`. Leaderboards below still honor the vibe and slot filters.</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex bg-[#121218] border border-white/10 rounded-full p-1">
@@ -2476,14 +2484,7 @@ function HotelQrCodePreview({ url, slug }) {
 
   useEffect(() => {
     let active = true;
-    QRCode.toDataURL(url, {
-      width: 112,
-      margin: 1,
-      color: {
-        dark: "#C6FF00",
-        light: "#000000",
-      },
-    })
+    generateHotelQrDataUrl(url, 112)
       .then((value) => {
         if (active) {
           setDataUrl(value);
@@ -2520,14 +2521,7 @@ function HotelQrDownloadButton({ url, slug }) {
   const handleDownload = async () => {
     setDownloading(true);
     try {
-      const dataUrl = await QRCode.toDataURL(url, {
-        width: 960,
-        margin: 1,
-        color: {
-          dark: "#C6FF00",
-          light: "#000000",
-        },
-      });
+      const dataUrl = await generateHotelQrDataUrl(url, 960);
       const link = document.createElement("a");
       link.href = dataUrl;
       link.download = `ynd-hotel-qr-${slug}.png`;

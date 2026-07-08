@@ -191,6 +191,22 @@ class TestAnalyticsContract(unittest.TestCase):
         self.assertIn('"vibe_breakdown": vibe_breakdown', source)
         self.assertIn('"totals": totals', source)
 
+    def test_homepage_visit_usage_metrics_use_visitor_id_not_ip(self):
+        source = ast.get_source_segment(SERVER_SOURCE, named_function("_homepage_visit_usage_metrics"))
+        self.assertIn('match["event_type"] = "homepage_visit"', source)
+        self.assertIn('{"$match": {"visitor_id": {"$nin": [None, ""]}}}', source)
+        self.assertIn('{"$group": {"_id": "$visitor_id", "visit_count": {"$sum": 1}}}', source)
+        self.assertIn('"unique_visitors": {"$sum": 1}', source)
+        self.assertIn('{"$gt": ["$visit_count", 1]}', source)
+        self.assertIn('"returning_visitor_rate": returning_visitor_rate', source)
+        self.assertNotIn('"ip"', source)
+
+    def test_admin_summary_totals_include_usage_cards(self):
+        source = ast.get_source_segment(SERVER_SOURCE, named_function("admin_analytics_summary"))
+        self.assertIn("usage_totals = await _homepage_visit_usage_metrics(days=days, city_slug=city_slug)", source)
+        self.assertIn("**usage_totals", source)
+        self.assertIn('"totals": totals', source)
+
     def test_admin_business_analytics_defaults_to_bounded_window(self):
         source = ast.get_source_segment(SERVER_SOURCE, named_function("admin_business_analytics"))
         self.assertIn('days: str = "30"', source)

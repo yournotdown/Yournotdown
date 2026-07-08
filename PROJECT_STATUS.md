@@ -6,6 +6,32 @@ The repo is currently on branch `main`. The only known worktree changes outside 
 
 ## Latest Work Session
 
+Latest local Hotel QR styling + analytics clarity pass:
+- updated the admin Hotel QR preview and downloaded PNG generation to use a centralized white-on-black QR style
+- the QR image itself no longer uses lime green; lime remains available elsewhere in the UI
+- kept the existing Hotel QR actions unchanged:
+  - `Copy URL`
+  - `Download QR`
+  - `Deactivate`
+  - `Delete`
+- updated `GET /api/admin/analytics/summary` so the top-line usage metrics are now based on the canonical `homepage_visit` event and stored `visitor_id` values instead of IP-based counting
+- added four clearer usage totals to the analytics summary response:
+  - `total_visits`
+  - `unique_visitors`
+  - `returning_visitors`
+  - `returning_visitor_rate`
+- returning visitors are now defined as distinct `visitor_id` values with more than one `homepage_visit` in the selected date window
+- kept existing date-range filtering intact for `7d`, `30d`, `90d`, and `all`
+- kept vibe/slot leaderboard filtering behavior intact for the lower analytics tables
+- updated the admin analytics top cards to show the new plain-English usage metrics instead of the older engagement-first card set
+- local verification for this pass:
+  - `python3 -m unittest backend.tests.test_business_owner_contract backend.tests.test_analytics_contract backend.tests.test_saved_itinerary_contract backend.tests.test_locked_steps_contract backend.tests.test_tonight_page_contract backend.tests.test_city_events_filtering_contract backend.tests.test_ticketmaster_events_unit` passed
+  - `cd frontend && npm run build` passed
+  - `cd frontend && CI=true npm test -- --watchAll=false` passed
+- still unverified:
+  - no manual admin browser QA has yet confirmed the white-on-black Hotel QR preview/download visually and on-device scanning behavior
+  - no manual admin QA has yet confirmed the updated analytics cards against production-like analytics data in the browser
+
 Latest local production-readiness P0D load-test planning pass:
 - added a production-safe load-test plan in `docs/production/load_test_plan.md`
 - added a lightweight reusable harness in `scripts/load_test_ynd.py`

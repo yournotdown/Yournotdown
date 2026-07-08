@@ -1,5 +1,21 @@
 ## Immediate Follow-Up
 
+0. Manually QA the updated admin `Analytics` top cards after the next deploy:
+   - confirm the cards read clearly as:
+     - `Total Visits`
+     - `Unique Visitors`
+     - `Returning Visitors`
+     - `Returning Visitor Rate`
+   - confirm `7d`, `30d`, `90d`, and `All time` update those totals correctly
+   - confirm usage cards reflect `homepage_visit` traffic and stored `visitor_id` values rather than IP-based counts
+   - confirm the lower leaderboards still respect the vibe and slot filters
+
+0. Manually QA the updated admin `Hotel QR` output after the next deploy:
+   - confirm the preview QR renders white on black in the admin table
+   - confirm `Download QR` saves a white-on-black PNG
+   - confirm the downloaded PNG still scans reliably on iPhone and Android camera flows
+   - confirm `Copy URL`, `Deactivate`, and `Delete` behavior is unchanged
+
 0. If Blake approves the latest production-readiness P0D tooling/docs pass, run the new harness locally first:
    - `python3 scripts/load_test_ynd.py --target http://localhost:8000 --users 10 --concurrency 10 --duration 60 --ramp-up 10 --city nashville --vibe down`
    - confirm the script refuses `yournotdown.com` targets unless `--allow-production` is passed
