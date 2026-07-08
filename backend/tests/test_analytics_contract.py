@@ -18,6 +18,18 @@ def named_function(name: str):
 
 
 class TestAnalyticsContract(unittest.TestCase):
+    def test_startup_maintenance_creates_hot_path_indexes(self):
+        source = ast.get_source_segment(SERVER_SOURCE, named_function("_apply_startup_maintenance"))
+        self.assertIn('await db.businesses.create_index([("id", 1)])', source)
+        self.assertIn('await db.businesses.create_index([("city_slug", 1), ("imported_status", 1), ("featured", -1), ("order", 1)])', source)
+        self.assertIn('await db.analytics_events.create_index([("event_type", 1), ("timestamp", -1)])', source)
+        self.assertIn('await db.saved_itineraries.create_index([("visitor_id", 1), ("created_at", -1)])', source)
+        self.assertIn('await db.audience_contacts.create_index([("marketing_opt_in", 1), ("last_saved_at", -1)])', source)
+        self.assertIn('await db.visitor_profiles.create_index([("last_seen_at", -1)])', source)
+        self.assertIn('await db.hotel_qr_codes.create_index([("city_slug", 1), ("active", 1), ("created_at", -1)])', source)
+        self.assertIn('await db.business_owner_invites.create_index([("business_id", 1), ("status", 1), ("created_at", -1)])', source)
+        self.assertIn('await db.business_owner_sessions.create_index([("business_id", 1), ("revoked_at", 1)])', source)
+
     def test_business_scoped_events_include_ticket_locked_and_saved_types(self):
         source = SERVER_SOURCE
         self.assertIn('"ticket_click"', source)
@@ -108,6 +120,15 @@ class TestAnalyticsContract(unittest.TestCase):
         self.assertIn("return _hotel_qr_response(await db.hotel_qr_codes.find_one", update_source)
         self.assertIn("return _hotel_qr_response(await db.hotel_qr_codes.find_one", deactivate_source)
         self.assertIn('"deleted": _hotel_qr_response(existing)', delete_source)
+
+    def test_duplicate_risk_indexes_remain_non_unique_except_existing_safe_keys(self):
+        source = ast.get_source_segment(SERVER_SOURCE, named_function("_apply_startup_maintenance"))
+        self.assertIn('await db.audience_contacts.create_index("email_normalized", unique=True)', source)
+        self.assertIn('await db.visitor_profiles.create_index("visitor_id", unique=True)', source)
+        self.assertIn('await db.hotel_qr_codes.create_index("slug", unique=True)', source)
+        self.assertNotIn('await db.businesses.create_index("id", unique=True)', source)
+        self.assertNotIn('await db.business_owner_invites.create_index([("token_hash", 1)], unique=True)', source)
+        self.assertNotIn('await db.business_owner_sessions.create_index([("session_token_hash", 1)], unique=True)', source)
 
     def test_hotel_qr_delete_removes_only_config_row_and_handles_missing(self):
         source = ast.get_source_segment(SERVER_SOURCE, named_function("admin_delete_hotel_qr_code"))

@@ -6,6 +6,51 @@ The repo is currently on branch `main`. The only known worktree changes outside 
 
 ## Latest Work Session
 
+Latest local production-readiness P0A hardening pass:
+- implemented the first backend-only follow-up from `docs/production/production_readiness_audit.md`: Mongo index coverage and hot-path query hardening in `backend/server.py`
+- expanded startup-managed index creation across the collections most likely to sit on the launch hot path:
+  - `businesses`
+  - `city_events`
+  - `analytics_events`
+  - `itineraries`
+  - `saved_itineraries`
+  - `audience_contacts`
+  - `visitor_profiles`
+  - `hotel_qr_codes`
+  - `business_owner_invites`
+  - `business_owners`
+  - `business_owner_sessions`
+  - `user_sessions`
+  - `admin_featured_events`
+  - `admin_sponsorships`
+- kept the previously existing unique indexes on:
+  - `businesses.google_place_id`
+  - `businesses.normalized_name_address`
+  - `city_events (source, external_event_id)`
+  - `audience_contacts.email_normalized`
+  - `visitor_profiles.visitor_id`
+  - `hotel_qr_codes.slug`
+- intentionally kept new app-generated identifier/token indexes non-unique for startup safety so an unexpected production duplicate cannot block boot while still giving lookups an index:
+  - `businesses.id`
+  - `hotel_qr_codes.id`
+  - `business_owner_invites.token_hash`
+  - `business_owners.owner_id`
+  - `business_owner_sessions.session_token_hash`
+  - `user_sessions.session_token`
+- hardened public/admin query paths without changing product behavior:
+  - `_public_businesses(...)` now clamps requested limits to a safe `1..2000`
+  - `GET /api/businesses` now clamps public limits to a safe `1..500`
+  - `GET /api/admin/audience` no longer loads up to `5000` full `visitor_profiles` documents just to compute totals
+  - audience totals now use indexed `count_documents(...)` queries plus a bounded repeat-saver lookup instead
+- updated backend source-contract tests so they assert the new startup indexes and the safer audience aggregation path
+- local verification for this hardening pass:
+  - `python3 -m unittest backend.tests.test_business_owner_contract backend.tests.test_analytics_contract backend.tests.test_saved_itinerary_contract backend.tests.test_locked_steps_contract backend.tests.test_tonight_page_contract backend.tests.test_city_events_filtering_contract backend.tests.test_ticketmaster_events_unit` passed (`115` tests)
+  - `cd frontend && npm run build` passed
+  - `cd frontend && CI=true npm test -- --watchAll=false` passed (`3` suites, `34` tests)
+- still unverified:
+  - no real Mongo explain-plan validation was run against production data
+  - no load test was run; this pass only reduces obvious query/index risk before a future controlled load test
+
 Latest local vibe-card typography polish:
 - refined the `frontend/src/pages/VibePage.jsx` card label styling so the final vibe labels read more cleanly without changing the words, slugs, or behavior
 - reduced the aggressive uppercase tracking on the vibe-card captions, increased the readable measure, and tightened the line-height so labels like `See Where It Goes` and `Make It Count` no longer visually collapse together

@@ -438,11 +438,65 @@ async def run_startup_maintenance():
 async def _apply_startup_maintenance():
     await db.businesses.create_index("google_place_id", unique=True, sparse=True)
     await db.businesses.create_index("normalized_name_address", unique=True, sparse=True)
+    await db.businesses.create_index([("id", 1)])
+    await db.businesses.create_index([("city_slug", 1), ("imported_status", 1), ("featured", -1), ("order", 1)])
+    await db.businesses.create_index([("city_slug", 1), ("imported_status", 1), ("category_slug", 1), ("featured", -1), ("order", 1)])
+    await db.businesses.create_index([("city_slug", 1), ("imported_status", 1), ("sponsor_tier", 1)])
+
     await db.city_events.create_index([("city_slug", 1), ("local_date", 1)])
     await db.city_events.create_index([("source", 1), ("external_event_id", 1)], unique=True)
+    await db.city_events.create_index([("city_slug", 1), ("source", 1), ("local_date", 1)])
+    await db.city_events.create_index([("venue_business_id", 1), ("local_date", 1)])
+
+    await db.analytics_events.create_index([("event_type", 1), ("timestamp", -1)])
+    await db.analytics_events.create_index([("business_id", 1), ("timestamp", -1)])
+    await db.analytics_events.create_index([("city_slug", 1), ("timestamp", -1)])
+    await db.analytics_events.create_index([("vibe", 1), ("timestamp", -1)])
+    await db.analytics_events.create_index([("slot", 1), ("timestamp", -1)])
+    await db.analytics_events.create_index([("qr_slug", 1), ("timestamp", -1)])
+    await db.analytics_events.create_index([("visitor_id", 1), ("timestamp", -1)])
+
+    await db.itineraries.create_index([("id", 1)])
+    await db.itineraries.create_index([("city", 1), ("vibe", 1), ("generated_at", -1)])
+
+    await db.saved_itineraries.create_index([("email", 1), ("created_at", -1)])
+    await db.saved_itineraries.create_index([("visitor_id", 1), ("created_at", -1)])
+    await db.saved_itineraries.create_index([("qr_slug", 1), ("created_at", -1)])
+    await db.saved_itineraries.create_index([("source_itinerary_id", 1)])
+
     await db.audience_contacts.create_index("email_normalized", unique=True)
+    await db.audience_contacts.create_index([("visitor_id", 1)])
+    await db.audience_contacts.create_index([("marketing_opt_in", 1), ("last_saved_at", -1)])
+    await db.audience_contacts.create_index([("last_saved_at", -1)])
+
     await db.visitor_profiles.create_index("visitor_id", unique=True)
+    await db.visitor_profiles.create_index([("email_normalized", 1)])
+    await db.visitor_profiles.create_index([("last_seen_at", -1)])
+    await db.visitor_profiles.create_index([("saved_itinerary_count", 1)])
+
     await db.hotel_qr_codes.create_index("slug", unique=True)
+    await db.hotel_qr_codes.create_index([("id", 1)])
+    await db.hotel_qr_codes.create_index([("city_slug", 1), ("active", 1), ("created_at", -1)])
+
+    await db.business_owner_invites.create_index([("token_hash", 1)])
+    await db.business_owner_invites.create_index([("business_id", 1), ("status", 1), ("created_at", -1)])
+    await db.business_owner_invites.create_index([("business_id", 1), ("email", 1), ("status", 1)])
+    await db.business_owner_invites.create_index([("expires_at", 1)])
+
+    await db.business_owners.create_index([("owner_id", 1)])
+    await db.business_owners.create_index([("business_id", 1), ("status", 1)])
+    await db.business_owners.create_index([("business_id", 1), ("email", 1)])
+
+    await db.business_owner_sessions.create_index([("session_token_hash", 1)])
+    await db.business_owner_sessions.create_index([("owner_id", 1), ("revoked_at", 1)])
+    await db.business_owner_sessions.create_index([("business_id", 1), ("revoked_at", 1)])
+    await db.business_owner_sessions.create_index([("expires_at", 1)])
+
+    await db.user_sessions.create_index([("session_token", 1)])
+    await db.user_sessions.create_index([("user_id", 1), ("expires_at", 1)])
+
+    await db.admin_featured_events.create_index([("city_slug", 1), ("slot", 1), ("priority", -1), ("updated_at", -1)])
+    await db.admin_sponsorships.create_index([("city_slug", 1), ("placement", 1), ("priority", -1), ("updated_at", -1)])
 
     # Seed cities
     for c in CITIES:
@@ -1345,6 +1399,7 @@ async def _public_businesses(
     require_slots: bool = False,
     event_rows: Optional[list[dict]] = None,
 ) -> list[dict]:
+    limit = max(1, min(int(limit or 200), 2000))
     q = {"city_slug": city, "imported_status": "approved"}
     if category and category != "surprise-me":
         q["category_slug"] = category
@@ -1556,6 +1611,7 @@ async def list_businesses(
     featured: Optional[bool] = None,
     limit: int = 200,
 ):
+    limit = max(1, min(int(limit or 200), 500))
     items = await _public_businesses(city, category=category, featured=featured, limit=limit)
     if category == "surprise-me":
         import random
@@ -1828,19 +1884,22 @@ async def admin_audience(
         for profile in visitor_profiles
         if profile.get("visitor_id")
     }
-    all_visitor_profiles = await db.visitor_profiles.find({}, {"_id": 0}).to_list(5000)
     now = datetime.now(timezone.utc)
     total_contacts = len(rows)
     marketing_opted_in_contacts = sum(1 for row in rows if row.get("marketing_opt_in"))
     non_marketing_contacts = total_contacts - marketing_opted_in_contacts
     total_saved_itineraries = sum(int(row.get("saved_itinerary_count", 0)) for row in rows)
-    total_anonymous_visitors = len(all_visitor_profiles)
-    new_visitors = sum(1 for profile in all_visitor_profiles if int(profile.get("event_count", 0)) <= 1)
+    total_anonymous_visitors = await db.visitor_profiles.count_documents({})
+    new_visitors = await db.visitor_profiles.count_documents({"event_count": {"$lte": 1}})
     returning_visitors = max(total_anonymous_visitors - new_visitors, 0)
     returning_visitor_rate = round(returning_visitors / total_anonymous_visitors, 4) if total_anonymous_visitors else 0
     repeat_saver_keys = set()
-    for profile in all_visitor_profiles:
-        if int(profile.get("saved_itinerary_count", 0)) > 1 and profile.get("visitor_id"):
+    repeat_visitor_profiles = await db.visitor_profiles.find(
+        {"saved_itinerary_count": {"$gt": 1}},
+        {"_id": 0, "visitor_id": 1},
+    ).to_list(5000)
+    for profile in repeat_visitor_profiles:
+        if profile.get("visitor_id"):
             repeat_saver_keys.add(f"visitor:{profile['visitor_id']}")
     for row in rows:
         if int(row.get("saved_itinerary_count", 0)) > 1:

@@ -1,5 +1,22 @@
 ## Immediate Follow-Up
 
+0. If Blake approves the latest production-readiness P0A pass, manually inspect Mongo/railway behavior after deploy:
+   - confirm startup maintenance completes instead of deferring
+   - confirm no index-creation error appears for any newly indexed collection
+   - sanity-check that `GET /api/admin/audience` loads faster and no longer needs to scan the entire `visitor_profiles` collection
+0. Use the new startup-managed indexes as the baseline before any future controlled load test:
+   - verify the hot-path collections now show the expected indexes in Mongo Atlas
+   - if Atlas metrics still show slow scans on `analytics_events`, `businesses`, or `saved_itineraries`, capture the exact query shapes before changing behavior further
+0. Next production-readiness follow-up after P0A should stay focused on the remaining audit P0s:
+   - image/proxy pressure from the Google Places photo pass-through
+   - broader `/api/itinerary/generate` read cost under spike traffic
+   - admin analytics and Hotel QR query weight on larger event volumes
+   - admin auth/session hardening called out in the production audit
+0. Before any real 500-user confidence claim, run a controlled non-production load test against the indexed build:
+   - warm `/api/itinerary/generate`, `/api/analytics/track`, and `/api/itinerary/save`
+   - include a smaller admin read mix for `/api/admin/audience` and `/api/admin/hotel-qr`
+   - capture p50/p95 latency plus Mongo CPU/IO rather than guessing from unit tests
+
 0. If Blake approves the latest vibe-card typography polish, manually QA the Vibe page after deploy:
    - confirm `See Where It Goes` and `Make It Count` keep clear spacing between words on mobile and desktop
    - confirm the cards still feel premium and balanced with the emoji-first layout

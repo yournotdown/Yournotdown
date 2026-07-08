@@ -145,6 +145,9 @@ class TestSavedItineraryContract(unittest.TestCase):
     def test_admin_audience_endpoint_requires_admin_and_returns_totals_rows(self):
         source = ast.get_source_segment(SERVER_SOURCE, named_function("admin_audience"))
         self.assertIn("user=Depends(require_admin)", source)
+        self.assertIn("await db.visitor_profiles.count_documents({})", source)
+        self.assertIn('await db.visitor_profiles.count_documents({"event_count": {"$lte": 1}})', source)
+        self.assertIn('{"saved_itinerary_count": {"$gt": 1}}', source)
         self.assertIn('"total_contacts"', source)
         self.assertIn('"total_anonymous_visitors"', source)
         self.assertIn('"new_visitors"', source)
