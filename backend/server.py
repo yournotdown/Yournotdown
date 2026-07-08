@@ -1515,15 +1515,15 @@ async def generate_itinerary(req: ItineraryRequest, request: Request):
                 pick = _weighted_pick(
                     event_candidates or candidates,
                     exclude | chosen_ids,
-                    slot_history_excludes,
                     req.vibe,
+                    slot_history_excludes,
                 )
         elif not pick:
             pick = _weighted_pick(
                 candidates,
                 exclude | chosen_ids,
-                slot_history_excludes,
                 req.vibe,
+                slot_history_excludes,
             )
         if pick:
             chosen_ids.add(pick["id"])

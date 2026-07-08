@@ -6,6 +6,30 @@ The repo is currently on branch `main`. The only known worktree changes outside 
 
 ## Latest Work Session
 
+Latest local Ticketmaster reroll-failure hotfix:
+- fixed a backend itinerary-generation crash that appeared after the Ticketmaster live-music rotation change when clicking `Run It Back`
+- root cause was not the new Ticketmaster event-pool picker itself; it was the fallback call into `_weighted_pick(...)` inside `backend/server.py`
+- both the entertainment fallback path and the normal slot picker path were passing `_weighted_pick(...)` arguments in the wrong order:
+  - `slot_history_excludes` was accidentally being passed as the `vibe` argument
+  - `req.vibe` was accidentally being passed as `historical_exclude_ids`
+- that stayed mostly hidden on first load because slot-history exclusions were empty, but after a reroll those exclusions became non-empty and could trigger a backend exception instead of a graceful fallback
+- corrected the `_weighted_pick(...)` calls in `backend/server.py` so they now pass:
+  - `candidates`
+  - hard excludes
+  - `req.vibe`
+  - `slot_history_excludes`
+- this restores the intended non-fatal behavior:
+  - Ticketmaster event-pool misses can still fall back to normal live-music business selection
+  - exhausted same-session slot history still relaxes only historical excludes
+  - dinner/drinks/late-night generation remains independent from Ticketmaster rotation
+- updated `backend/tests/test_city_events_filtering_contract.py` so the source-contract coverage now locks the `_weighted_pick(...)` argument order for both the entertainment path and the normal slot path
+- local verification for this hotfix:
+  - `python3 -m unittest backend.tests.test_ticketmaster_events_unit backend.tests.test_city_events_filtering_contract backend.tests.test_tonight_page_contract backend.tests.test_analytics_contract backend.tests.test_saved_itinerary_contract backend.tests.test_locked_steps_contract backend.tests.test_business_owner_contract` passed (`123` tests)
+  - `cd frontend && npm run build` passed
+  - `cd frontend && CI=true npm test -- --watchAll=false` passed (`3` suites, `38` tests)
+- still unverified:
+  - no manual browser reroll QA has yet reconfirmed that a first-load Ticketmaster show followed by repeated `Run It Back` clicks never throws the full-page `Couldn't plan tonight. Try again.` error
+
 Latest local Ticketmaster live-music variety + venue-matching hardening pass:
 - fixed the deterministic Ticketmaster entertainment picker bias that kept surfacing the first matched venue/business in sorted order
 - `backend/ticketmaster_events.py` now builds the full eligible matched `(business, event)` pool for Ticketmaster live music before choosing a result, instead of returning the first matching business/event pair
