@@ -63,7 +63,17 @@ def open_mongo_client(mongo_url: str):
 def load_approved_businesses(database, city_slug: str) -> list[dict]:
     return list(database.businesses.find(
         {"city_slug": city_slug, "imported_status": "approved"},
-        {"_id": 0, "id": 1, "name": 1},
+        {
+            "_id": 0,
+            "id": 1,
+            "name": 1,
+            "category_slug": 1,
+            "featured": 1,
+            "imported_status": 1,
+            "order": 1,
+            "slots": 1,
+            "tags": 1,
+        },
     ))
 
 

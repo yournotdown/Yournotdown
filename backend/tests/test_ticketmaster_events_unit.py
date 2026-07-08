@@ -87,6 +87,36 @@ class TestMatching(unittest.TestCase):
         business = {"id": "business-123", "name": "The Basement East"}
         self.assertEqual(match_business_for_venue("Basement East", [business]), business)
 
+    def test_maps_3rd_and_lindsley_to_bar_and_grill_business(self):
+        business = {"id": "business-123", "name": "3rd & Lindsley Bar & Grill", "category_slug": "live-music", "slots": ["entertainment"]}
+        self.assertEqual(match_business_for_venue("3rd & Lindsley", [business]), business)
+
+    def test_maps_listening_room_alias_to_catalog_business(self):
+        business = {"id": "business-123", "name": "Listening Room Cafe - Nashville", "category_slug": "night-out", "slots": ["dinner", "entertainment"], "tags": ["live_music"]}
+        self.assertEqual(match_business_for_venue("The Listening Room Cafe", [business]), business)
+
+    def test_prefers_live_music_capable_record_when_duplicate_names_exist(self):
+        duplicate_generic = {
+            "id": "generic",
+            "name": "The Basement East",
+            "category_slug": "night-out",
+            "slots": ["late-night"],
+            "tags": ["nightlife"],
+            "order": 999,
+        }
+        duplicate_music = {
+            "id": "music",
+            "name": "The Basement East",
+            "category_slug": "live-music",
+            "slots": ["entertainment"],
+            "tags": ["live_music", "concerts"],
+            "order": 5,
+        }
+        self.assertEqual(
+            match_business_for_venue("The Basement East", [duplicate_generic, duplicate_music]),
+            duplicate_music,
+        )
+
     def test_canonicalizes_3rd_and_lindsley_alias(self):
         self.assertEqual(canonical_venue_name("3rd and Lindsley"), "3rd & Lindsley")
 
@@ -320,10 +350,38 @@ class TestDates(unittest.TestCase):
         self.assertEqual(business["id"], "basement")
         self.assertEqual(event_row["external_event_id"], "event-2")
 
+    def test_itinerary_event_pick_chooses_from_full_eligible_pool(self):
+        businesses = [
+            {"id": "bluebird", "name": "The Bluebird Cafe"},
+            {"id": "ryman", "name": "Ryman Auditorium"},
+            {"id": "east-room", "name": "The East Room"},
+        ]
+        events = [
+            {"title": "Bluebird Show", "venue_business_id": "bluebird", "external_event_id": "event-1"},
+            {"title": "Ryman Show", "venue_business_id": "ryman", "external_event_id": "event-2"},
+            {"title": "East Room Show", "venue_business_id": "east-room", "external_event_id": "event-3"},
+        ]
+        business, event_row = itinerary_event_pick(
+            businesses,
+            events,
+            {"none"},
+            set(),
+            chooser=lambda pairs: pairs[-1],
+        )
+        self.assertEqual(business["id"], "east-room")
+        self.assertEqual(event_row["external_event_id"], "event-3")
+
     def test_itinerary_event_pick_relaxes_exclusions_when_all_events_are_exhausted(self):
         businesses = [{"id": "exit", "name": "Exit/In"}]
         events = [{"title": "Only Show", "venue_business_id": "exit", "external_event_id": "event-1"}]
         business, event_row = itinerary_event_pick(businesses, events, {"exit"}, {"event-1"})
+        self.assertIsNone(business)
+        self.assertIsNone(event_row)
+
+    def test_itinerary_event_pick_relaxes_event_history_but_not_business_excludes(self):
+        businesses = [{"id": "exit", "name": "Exit/In"}]
+        events = [{"title": "Only Show", "venue_business_id": "exit", "external_event_id": "event-1"}]
+        business, event_row = itinerary_event_pick(businesses, events, {"none"}, {"event-1"})
         self.assertEqual(business["id"], "exit")
         self.assertEqual(event_row["external_event_id"], "event-1")
 

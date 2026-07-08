@@ -205,18 +205,34 @@
 
 ## Top 5 Next Tasks
 
-1. Review `backend/discovery_reports/nashville_take_it_easy_supplement_candidates.json`, `.csv`, and `..._report.txt`; the dry-run supplement recommends `20` additional Nashville candidates for `Take It Easy` and would likely move `just_vibing` from `15` to roughly `25-35` if a later import only approved the strongest fits.
-2. Use `backend/discovery_reports/nashville_take_it_easy_supplement_human_review.csv` and `..._human_review_report.txt` for Blake review before any import-ready work:
+1. Manually QA live-music Ticketmaster variety in production-like browser sessions now that the picker uses the full matched event pool:
+   - verify first-load `ticketmaster_preferred` can surface more than Basement/Basement East when multiple same-day matched venues exist
+   - verify every-fourth `Run It Back` in entertainment can rotate across venues like `Brooklyn Bowl Nashville`, `Ryman Auditorium`, `The East Room`, and `The Bluebird Cafe`
+   - verify Ticketmaster event-id exclusions still prevent immediate repeat-show loops while allowing later fallback if the pool is exhausted
+2. Decide how to resolve the catalog/data gap for `Grand Ole Opry House`:
+   - there is still no approved canonical Opry business record to map that Ticketmaster venue onto
+   - no alias was added in code because mapping to a missing target would be unsafe
+3. Audit and eventually clean duplicate approved live-music venue rows that were observed during the read-only Ticketmaster investigation:
+   - `Ryman Auditorium`
+   - `The Basement East`
+   - duplicate cleanup is still deferred; current code only makes the matching deterministic
+4. If Ticketmaster venue coverage still feels narrow after manual QA, expand the safe venue alias map with additional real Nashville mismatches found in production data instead of changing the same-day event scope:
+   - continue preferring explicit curated aliases over fuzzy matching
+   - keep sports/baseball exclusions and current classification rules unchanged
+5. If Blake wants broader live-music diversity after the current picker fix is verified, consider a second pass that adds weighted/randomized Ticketmaster pair selection tuning or stronger venue rotation memory without changing first-load cadence or tomorrow-event scope.
+
+6. Review `backend/discovery_reports/nashville_take_it_easy_supplement_candidates.json`, `.csv`, and `..._report.txt`; the dry-run supplement recommends `20` additional Nashville candidates for `Take It Easy` and would likely move `just_vibing` from `15` to roughly `25-35` if a later import only approved the strongest fits.
+7. Use `backend/discovery_reports/nashville_take_it_easy_supplement_human_review.csv` and `..._human_review_report.txt` for Blake review before any import-ready work:
    - current strict split: `10 approve`, `5 maybe`, `5 reject`
    - safest current approvals: `Park Cafe`, `The Cookery`, `Lockeland Table`, `Caffe Nonna`, `Epice`, `Once Upon A Time In France`, `Koré`, `Sirocco`, `ButterFLY Garden Brunch`, and `Germantown Café`
    - highest-risk rows needing caution: `The Chloe Nashville Restaurant & Bar`, `Chateau West`, `Sadie's`, `Peninsula`, `Milk & Honey Gulch`, `Frothy Monkey`, `1 Kitchen`, `Bungalow 10 Dining`, and `Twenty First`
-3. Use `backend/discovery_reports/nashville_take_it_easy_approved_10_import_ready_enriched.json`, `.csv`, and `..._enrichment_report.txt` as the current approved-only enriched dry-run import package:
+8. Use `backend/discovery_reports/nashville_take_it_easy_approved_10_import_ready_enriched.json`, `.csv`, and `..._enrichment_report.txt` as the current approved-only enriched dry-run import package:
    - final count: `10`
    - duplicate checks against the `v5` deduped catalog are clean by `google_place_id`, exact name, normalized name, and normalized name+address
    - core Business-schema validation is clean
    - websites found: `10/10`
    - photo sets found: `10/10`
-4. If Blake approves a future production-safe database dry-run for the Take It Easy 10, use `backend/import_nashville_take_it_easy_approved_10.py` against the enriched package first:
+9. If Blake approves a future production-safe database dry-run for the Take It Easy 10, use `backend/import_nashville_take_it_easy_approved_10.py` against the enriched package first:
    - default mode is dry-run
    - real inserts require `--apply --confirm IMPORT_NASHVILLE_TAKE_IT_EASY_10`
    - it inserts only non-duplicates into `db.businesses`

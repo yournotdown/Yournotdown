@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import random
 import re
 import socket
 import time
@@ -34,6 +35,10 @@ CITY_CONFIG = {
 VENUE_ALIASES = {
     "3rd and lindsley": "3rd & Lindsley",
     "ole red nashville": "Ole Red",
+}
+VENUE_MATCH_ALIASES = {
+    "3rd and lindsley": "3rd & Lindsley Bar & Grill",
+    "listening room cafe": "Listening Room Cafe - Nashville",
 }
 EXCLUDED_EVENT_STATUSES = {"cancelled", "canceled", "offsale"}
 DEFAULT_EVENT_START_GRACE_MINUTES = max(0, int(os.environ.get("EVENT_START_GRACE_MINUTES", "60")))
@@ -89,16 +94,63 @@ def canonical_venue_name(value: str) -> str:
     return VENUE_ALIASES.get(normalize_venue_name(value), value)
 
 
+def _business_live_music_capable(business: dict) -> bool:
+    slots = set(business.get("slots") or [])
+    tags = set(business.get("tags") or [])
+    return (
+        business.get("category_slug") == "live-music"
+        or "live_music" in tags
+        or "concerts" in tags
+        or ("entertainment" in slots and "live_music" in tags)
+    )
+
+
+def _business_match_priority(business: dict) -> tuple:
+    order = business.get("order")
+    if not isinstance(order, (int, float)):
+        order = 10**9
+    return (
+        1 if (business.get("imported_status") or "") == "approved" else 0,
+        1 if _business_live_music_capable(business) else 0,
+        1 if business.get("category_slug") == "live-music" else 0,
+        1 if "entertainment" in set(business.get("slots") or []) else 0,
+        1 if business.get("featured") else 0,
+        -int(order),
+        business.get("id") or "",
+    )
+
+
+def candidate_business_keys_for_venue(venue_name: str) -> list[str]:
+    normalized = normalize_venue_name(venue_name)
+    keys = [normalized]
+    if normalized in VENUE_ALIASES:
+        keys.append(normalize_venue_name(VENUE_ALIASES[normalized]))
+    if normalized in VENUE_MATCH_ALIASES:
+        keys.append(normalize_venue_name(VENUE_MATCH_ALIASES[normalized]))
+    return list(dict.fromkeys(key for key in keys if key))
+
+
 def businesses_by_normalized_venue(businesses: Iterable[dict]) -> dict[str, dict]:
-    return {
-        normalize_venue_name(business.get("name", "")): business
-        for business in businesses
-        if business.get("id") and normalize_venue_name(business.get("name", ""))
-    }
+    by_venue: dict[str, dict] = {}
+    for business in businesses:
+        if not business.get("id"):
+            continue
+        key = normalize_venue_name(business.get("name", ""))
+        if not key:
+            continue
+        current = by_venue.get(key)
+        if current is None or _business_match_priority(business) > _business_match_priority(current):
+            by_venue[key] = business
+    return by_venue
 
 
 def match_business_for_venue(venue_name: str, businesses: Iterable[dict]) -> Optional[dict]:
-    return businesses_by_normalized_venue(businesses).get(normalize_venue_name(venue_name))
+    business_lookup = businesses_by_normalized_venue(businesses)
+    for key in candidate_business_keys_for_venue(venue_name):
+        business = business_lookup.get(key)
+        if business:
+            return business
+    return None
 
 
 def event_is_on_local_date(event: dict, local_date: str) -> bool:
@@ -205,14 +257,7 @@ def event_classification_subgenre(event: dict) -> str:
 
 
 def business_supports_live_music_event(business: dict) -> bool:
-    slots = set(business.get("slots") or [])
-    tags = set(business.get("tags") or [])
-    return (
-        business.get("category_slug") == "live-music"
-        or "live_music" in tags
-        or "concerts" in tags
-        or ("entertainment" in slots and "live_music" in tags)
-    )
+    return _business_live_music_capable(business)
 
 
 def event_is_ticketmaster_music(event: dict, business: Optional[dict] = None) -> bool:
@@ -236,11 +281,13 @@ def eligible_ticketmaster_music_events(events: Iterable[dict], businesses: Itera
 
 
 def itinerary_event_pick(candidates: Iterable[dict], events: Iterable[dict], exclude_business_ids: set[str],
-                         exclude_event_ids: set[str]) -> tuple[Optional[dict], Optional[dict]]:
+                         exclude_event_ids: set[str], chooser=None) -> tuple[Optional[dict], Optional[dict]]:
     candidate_list = list(candidates)
     event_lookup = events_by_business_id(events)
+    choose_one = chooser or random.choice
 
     def pick_with(active_business_excludes: set[str], active_event_excludes: set[str]) -> tuple[Optional[dict], Optional[dict]]:
+        eligible_pairs = []
         for business in candidate_list:
             event = event_lookup.get(business.get("id"))
             if not event:
@@ -248,16 +295,18 @@ def itinerary_event_pick(candidates: Iterable[dict], events: Iterable[dict], exc
             event_id = event.get("external_event_id") or event.get("id")
             if business.get("id") in active_business_excludes or event_id in active_event_excludes:
                 continue
-            return business, event
-        return None, None
+            eligible_pairs.append((business, event))
+        if not eligible_pairs:
+            return None, None
+        return choose_one(eligible_pairs)
 
     pick = pick_with(exclude_business_ids, exclude_event_ids)
     if pick != (None, None):
         return pick
 
-    # Mirror the normal itinerary picker behavior: if refresh exclusions exhaust
-    # the live-music event pool, relax them so the slot still returns a show.
-    return pick_with(set(), set())
+    # Preserve hard business exclusions. Only relax event-id history exclusions
+    # when the matched live-music event pool has been exhausted by rerolls.
+    return pick_with(exclude_business_ids, set())
 
 
 def primary_classification(event: dict) -> dict:

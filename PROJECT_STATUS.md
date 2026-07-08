@@ -6,6 +6,38 @@ The repo is currently on branch `main`. The only known worktree changes outside 
 
 ## Latest Work Session
 
+Latest local Ticketmaster live-music variety + venue-matching hardening pass:
+- fixed the deterministic Ticketmaster entertainment picker bias that kept surfacing the first matched venue/business in sorted order
+- `backend/ticketmaster_events.py` now builds the full eligible matched `(business, event)` pool for Ticketmaster live music before choosing a result, instead of returning the first matching business/event pair
+- Ticketmaster entertainment selection now:
+  - still respects matched-business eligibility and same-day-only event scope
+  - still excludes non-music Ticketmaster rows when `classification_segment` is present and not `Music`
+  - still respects `exclude_event_ids`
+  - now relaxes only exhausted event-history exclusions, while preserving hard business exclusions
+- preserved existing public cadence behavior:
+  - first load still uses `ticketmaster_preferred`
+  - every fourth `Run It Back` still uses `ticketmaster`
+  - featured live music override behavior is unchanged
+- improved venue matching for known Nashville name mismatches:
+  - `3rd & Lindsley` now maps safely to `3rd & Lindsley Bar & Grill`
+  - `The Listening Room Cafe` now maps safely to `Listening Room Cafe - Nashville`
+- made duplicate-name venue matching deterministic instead of last-write fragile:
+  - when multiple approved businesses normalize to the same venue key, matching now prefers the stronger live-music-capable record rather than whichever record happened to be iterated last
+- expanded `backend/ticketmaster_sync_job.py` approved-business projection so venue matching has access to the business fields needed for deterministic duplicate resolution during sync
+- intentionally did **not** add a `Grand Ole Opry House` alias because no approved canonical Opry business target currently exists in the catalog; a business record is still needed before that venue can surface through the existing matched-business path
+- updated backend Ticketmaster helper coverage for:
+  - full-pool event selection
+  - event-history relaxation without relaxing hard business exclusions
+  - duplicate-name deterministic venue matching
+  - `3rd & Lindsley` and `Listening Room` alias mapping
+- local verification for this pass:
+  - `python3 -m unittest backend.tests.test_ticketmaster_events_unit backend.tests.test_city_events_filtering_contract backend.tests.test_tonight_page_contract backend.tests.test_analytics_contract backend.tests.test_saved_itinerary_contract backend.tests.test_locked_steps_contract backend.tests.test_business_owner_contract` passed (`123` tests)
+  - `cd frontend && npm run build` passed
+  - `cd frontend && CI=true npm test -- --watchAll=false` passed (`3` suites, `38` tests)
+- still unverified:
+  - no browser/manual QA has yet confirmed that repeated `Run It Back` sessions surface a visibly broader mix of live-music venues in production
+  - no production data cleanup has yet removed duplicate venue/business rows like the duplicate `Ryman Auditorium` / `The Basement East` records observed during the read-only audit
+
 Latest local Tonight's Move reroll repetition hardening pass:
 - fixed the same-session `Run It Back` repetition issue where a normal business could reappear in the same slot after only a few rerolls
 - `frontend/src/pages/TonightPage.jsx` now keeps slot-specific seen business history for the current page session via `seenIdsBySlot`
