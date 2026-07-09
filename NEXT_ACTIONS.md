@@ -1,5 +1,17 @@
 ## Immediate Follow-Up
 
+0. Manually QA the owner portal access messaging after the next deploy:
+   - confirm the dashboard now clearly communicates that access stays active after the original invite is claimed
+   - confirm the `Account Access` section shows the correct owner email, business name, and sponsor tier
+   - confirm the copy points owners to `yournotdown.com/business/login` as the long-term return path
+   - confirm the expired-session state reads clearly and the `Send me a login link` CTA opens `/business/login`
+   - confirm the support CTA target is the right mailbox for launch-day owner help
+
+0. If Blake wants a true owner sign-out later, add it as a separate backend/frontend chunk:
+   - business-owner-specific logout endpoint
+   - clear `business_owner_session`
+   - keep it separate from the existing admin `/api/auth/logout` behavior
+
 0. Manually QA the new business-owner magic-link login flow after the next deploy:
    - visit `/business/login`
    - request a magic link for an active owner email

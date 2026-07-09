@@ -169,7 +169,7 @@ describe("Business owner routes source contract", () => {
     expect(businessClaimSource).toContain('.post("/business/claim", { token })');
     expect(businessClaimSource).toContain('api.get("/business/me")');
     expect(businessClaimSource).toContain('window.location.replace("/business/dashboard")');
-    expect(businessClaimSource).toContain("Create Account");
+    expect(businessClaimSource).toContain("Activate Dashboard Access");
     expect(businessClaimSource).not.toContain("MVP");
   });
 
@@ -190,7 +190,13 @@ describe("Business owner routes source contract", () => {
     expect(businessDashboardSource).toContain('api.get("/business/analytics")');
     expect(businessDashboardSource).toContain("Business Portal");
     expect(businessDashboardSource).toContain("Sponsor tier:");
-    expect(businessDashboardSource).toContain("Request a fresh magic link to continue.");
+    expect(businessDashboardSource).toContain("Your dashboard access is active.");
+    expect(businessDashboardSource).toContain("yournotdown.com/business/login");
+    expect(businessDashboardSource).toContain("Return login page");
+    expect(businessDashboardSource).toContain("Need help?");
+    expect(businessDashboardSource).toContain("Your session expired. Request a fresh secure login link.");
+    expect(businessDashboardSource).toContain("Send me a login link");
+    expect(businessDashboardSource).toContain('data-testid="business-dashboard-email"');
     expect(businessDashboardSource).toContain('href="/business/login"');
     expect(businessDashboardSource).not.toContain("MVP");
     expect(businessDashboardSource).not.toContain("being prepared");

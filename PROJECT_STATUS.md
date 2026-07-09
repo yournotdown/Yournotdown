@@ -6,6 +6,35 @@ The repo is currently on branch `main`. The only known worktree changes outside 
 
 ## Latest Work Session
 
+Latest local business-owner portal access UX polish pass:
+- refined the owner-facing portal copy so dashboard access feels persistent rather than temporary
+- updated `frontend/src/pages/BusinessDashboardPage.jsx`:
+  - expired/missing-session state now says `Your session expired. Request a fresh secure login link.`
+  - session recovery CTA now reads `Send me a login link` and points to `/business/login`
+  - added a new `Account Access` section at the top of the dashboard
+  - the new section explicitly tells owners:
+    - `Your dashboard access is active.`
+    - their access is tied to the current email
+    - the long-term return path is `yournotdown.com/business/login`
+  - shows:
+    - owner email from `/api/business/me`
+    - business name
+    - sponsor tier
+    - `Return login page` CTA
+    - `Need help?` support mailto CTA
+  - intentionally did **not** add a sign-out button because the existing logout endpoint is for admin sessions, not the business-owner session cookie
+- updated `frontend/src/pages/BusinessClaimPage.jsx`:
+  - changed headline from `Create Account` to `Activate Dashboard Access`
+  - changed loading/error copy to reflect access activation rather than account creation
+- updated `frontend/src/pages/pages.contract.test.js` for the new owner-facing copy expectations
+- local verification for this pass:
+  - `python3 -B -m unittest backend.tests.test_business_owner_contract` passed
+  - `cd frontend && npm run build` passed
+  - `cd frontend && CI=true npm test -- --watchAll=false` passed
+- still unverified:
+  - no manual browser QA has yet confirmed the new owner dashboard copy reads clearly in the live portal on desktop/mobile
+  - no live support mailbox validation was done in this pass; the support CTA currently uses `hello@yournotdown.com`
+
 Latest local business-owner magic-link login pass:
 - added self-serve owner re-entry without changing the original admin invite claim flow
 - backend changes in `backend/server.py`:

@@ -4,7 +4,7 @@ import { api } from "../lib/api";
 const ownerSessionError = (err) => {
   const detail = err?.response?.data?.detail || "";
   if (detail === "Not authenticated" || detail === "Invalid session" || detail === "Session revoked" || detail === "Session expired") {
-    return "Your secure business session is not active in this browser. Request a fresh magic link to continue.";
+    return "Your session expired. Request a fresh secure login link.";
   }
   if (detail === "Owner access revoked") {
     return "Your business portal access is no longer active.";
@@ -52,7 +52,7 @@ export default function BusinessDashboardPage() {
             className="mt-5 inline-block text-[11px] font-black uppercase tracking-[0.22em] text-[#C6FF00]"
             data-testid="business-dashboard-login-link"
           >
-            Get a magic link
+            Send me a login link
           </a>
         </div>
       </div>
@@ -72,6 +72,8 @@ export default function BusinessDashboardPage() {
   }
 
   const business = owner.business || {};
+  const ownerEmail = owner.email || "";
+  const supportHref = "mailto:hello@yournotdown.com";
   const cards = [
     { label: "Appearances", value: analytics.appearances },
     { label: "Locked In", value: analytics.locked_in },
@@ -94,6 +96,46 @@ export default function BusinessDashboardPage() {
         <p className="mt-4 text-sm text-white/65 max-w-2xl">
           Sponsor tier: <span className="text-white">{business.sponsor_tier || "none"}</span>. Your portal includes your venue snapshot and current performance totals.
         </p>
+
+        <div className="mt-8 border border-white/10 bg-[#121218] p-6" data-testid="business-dashboard-access">
+          <div className="text-[10px] uppercase tracking-[0.24em] text-[#C6FF00]">Account Access</div>
+          <h2 className="mt-3 font-flyer uppercase text-3xl leading-[0.95]">Your dashboard access is active.</h2>
+          <p className="mt-4 max-w-3xl text-sm leading-7 text-white/68">
+            Your access is connected to this email. To return later, visit <span className="text-white">yournotdown.com/business/login</span> and request a secure magic link.
+          </p>
+
+          <div className="mt-6 grid gap-4 md:grid-cols-3">
+            <div className="border border-white/8 bg-black/20 p-4">
+              <div className="text-[10px] uppercase tracking-[0.22em] text-white/45">Email</div>
+              <div className="mt-2 text-sm text-white break-all" data-testid="business-dashboard-email">{ownerEmail || "Active access email"}</div>
+            </div>
+            <div className="border border-white/8 bg-black/20 p-4">
+              <div className="text-[10px] uppercase tracking-[0.22em] text-white/45">Business</div>
+              <div className="mt-2 text-sm text-white">{business.name || "Your Venue"}</div>
+            </div>
+            <div className="border border-white/8 bg-black/20 p-4">
+              <div className="text-[10px] uppercase tracking-[0.22em] text-white/45">Sponsor Tier</div>
+              <div className="mt-2 text-sm text-white">{business.sponsor_tier || "none"}</div>
+            </div>
+          </div>
+
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+            <a
+              href="/business/login"
+              className="inline-flex items-center justify-center border border-[#C6FF00] px-4 py-3 text-[11px] font-black uppercase tracking-[0.22em] text-[#C6FF00]"
+              data-testid="business-dashboard-return-login"
+            >
+              Return login page
+            </a>
+            <a
+              href={supportHref}
+              className="inline-flex items-center justify-center border border-white/14 px-4 py-3 text-[11px] font-black uppercase tracking-[0.22em] text-white/80"
+              data-testid="business-dashboard-help"
+            >
+              Need help?
+            </a>
+          </div>
+        </div>
 
         <div className="mt-10 grid grid-cols-2 lg:grid-cols-4 gap-4">
           {cards.map((card) => (

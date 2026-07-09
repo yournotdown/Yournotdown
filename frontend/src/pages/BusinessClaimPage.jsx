@@ -5,7 +5,7 @@ import { api } from "../lib/api";
 const ownerSessionError = (err, fallback) => {
   const detail = err?.response?.data?.detail || "";
   if (detail === "Not authenticated" || detail === "Invalid session" || detail === "Session revoked") {
-    return "Your secure business access could not be completed in this browser. Please open the latest invite link again. If this keeps happening, support may need to finish the secure portal domain setup.";
+    return "Your dashboard access could not be activated in this browser. Please open the latest access link again. If this keeps happening, support may need to finish the secure portal domain setup.";
   }
   return detail || fallback;
 };
@@ -38,14 +38,14 @@ export default function BusinessClaimPage() {
     <div className="min-h-screen bg-[#050505] text-white flex items-center justify-center px-6" data-testid="business-claim-page">
       <div className="w-full max-w-md border border-white/10 bg-[#121218] p-8">
         <div className="text-[10px] uppercase tracking-[0.3em] text-[#C6FF00]">YND / EST. 26</div>
-        <h1 className="mt-4 font-flyer uppercase text-4xl leading-[0.92]">Create Account</h1>
+        <h1 className="mt-4 font-flyer uppercase text-4xl leading-[0.92]">Activate Dashboard Access</h1>
         {error ? (
           <p className="mt-4 text-sm text-[#FF8A8A]" data-testid="business-claim-error">
             {error}
           </p>
         ) : (
           <p className="mt-4 text-sm text-white/65" data-testid="business-claim-loading">
-            Verifying your secure access link…
+            Verifying your secure access link and activating your portal access…
           </p>
         )}
       </div>
