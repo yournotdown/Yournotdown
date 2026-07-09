@@ -179,6 +179,8 @@ class TestBusinessOwnerContract(unittest.TestCase):
         self.assertIn('_require_ip_rate_limit(', source)
         self.assertIn('"admin_owner_invite_ip"', source)
         self.assertIn("RATE_LIMIT_OWNER_INVITE_PER_IP", source)
+        self.assertIn('"owner invite email failed: business_id=%s delivery_status=%s email_hash=%s error_type=%s"', source)
+        self.assertIn('_hash_token(email)[:12]', source)
         self.assertIn('{"business_id": business_id, "email": email, "status": "pending"}', source)
         self.assertIn('await db.business_owner_invites.insert_one(doc)', source)
 

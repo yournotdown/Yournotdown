@@ -145,6 +145,13 @@ class TestSavedItineraryContract(unittest.TestCase):
         self.assertIn('detail="Too many requests. Please try again later."', source)
         self.assertIn('"Retry-After"', source)
 
+    def test_save_itinerary_logs_resend_failures_without_raw_email(self):
+        source = ast.get_source_segment(SERVER_SOURCE, named_function("save_itinerary"))
+        self.assertIn('logger.warning(', source)
+        self.assertIn('"save itinerary email failed: city_slug=%s vibe=%s delivery_status=%s email_hash=%s error_type=%s"', source)
+        self.assertIn('_hash_token(email)[:12]', source)
+        self.assertNotIn('logger.warning(email', source)
+
     def test_audience_contact_upsert_tracks_repeat_saves_and_opt_in(self):
         source = ast.get_source_segment(SERVER_SOURCE, named_function("_upsert_audience_contact"))
         self.assertIn('"email_normalized": email_normalized', source)

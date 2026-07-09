@@ -1671,146 +1671,155 @@ async def _active_tonight_move_sponsorship(city: str) -> Optional[dict]:
 @api_router.post("/itinerary/generate")
 async def generate_itinerary(req: ItineraryRequest, request: Request):
     """Build a 4-step 'Tonight's Move' itinerary tuned to the user's mood."""
-    _require_ip_rate_limit(
-        "itinerary_generate_ip",
-        request,
-        limit=RATE_LIMIT_ITINERARY_GENERATE_PER_IP,
-        window_seconds=RATE_LIMIT_MINUTE_SECONDS,
-    )
-    event_rows = await _today_city_events(req.city)
-    all_biz = await _public_businesses(req.city, limit=2000, require_slots=True, event_rows=event_rows)
-    today_events_by_business = events_by_business_id(event_rows)
-    eligible_music_events = eligible_ticketmaster_music_events(event_rows, all_biz)
-    live_music_event_mode = normalize_live_music_event_mode(req.live_music_event_mode)
-    featured_live_music = await _active_featured_live_music_event(req.city)
-    tonight_move_sponsorship = await _active_tonight_move_sponsorship(req.city)
+    try:
+        _require_ip_rate_limit(
+            "itinerary_generate_ip",
+            request,
+            limit=RATE_LIMIT_ITINERARY_GENERATE_PER_IP,
+            window_seconds=RATE_LIMIT_MINUTE_SECONDS,
+        )
+        event_rows = await _today_city_events(req.city)
+        all_biz = await _public_businesses(req.city, limit=2000, require_slots=True, event_rows=event_rows)
+        today_events_by_business = events_by_business_id(event_rows)
+        eligible_music_events = eligible_ticketmaster_music_events(event_rows, all_biz)
+        live_music_event_mode = normalize_live_music_event_mode(req.live_music_event_mode)
+        featured_live_music = await _active_featured_live_music_event(req.city)
+        tonight_move_sponsorship = await _active_tonight_move_sponsorship(req.city)
 
-    by_slot: dict = {}
-    for b in all_biz:
-        for slot in b.get("slots", []):
-            by_slot.setdefault(slot, []).append(b)
+        by_slot: dict = {}
+        for b in all_biz:
+            for slot in b.get("slots", []):
+                by_slot.setdefault(slot, []).append(b)
 
-    exclude = set(req.exclude_ids)
-    exclude_ids_by_slot = {
-        slot: {
+        exclude = set(req.exclude_ids)
+        exclude_ids_by_slot = {
+            slot: {
+                business_id
+                for business_id in (ids or [])
+                if business_id
+            }
+            for slot, ids in (req.exclude_ids_by_slot or {}).items()
+            if slot
+        }
+        exclude_event_ids = set(req.exclude_event_ids)
+        locked_steps_by_slot = {
+            slot: _safe_locked_step(slot, step)
+            for slot, step in (req.locked_steps or {}).items()
+            if slot
+        }
+        chosen_ids: set = {
             business_id
-            for business_id in (ids or [])
+            for business_id in [
+                ((step.get("business") or {}).get("id"))
+                for step in locked_steps_by_slot.values()
+            ]
             if business_id
         }
-        for slot, ids in (req.exclude_ids_by_slot or {}).items()
-        if slot
-    }
-    exclude_event_ids = set(req.exclude_event_ids)
-    locked_steps_by_slot = {
-        slot: _safe_locked_step(slot, step)
-        for slot, step in (req.locked_steps or {}).items()
-        if slot
-    }
-    chosen_ids: set = {
-        business_id
-        for business_id in [
-            ((step.get("business") or {}).get("id"))
-            for step in locked_steps_by_slot.values()
-        ]
-        if business_id
-    }
-    steps = []
-    for label in SLOT_LABELS:
-        locked_step = locked_steps_by_slot.get(label["slot"])
-        if locked_step:
-            steps.append(locked_step)
-            continue
-        candidates = by_slot.get(label["slot"], [])
-        slot_history_excludes = exclude_ids_by_slot.get(label["slot"], set())
-        pick = None
-        forced_event = None
-        if label["slot"] == "entertainment":
-            event_candidates = [business for business in candidates if business_supports_live_music_event(business)]
-            if featured_live_music:
-                pick = featured_live_music_business(featured_live_music)
-                forced_event = featured_live_music_step_event(featured_live_music)
-            elif live_music_event_mode in {"ticketmaster", "ticketmaster_preferred"}:
-                pick, forced_event = itinerary_event_pick(
-                    event_candidates,
-                    eligible_music_events,
-                    exclude | chosen_ids | slot_history_excludes,
-                    exclude_event_ids,
-                )
-            if not pick:
+        steps = []
+        for label in SLOT_LABELS:
+            locked_step = locked_steps_by_slot.get(label["slot"])
+            if locked_step:
+                steps.append(locked_step)
+                continue
+            candidates = by_slot.get(label["slot"], [])
+            slot_history_excludes = exclude_ids_by_slot.get(label["slot"], set())
+            pick = None
+            forced_event = None
+            if label["slot"] == "entertainment":
+                event_candidates = [business for business in candidates if business_supports_live_music_event(business)]
+                if featured_live_music:
+                    pick = featured_live_music_business(featured_live_music)
+                    forced_event = featured_live_music_step_event(featured_live_music)
+                elif live_music_event_mode in {"ticketmaster", "ticketmaster_preferred"}:
+                    pick, forced_event = itinerary_event_pick(
+                        event_candidates,
+                        eligible_music_events,
+                        exclude | chosen_ids | slot_history_excludes,
+                        exclude_event_ids,
+                    )
+                if not pick:
+                    pick = _weighted_pick(
+                        event_candidates or candidates,
+                        exclude | chosen_ids,
+                        req.vibe,
+                        slot_history_excludes,
+                    )
+            elif not pick:
                 pick = _weighted_pick(
-                    event_candidates or candidates,
+                    candidates,
                     exclude | chosen_ids,
                     req.vibe,
                     slot_history_excludes,
                 )
-        elif not pick:
-            pick = _weighted_pick(
-                candidates,
-                exclude | chosen_ids,
-                req.vibe,
-                slot_history_excludes,
-            )
-        if pick:
-            chosen_ids.add(pick["id"])
-            step = {
-                "slot": label["slot"],
-                "number": label["number"],
-                "label": label["label"],
-                "emoji": label["emoji"],
-                "business": pick,
-                "relevance_score": round(_relevance_score(pick, req.vibe), 2),
-            }
-            if forced_event:
-                steps.append({**step, "event": forced_event})
-            elif label["slot"] == "entertainment":
-                steps.append(step)
-            else:
-                steps.append(attach_event_to_step(step, today_events_by_business))
+            if pick:
+                chosen_ids.add(pick["id"])
+                step = {
+                    "slot": label["slot"],
+                    "number": label["number"],
+                    "label": label["label"],
+                    "emoji": label["emoji"],
+                    "business": pick,
+                    "relevance_score": round(_relevance_score(pick, req.vibe), 2),
+                }
+                if forced_event:
+                    steps.append({**step, "event": forced_event})
+                elif label["slot"] == "entertainment":
+                    steps.append(step)
+                else:
+                    steps.append(attach_event_to_step(step, today_events_by_business))
 
-    itin_id = str(uuid.uuid4())
-    itinerary = {
-        "id": itin_id,
-        "vibe": req.vibe,
-        "city": req.city,
-        "steps": steps,
-        "tonight_move_sponsorship": tonight_move_sponsorship,
-        "generated_at": now_iso(),
-    }
+        itin_id = str(uuid.uuid4())
+        itinerary = {
+            "id": itin_id,
+            "vibe": req.vibe,
+            "city": req.city,
+            "steps": steps,
+            "tonight_move_sponsorship": tonight_move_sponsorship,
+            "generated_at": now_iso(),
+        }
 
-    # Persist itinerary + analytics events
-    await db.itineraries.insert_one({
-        **itinerary,
-        "ip": request.client.host if request.client else None,
-    })
-    appearance_docs = []
-    for step in steps:
-        b = step["business"]
-        appearance_docs.append(_business_event_doc(
-            "business_appearance",
-            b,
-            slot=step.get("slot", ""),
-            category_slug=b.get("category_slug", ""),
-            city_slug=req.city,
-            vibe=req.vibe,
-            itinerary_id=itin_id,
-            source_surface="tonight_page",
-            ip=request.client.host if request.client else None,
-            user_agent=request.headers.get("user-agent"),
-        ))
-    if appearance_docs:
-        await db.analytics_events.insert_many(appearance_docs)
-    await db.analytics_events.insert_one({
-        "id": str(uuid.uuid4()),
-        "event_type": "itinerary_generated",
-        "city_slug": req.city,
-        "vibe": req.vibe,
-        "itinerary_id": itin_id,
-        "ip": request.client.host if request.client else None,
-        "user_agent": request.headers.get("user-agent"),
-        "timestamp": now_iso(),
-    })
+        # Persist itinerary + analytics events
+        await db.itineraries.insert_one({
+            **itinerary,
+            "ip": request.client.host if request.client else None,
+        })
+        appearance_docs = []
+        for step in steps:
+            b = step["business"]
+            appearance_docs.append(_business_event_doc(
+                "business_appearance",
+                b,
+                slot=step.get("slot", ""),
+                category_slug=b.get("category_slug", ""),
+                city_slug=req.city,
+                vibe=req.vibe,
+                itinerary_id=itin_id,
+                source_surface="tonight_page",
+                ip=request.client.host if request.client else None,
+                user_agent=request.headers.get("user-agent"),
+            ))
+        if appearance_docs:
+            await db.analytics_events.insert_many(appearance_docs)
+        await db.analytics_events.insert_one({
+            "id": str(uuid.uuid4()),
+            "event_type": "itinerary_generated",
+            "city_slug": req.city,
+            "vibe": req.vibe,
+            "itinerary_id": itin_id,
+            "ip": request.client.host if request.client else None,
+            "user_agent": request.headers.get("user-agent"),
+            "timestamp": now_iso(),
+        })
 
-    return itinerary
+        return itinerary
+    except Exception as exc:
+        logger.error(
+            "itinerary generation failed: city=%s vibe=%s error_type=%s",
+            req.city,
+            req.vibe or "",
+            type(exc).__name__,
+        )
+        raise
 
 
 # ------------- Public endpoints -------------
@@ -2106,6 +2115,14 @@ async def save_itinerary(payload: SaveItineraryRequest, request: Request):
         try:
             delivery = await run_in_threadpool(_send_resend_email, doc)
         except requests.RequestException as exc:
+            logger.warning(
+                "save itinerary email failed: city_slug=%s vibe=%s delivery_status=%s email_hash=%s error_type=%s",
+                doc["city_slug"],
+                doc["vibe"],
+                "failed",
+                _hash_token(email)[:12],
+                type(exc).__name__,
+            )
             delivery = {
                 "delivery_status": "failed",
                 "delivery_error": str(exc),
@@ -2375,119 +2392,151 @@ async def admin_list_hotel_qr_codes(
 
 @api_router.post("/admin/hotel-qr")
 async def admin_create_hotel_qr_code(body: HotelQrCodeCreate, request: Request, user=Depends(require_admin)):
-    _require_rate_limit_key(
-        "admin_hotel_qr_write_user",
-        user["user_id"],
-        limit=RATE_LIMIT_HOTEL_QR_ADMIN_WRITES_PER_ADMIN,
-        window_seconds=RATE_LIMIT_HOUR_SECONDS,
-    )
-    _require_ip_rate_limit(
-        "admin_hotel_qr_write_ip",
-        request,
-        limit=RATE_LIMIT_HOTEL_QR_ADMIN_WRITES_PER_IP,
-        window_seconds=RATE_LIMIT_HOUR_SECONDS,
-    )
-    if not body.name.strip():
-        raise HTTPException(status_code=400, detail="Name is required")
-    slug = await _unique_hotel_qr_slug(body.name)
-    now = now_iso()
-    doc = {
-        "id": str(uuid.uuid4()),
-        "name": body.name.strip(),
-        "slug": slug,
-        "city_slug": body.city_slug or "nashville",
-        "destination_url": _hotel_qr_destination_url(body.city_slug or "nashville", slug),
-        "hotel_name": body.hotel_name.strip(),
-        "location_label": body.location_label.strip(),
-        "notes": body.notes.strip(),
-        "active": True,
-        "created_at": now,
-        "updated_at": now,
-        "created_by_user_id": user["user_id"],
-    }
-    await db.hotel_qr_codes.insert_one(doc)
-    return _hotel_qr_response(doc)
+    try:
+        _require_rate_limit_key(
+            "admin_hotel_qr_write_user",
+            user["user_id"],
+            limit=RATE_LIMIT_HOTEL_QR_ADMIN_WRITES_PER_ADMIN,
+            window_seconds=RATE_LIMIT_HOUR_SECONDS,
+        )
+        _require_ip_rate_limit(
+            "admin_hotel_qr_write_ip",
+            request,
+            limit=RATE_LIMIT_HOTEL_QR_ADMIN_WRITES_PER_IP,
+            window_seconds=RATE_LIMIT_HOUR_SECONDS,
+        )
+        if not body.name.strip():
+            raise HTTPException(status_code=400, detail="Name is required")
+        slug = await _unique_hotel_qr_slug(body.name)
+        now = now_iso()
+        doc = {
+            "id": str(uuid.uuid4()),
+            "name": body.name.strip(),
+            "slug": slug,
+            "city_slug": body.city_slug or "nashville",
+            "destination_url": _hotel_qr_destination_url(body.city_slug or "nashville", slug),
+            "hotel_name": body.hotel_name.strip(),
+            "location_label": body.location_label.strip(),
+            "notes": body.notes.strip(),
+            "active": True,
+            "created_at": now,
+            "updated_at": now,
+            "created_by_user_id": user["user_id"],
+        }
+        await db.hotel_qr_codes.insert_one(doc)
+        return _hotel_qr_response(doc)
+    except Exception as exc:
+        logger.warning(
+            "hotel qr create failed: city_slug=%s error_type=%s",
+            body.city_slug or "nashville",
+            type(exc).__name__,
+        )
+        raise
 
 
 @api_router.patch("/admin/hotel-qr/{qr_id}")
 async def admin_update_hotel_qr_code(qr_id: str, body: HotelQrCodeUpdate, request: Request, user=Depends(require_admin)):
-    _require_rate_limit_key(
-        "admin_hotel_qr_write_user",
-        user["user_id"],
-        limit=RATE_LIMIT_HOTEL_QR_ADMIN_WRITES_PER_ADMIN,
-        window_seconds=RATE_LIMIT_HOUR_SECONDS,
-    )
-    _require_ip_rate_limit(
-        "admin_hotel_qr_write_ip",
-        request,
-        limit=RATE_LIMIT_HOTEL_QR_ADMIN_WRITES_PER_IP,
-        window_seconds=RATE_LIMIT_HOUR_SECONDS,
-    )
-    existing = await db.hotel_qr_codes.find_one({"id": qr_id}, {"_id": 0})
-    if not existing:
-        raise HTTPException(status_code=404, detail="Hotel QR not found")
-    update = {k: v for k, v in body.model_dump().items() if v is not None}
-    if "name" in update:
-        update["name"] = update["name"].strip()
-        if not update["name"]:
-            raise HTTPException(status_code=400, detail="Name is required")
-        update["slug"] = await _unique_hotel_qr_slug(update["name"], exclude_id=qr_id)
-    for key in ("hotel_name", "location_label", "notes"):
-        if key in update:
-            update[key] = (update[key] or "").strip()
-    city_slug = update.get("city_slug", existing.get("city_slug", "nashville"))
-    slug = update.get("slug", existing.get("slug"))
-    update["destination_url"] = _hotel_qr_destination_url(city_slug, slug)
-    update["updated_at"] = now_iso()
-    await db.hotel_qr_codes.update_one({"id": qr_id}, {"$set": update})
-    return _hotel_qr_response(await db.hotel_qr_codes.find_one({"id": qr_id}, {"_id": 0}))
+    try:
+        _require_rate_limit_key(
+            "admin_hotel_qr_write_user",
+            user["user_id"],
+            limit=RATE_LIMIT_HOTEL_QR_ADMIN_WRITES_PER_ADMIN,
+            window_seconds=RATE_LIMIT_HOUR_SECONDS,
+        )
+        _require_ip_rate_limit(
+            "admin_hotel_qr_write_ip",
+            request,
+            limit=RATE_LIMIT_HOTEL_QR_ADMIN_WRITES_PER_IP,
+            window_seconds=RATE_LIMIT_HOUR_SECONDS,
+        )
+        existing = await db.hotel_qr_codes.find_one({"id": qr_id}, {"_id": 0})
+        if not existing:
+            raise HTTPException(status_code=404, detail="Hotel QR not found")
+        update = {k: v for k, v in body.model_dump().items() if v is not None}
+        if "name" in update:
+            update["name"] = update["name"].strip()
+            if not update["name"]:
+                raise HTTPException(status_code=400, detail="Name is required")
+            update["slug"] = await _unique_hotel_qr_slug(update["name"], exclude_id=qr_id)
+        for key in ("hotel_name", "location_label", "notes"):
+            if key in update:
+                update[key] = (update[key] or "").strip()
+        city_slug = update.get("city_slug", existing.get("city_slug", "nashville"))
+        slug = update.get("slug", existing.get("slug"))
+        update["destination_url"] = _hotel_qr_destination_url(city_slug, slug)
+        update["updated_at"] = now_iso()
+        await db.hotel_qr_codes.update_one({"id": qr_id}, {"$set": update})
+        return _hotel_qr_response(await db.hotel_qr_codes.find_one({"id": qr_id}, {"_id": 0}))
+    except Exception as exc:
+        logger.warning(
+            "hotel qr update failed: qr_id=%s error_type=%s",
+            qr_id,
+            type(exc).__name__,
+        )
+        raise
 
 
 @api_router.post("/admin/hotel-qr/{qr_id}/deactivate")
 async def admin_deactivate_hotel_qr_code(qr_id: str, request: Request, user=Depends(require_admin)):
-    _require_rate_limit_key(
-        "admin_hotel_qr_write_user",
-        user["user_id"],
-        limit=RATE_LIMIT_HOTEL_QR_ADMIN_WRITES_PER_ADMIN,
-        window_seconds=RATE_LIMIT_HOUR_SECONDS,
-    )
-    _require_ip_rate_limit(
-        "admin_hotel_qr_write_ip",
-        request,
-        limit=RATE_LIMIT_HOTEL_QR_ADMIN_WRITES_PER_IP,
-        window_seconds=RATE_LIMIT_HOUR_SECONDS,
-    )
-    result = await db.hotel_qr_codes.update_one(
-        {"id": qr_id},
-        {"$set": {"active": False, "updated_at": now_iso()}},
-    )
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Hotel QR not found")
-    return _hotel_qr_response(await db.hotel_qr_codes.find_one({"id": qr_id}, {"_id": 0}))
+    try:
+        _require_rate_limit_key(
+            "admin_hotel_qr_write_user",
+            user["user_id"],
+            limit=RATE_LIMIT_HOTEL_QR_ADMIN_WRITES_PER_ADMIN,
+            window_seconds=RATE_LIMIT_HOUR_SECONDS,
+        )
+        _require_ip_rate_limit(
+            "admin_hotel_qr_write_ip",
+            request,
+            limit=RATE_LIMIT_HOTEL_QR_ADMIN_WRITES_PER_IP,
+            window_seconds=RATE_LIMIT_HOUR_SECONDS,
+        )
+        result = await db.hotel_qr_codes.update_one(
+            {"id": qr_id},
+            {"$set": {"active": False, "updated_at": now_iso()}},
+        )
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Hotel QR not found")
+        return _hotel_qr_response(await db.hotel_qr_codes.find_one({"id": qr_id}, {"_id": 0}))
+    except Exception as exc:
+        logger.warning(
+            "hotel qr deactivate failed: qr_id=%s error_type=%s",
+            qr_id,
+            type(exc).__name__,
+        )
+        raise
 
 
 @api_router.delete("/admin/hotel-qr/{qr_id}")
 async def admin_delete_hotel_qr_code(qr_id: str, request: Request, user=Depends(require_admin)):
-    _require_rate_limit_key(
-        "admin_hotel_qr_write_user",
-        user["user_id"],
-        limit=RATE_LIMIT_HOTEL_QR_ADMIN_WRITES_PER_ADMIN,
-        window_seconds=RATE_LIMIT_HOUR_SECONDS,
-    )
-    _require_ip_rate_limit(
-        "admin_hotel_qr_write_ip",
-        request,
-        limit=RATE_LIMIT_HOTEL_QR_ADMIN_WRITES_PER_IP,
-        window_seconds=RATE_LIMIT_HOUR_SECONDS,
-    )
-    existing = await db.hotel_qr_codes.find_one({"id": qr_id}, {"_id": 0})
-    if not existing:
-        raise HTTPException(status_code=404, detail="Hotel QR not found")
-    await db.hotel_qr_codes.delete_one({"id": qr_id})
-    return {
-        "ok": True,
-        "deleted": _hotel_qr_response(existing),
-    }
+    try:
+        _require_rate_limit_key(
+            "admin_hotel_qr_write_user",
+            user["user_id"],
+            limit=RATE_LIMIT_HOTEL_QR_ADMIN_WRITES_PER_ADMIN,
+            window_seconds=RATE_LIMIT_HOUR_SECONDS,
+        )
+        _require_ip_rate_limit(
+            "admin_hotel_qr_write_ip",
+            request,
+            limit=RATE_LIMIT_HOTEL_QR_ADMIN_WRITES_PER_IP,
+            window_seconds=RATE_LIMIT_HOUR_SECONDS,
+        )
+        existing = await db.hotel_qr_codes.find_one({"id": qr_id}, {"_id": 0})
+        if not existing:
+            raise HTTPException(status_code=404, detail="Hotel QR not found")
+        await db.hotel_qr_codes.delete_one({"id": qr_id})
+        return {
+            "ok": True,
+            "deleted": _hotel_qr_response(existing),
+        }
+    except Exception as exc:
+        logger.warning(
+            "hotel qr delete failed: qr_id=%s error_type=%s",
+            qr_id,
+            type(exc).__name__,
+        )
+        raise
 
 
 # ------------- Auth -------------
@@ -2776,6 +2825,13 @@ async def admin_business_owner_invite(business_id: str, payload: BusinessOwnerIn
         try:
             delivery = await run_in_threadpool(_send_business_owner_invite_email, doc, claim_url, business.get("name", ""))
         except requests.RequestException as exc:
+            logger.warning(
+                "owner invite email failed: business_id=%s delivery_status=%s email_hash=%s error_type=%s",
+                business_id,
+                "failed",
+                _hash_token(email)[:12],
+                type(exc).__name__,
+            )
             delivery = {
                 "delivery_status": "failed",
                 "delivery_error": str(exc),

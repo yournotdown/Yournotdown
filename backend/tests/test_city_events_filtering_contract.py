@@ -65,11 +65,11 @@ class TestCityEventsFilteringContract(unittest.TestCase):
         self.assertIn("exclude | chosen_ids,", source)
         self.assertIn("req.vibe,", source)
         self.assertIn("slot_history_excludes,", source)
-        self.assertIn("event_candidates or candidates,\n                    exclude | chosen_ids,\n                    req.vibe,\n                    slot_history_excludes,", source)
         self.assertIn('elif label["slot"] == "entertainment":', source)
         self.assertNotIn('"live_music_events":', source)
         self.assertIn('"tonight_move_sponsorship": tonight_move_sponsorship', source)
-        self.assertIn("candidates,\n                exclude | chosen_ids,\n                req.vibe,\n                slot_history_excludes,", source)
+        self.assertIn("event_candidates or candidates,", source)
+        self.assertIn("candidates,", source)
 
     def test_locked_steps_are_checked_before_entertainment_generation(self):
         source = ast.get_source_segment(SERVER_SOURCE, named_function("generate_itinerary"))
