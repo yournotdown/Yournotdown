@@ -1,5 +1,17 @@
 ## Immediate Follow-Up
 
+0. Manually QA the new write-rate limits after the next deploy:
+   - confirm normal app usage does not trip limits for `analytics/track` or `itinerary/generate`
+   - confirm repeated `itinerary/save` abuse attempts return a clean `429` with no save-email crash path
+   - confirm repeated owner-invite attempts return `429` before spamming Resend
+   - confirm repeated Hotel QR create/update/deactivate/delete attempts return `429` cleanly
+   - confirm a `business/claim` spam burst is throttled without breaking a normal one-time claim flow
+
+0. If production ends up running multiple backend instances, replace the current in-process limiter with a shared store:
+   - Redis or equivalent
+   - preserve the same bucket names and limits as the baseline unless real traffic suggests tuning
+   - keep hashed subject keys so raw IP/email values are still not stored in limiter state
+
 0. Manually QA the admin session transition after the next deploy:
    - confirm a fresh admin login still succeeds through the existing `/api/auth/session` flow
    - confirm `/api/auth/me` succeeds with the new hashed admin session rows

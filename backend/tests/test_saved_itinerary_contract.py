@@ -118,6 +118,12 @@ def load_save_helpers():
 class TestSavedItineraryContract(unittest.TestCase):
     def test_valid_save_request_persists_saved_itinerary_document(self):
         source = ast.get_source_segment(SERVER_SOURCE, named_function("save_itinerary"))
+        self.assertIn('_require_ip_rate_limit(', source)
+        self.assertIn('"itinerary_save_ip"', source)
+        self.assertIn("RATE_LIMIT_ITINERARY_SAVE_PER_IP", source)
+        self.assertIn('_require_rate_limit_key(', source)
+        self.assertIn('"itinerary_save_email"', source)
+        self.assertIn("RATE_LIMIT_ITINERARY_SAVE_PER_EMAIL", source)
         self.assertIn('await db.saved_itineraries.insert_one(doc)', source)
         self.assertIn('"visitor_id": visitor_id or None', source)
         self.assertIn('"qr_slug": qr_slug or None', source)
@@ -132,6 +138,12 @@ class TestSavedItineraryContract(unittest.TestCase):
         self.assertIn('"delivery_channel": "email"', source)
         self.assertIn('"provider_message_id": delivery["provider_message_id"]', source)
         self.assertIn('"saved_itinerary_business"', source)
+
+    def test_rate_limited_save_returns_clean_429_message(self):
+        source = SERVER_SOURCE
+        self.assertIn('status_code=429', source)
+        self.assertIn('detail="Too many requests. Please try again later."', source)
+        self.assertIn('"Retry-After"', source)
 
     def test_audience_contact_upsert_tracks_repeat_saves_and_opt_in(self):
         source = ast.get_source_segment(SERVER_SOURCE, named_function("_upsert_audience_contact"))

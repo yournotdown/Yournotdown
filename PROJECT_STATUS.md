@@ -6,6 +6,37 @@ The repo is currently on branch `main`. The only known worktree changes outside 
 
 ## Latest Work Session
 
+Latest local production-readiness P0F write-abuse and rate-limit protection pass:
+- added lightweight in-process write-rate limiting in `backend/server.py`
+- kept the implementation dependency-free and local-memory only for now
+- added an explicit note in code that multi-instance production deployments would need a shared store such as Redis for stronger coordination
+- the limiter now:
+  - prefers `X-Forwarded-For` when present
+  - falls back to `request.client.host`
+  - does not crash when header/client IP data is missing
+  - hashes rate-limit subjects before storing them in local limiter state so raw IP/email values are not retained there
+  - returns clean `429` responses with `Retry-After`
+  - bypasses loopback/local requests so local development and the local load-test harness are not artificially throttled
+- protected public write endpoints:
+  - `POST /api/analytics/track` at `300/min` per IP
+  - `POST /api/itinerary/generate` at `60/min` per IP
+  - `POST /api/itinerary/save` at `10/hour` per IP and `5/hour` per email
+- protected admin/business-owner write endpoints:
+  - `POST /api/admin/businesses/{business_id}/owner-invite` at `10/hour` per admin user and `10/hour` per IP
+  - `POST /api/admin/hotel-qr` at `30/hour` per admin user and `30/hour` per IP
+  - `PATCH /api/admin/hotel-qr/{id}` at `30/hour` per admin user and `30/hour` per IP
+  - `POST /api/admin/hotel-qr/{id}/deactivate` at `30/hour` per admin user and `30/hour` per IP
+  - `DELETE /api/admin/hotel-qr/{id}` at `30/hour` per admin user and `30/hour` per IP
+  - `POST /api/business/claim` at `20/hour` per IP
+- intentionally did not add aggressive rate limits to normal public read endpoints in this pass
+- local verification for this pass:
+  - `python3 -m unittest backend.tests.test_business_owner_contract backend.tests.test_analytics_contract backend.tests.test_saved_itinerary_contract backend.tests.test_locked_steps_contract backend.tests.test_tonight_page_contract backend.tests.test_city_events_filtering_contract backend.tests.test_ticketmaster_events_unit` passed
+  - `cd frontend && npm run build` passed
+  - `cd frontend && CI=true npm test -- --watchAll=false` passed
+- still unverified:
+  - no manual browser/API QA has yet confirmed the exact `429` UX on real rate-limited save/invite/hotel-qr flows after deploy
+  - no production multi-instance coordination exists yet; this pass is intentionally single-process/local-memory only
+
 Latest local production-readiness P0E admin/session security cleanup pass:
 - hardened admin session storage in `backend/server.py` without changing public Tonight’s Move behavior, sponsorship weighting, or analytics event names
 - new admin sessions now store `session_token_hash` in `user_sessions` instead of raw `session_token`

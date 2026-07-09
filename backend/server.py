@@ -107,6 +107,19 @@ ADMIN_SESSION_COOKIE = "session_token"
 BUSINESS_OWNER_INVITE_DAYS = 7
 BUSINESS_OWNER_SESSION_DAYS = 30
 BUSINESS_OWNER_SESSION_COOKIE = "business_owner_session"
+RATE_LIMIT_ANALYTICS_TRACK_PER_IP = 300
+RATE_LIMIT_ITINERARY_GENERATE_PER_IP = 60
+RATE_LIMIT_ITINERARY_SAVE_PER_IP = 10
+RATE_LIMIT_ITINERARY_SAVE_PER_EMAIL = 5
+RATE_LIMIT_OWNER_INVITE_PER_ADMIN = 10
+RATE_LIMIT_OWNER_INVITE_PER_IP = 10
+RATE_LIMIT_HOTEL_QR_ADMIN_WRITES_PER_ADMIN = 30
+RATE_LIMIT_HOTEL_QR_ADMIN_WRITES_PER_IP = 30
+RATE_LIMIT_BUSINESS_CLAIM_PER_IP = 20
+RATE_LIMIT_MINUTE_SECONDS = 60
+RATE_LIMIT_HOUR_SECONDS = 60 * 60
+# In-process only. Multi-instance deployments need a shared store such as Redis.
+RATE_LIMIT_STATE: Dict[str, List[float]] = {}
 
 
 # ------------- Models -------------
@@ -130,6 +143,101 @@ def _cors_allowed_origins() -> List[str]:
         if value:
             origins.add(value.rstrip("/"))
     return sorted(origins)
+
+
+def _client_ip(request: Optional[Request]) -> str:
+    if not request:
+        return ""
+    forwarded_for = request.headers.get("x-forwarded-for", "")
+    if forwarded_for:
+        for part in forwarded_for.split(","):
+            candidate = part.strip()
+            if candidate:
+                return candidate
+    if request.client and request.client.host:
+        return request.client.host
+    return ""
+
+
+def _rate_limit_subject(value: str) -> str:
+    normalized = (value or "").strip().lower()
+    if not normalized:
+        return "unknown"
+    return _hash_token(normalized)
+
+
+def _should_bypass_rate_limit(request: Optional[Request]) -> bool:
+    ip = _client_ip(request)
+    return ip in {"127.0.0.1", "::1", "localhost"}
+
+
+def _consume_rate_limit(
+    key: str,
+    *,
+    limit: int,
+    window_seconds: int,
+    now_ts: Optional[float] = None,
+    state: Optional[Dict[str, List[float]]] = None,
+) -> tuple[bool, int]:
+    if limit <= 0 or window_seconds <= 0:
+        return True, 0
+    store = state if state is not None else RATE_LIMIT_STATE
+    current_ts = now_ts if now_ts is not None else datetime.now(timezone.utc).timestamp()
+    cutoff = current_ts - window_seconds
+    hits = [ts for ts in store.get(key, []) if ts > cutoff]
+    if len(hits) >= limit:
+        store[key] = hits
+        retry_after = max(1, int(window_seconds - (current_ts - hits[0])) + 1)
+        return False, retry_after
+    hits.append(current_ts)
+    store[key] = hits
+    return True, 0
+
+
+def _rate_limit_error(retry_after: int) -> HTTPException:
+    return HTTPException(
+        status_code=429,
+        detail="Too many requests. Please try again later.",
+        headers={"Retry-After": str(max(1, int(retry_after or 1)))},
+    )
+
+
+def _require_rate_limit_key(
+    bucket_name: str,
+    subject: str,
+    *,
+    limit: int,
+    window_seconds: int,
+    now_ts: Optional[float] = None,
+) -> None:
+    bucket_key = f"{bucket_name}:{_rate_limit_subject(subject)}"
+    allowed, retry_after = _consume_rate_limit(
+        bucket_key,
+        limit=limit,
+        window_seconds=window_seconds,
+        now_ts=now_ts,
+    )
+    if not allowed:
+        raise _rate_limit_error(retry_after)
+
+
+def _require_ip_rate_limit(
+    bucket_name: str,
+    request: Optional[Request],
+    *,
+    limit: int,
+    window_seconds: int,
+    now_ts: Optional[float] = None,
+) -> None:
+    if _should_bypass_rate_limit(request):
+        return
+    _require_rate_limit_key(
+        bucket_name,
+        _client_ip(request) or "unknown",
+        limit=limit,
+        window_seconds=window_seconds,
+        now_ts=now_ts,
+    )
 
 
 class City(BaseModel):
@@ -1563,6 +1671,12 @@ async def _active_tonight_move_sponsorship(city: str) -> Optional[dict]:
 @api_router.post("/itinerary/generate")
 async def generate_itinerary(req: ItineraryRequest, request: Request):
     """Build a 4-step 'Tonight's Move' itinerary tuned to the user's mood."""
+    _require_ip_rate_limit(
+        "itinerary_generate_ip",
+        request,
+        limit=RATE_LIMIT_ITINERARY_GENERATE_PER_IP,
+        window_seconds=RATE_LIMIT_MINUTE_SECONDS,
+    )
     event_rows = await _today_city_events(req.city)
     all_biz = await _public_businesses(req.city, limit=2000, require_slots=True, event_rows=event_rows)
     today_events_by_business = events_by_business_id(event_rows)
@@ -1848,6 +1962,12 @@ async def serve_file(path: str):
 # ------------- Analytics -------------
 @api_router.post("/analytics/track")
 async def track_event(event: AnalyticsEvent, request: Request):
+    _require_ip_rate_limit(
+        "analytics_track_ip",
+        request,
+        limit=RATE_LIMIT_ANALYTICS_TRACK_PER_IP,
+        window_seconds=RATE_LIMIT_MINUTE_SECONDS,
+    )
     doc = {
         "id": str(uuid.uuid4()),
         "event_type": event.event_type,
@@ -1894,9 +2014,21 @@ async def create_lead(lead: LeadCreate):
 
 @api_router.post("/itinerary/save")
 async def save_itinerary(payload: SaveItineraryRequest, request: Request):
+    _require_ip_rate_limit(
+        "itinerary_save_ip",
+        request,
+        limit=RATE_LIMIT_ITINERARY_SAVE_PER_IP,
+        window_seconds=RATE_LIMIT_HOUR_SECONDS,
+    )
     email = (payload.email or "").strip().lower()
     if not _valid_email(email):
         raise HTTPException(status_code=400, detail="Enter a valid email.")
+    _require_rate_limit_key(
+        "itinerary_save_email",
+        email,
+        limit=RATE_LIMIT_ITINERARY_SAVE_PER_EMAIL,
+        window_seconds=RATE_LIMIT_HOUR_SECONDS,
+    )
     visitor_id = _normalize_visitor_id(payload.visitor_id)
     qr_slug = _normalize_qr_slug(payload.qr_slug)
 
@@ -2242,7 +2374,19 @@ async def admin_list_hotel_qr_codes(
 
 
 @api_router.post("/admin/hotel-qr")
-async def admin_create_hotel_qr_code(body: HotelQrCodeCreate, user=Depends(require_admin)):
+async def admin_create_hotel_qr_code(body: HotelQrCodeCreate, request: Request, user=Depends(require_admin)):
+    _require_rate_limit_key(
+        "admin_hotel_qr_write_user",
+        user["user_id"],
+        limit=RATE_LIMIT_HOTEL_QR_ADMIN_WRITES_PER_ADMIN,
+        window_seconds=RATE_LIMIT_HOUR_SECONDS,
+    )
+    _require_ip_rate_limit(
+        "admin_hotel_qr_write_ip",
+        request,
+        limit=RATE_LIMIT_HOTEL_QR_ADMIN_WRITES_PER_IP,
+        window_seconds=RATE_LIMIT_HOUR_SECONDS,
+    )
     if not body.name.strip():
         raise HTTPException(status_code=400, detail="Name is required")
     slug = await _unique_hotel_qr_slug(body.name)
@@ -2266,7 +2410,19 @@ async def admin_create_hotel_qr_code(body: HotelQrCodeCreate, user=Depends(requi
 
 
 @api_router.patch("/admin/hotel-qr/{qr_id}")
-async def admin_update_hotel_qr_code(qr_id: str, body: HotelQrCodeUpdate, user=Depends(require_admin)):
+async def admin_update_hotel_qr_code(qr_id: str, body: HotelQrCodeUpdate, request: Request, user=Depends(require_admin)):
+    _require_rate_limit_key(
+        "admin_hotel_qr_write_user",
+        user["user_id"],
+        limit=RATE_LIMIT_HOTEL_QR_ADMIN_WRITES_PER_ADMIN,
+        window_seconds=RATE_LIMIT_HOUR_SECONDS,
+    )
+    _require_ip_rate_limit(
+        "admin_hotel_qr_write_ip",
+        request,
+        limit=RATE_LIMIT_HOTEL_QR_ADMIN_WRITES_PER_IP,
+        window_seconds=RATE_LIMIT_HOUR_SECONDS,
+    )
     existing = await db.hotel_qr_codes.find_one({"id": qr_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Hotel QR not found")
@@ -2288,7 +2444,19 @@ async def admin_update_hotel_qr_code(qr_id: str, body: HotelQrCodeUpdate, user=D
 
 
 @api_router.post("/admin/hotel-qr/{qr_id}/deactivate")
-async def admin_deactivate_hotel_qr_code(qr_id: str, user=Depends(require_admin)):
+async def admin_deactivate_hotel_qr_code(qr_id: str, request: Request, user=Depends(require_admin)):
+    _require_rate_limit_key(
+        "admin_hotel_qr_write_user",
+        user["user_id"],
+        limit=RATE_LIMIT_HOTEL_QR_ADMIN_WRITES_PER_ADMIN,
+        window_seconds=RATE_LIMIT_HOUR_SECONDS,
+    )
+    _require_ip_rate_limit(
+        "admin_hotel_qr_write_ip",
+        request,
+        limit=RATE_LIMIT_HOTEL_QR_ADMIN_WRITES_PER_IP,
+        window_seconds=RATE_LIMIT_HOUR_SECONDS,
+    )
     result = await db.hotel_qr_codes.update_one(
         {"id": qr_id},
         {"$set": {"active": False, "updated_at": now_iso()}},
@@ -2299,7 +2467,19 @@ async def admin_deactivate_hotel_qr_code(qr_id: str, user=Depends(require_admin)
 
 
 @api_router.delete("/admin/hotel-qr/{qr_id}")
-async def admin_delete_hotel_qr_code(qr_id: str, user=Depends(require_admin)):
+async def admin_delete_hotel_qr_code(qr_id: str, request: Request, user=Depends(require_admin)):
+    _require_rate_limit_key(
+        "admin_hotel_qr_write_user",
+        user["user_id"],
+        limit=RATE_LIMIT_HOTEL_QR_ADMIN_WRITES_PER_ADMIN,
+        window_seconds=RATE_LIMIT_HOUR_SECONDS,
+    )
+    _require_ip_rate_limit(
+        "admin_hotel_qr_write_ip",
+        request,
+        limit=RATE_LIMIT_HOTEL_QR_ADMIN_WRITES_PER_IP,
+        window_seconds=RATE_LIMIT_HOUR_SECONDS,
+    )
     existing = await db.hotel_qr_codes.find_one({"id": qr_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Hotel QR not found")
@@ -2403,6 +2583,12 @@ async def logout(response: Response, session_token: Optional[str] = Cookie(None)
 
 @api_router.post("/business/claim")
 async def business_claim(payload: BusinessOwnerClaimRequest, response: Response, request: Request):
+    _require_ip_rate_limit(
+        "business_claim_ip",
+        request,
+        limit=RATE_LIMIT_BUSINESS_CLAIM_PER_IP,
+        window_seconds=RATE_LIMIT_HOUR_SECONDS,
+    )
     raw_token = (payload.token or "").strip()
     if not raw_token:
         raise HTTPException(status_code=400, detail="Invalid or expired invite.")
@@ -2530,7 +2716,19 @@ async def admin_business_owner_access(business_id: str, user=Depends(require_adm
 
 
 @api_router.post("/admin/businesses/{business_id}/owner-invite")
-async def admin_business_owner_invite(business_id: str, payload: BusinessOwnerInviteCreate, user=Depends(require_admin)):
+async def admin_business_owner_invite(business_id: str, payload: BusinessOwnerInviteCreate, request: Request, user=Depends(require_admin)):
+    _require_rate_limit_key(
+        "admin_owner_invite_user",
+        user["user_id"],
+        limit=RATE_LIMIT_OWNER_INVITE_PER_ADMIN,
+        window_seconds=RATE_LIMIT_HOUR_SECONDS,
+    )
+    _require_ip_rate_limit(
+        "admin_owner_invite_ip",
+        request,
+        limit=RATE_LIMIT_OWNER_INVITE_PER_IP,
+        window_seconds=RATE_LIMIT_HOUR_SECONDS,
+    )
     business = await db.businesses.find_one({"id": business_id}, {"_id": 0})
     if not business:
         raise HTTPException(status_code=404, detail="Business not found")

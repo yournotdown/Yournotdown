@@ -17,7 +17,113 @@ def named_function(name: str):
     )
 
 
+def load_rate_limit_helpers():
+    class HTTPExceptionStub(Exception):
+        def __init__(self, status_code, detail=None, headers=None):
+            super().__init__(detail)
+            self.status_code = status_code
+            self.detail = detail
+            self.headers = headers or {}
+
+    namespace = {
+        "datetime": __import__("datetime").datetime,
+        "timezone": __import__("datetime").timezone,
+        "Dict": __import__("typing").Dict,
+        "List": __import__("typing").List,
+        "Optional": __import__("typing").Optional,
+        "Request": object,
+        "HTTPException": HTTPExceptionStub,
+        "RATE_LIMIT_STATE": {},
+        "now_iso": lambda: "2026-07-08T00:00:00+00:00",
+        "hashlib": __import__("hashlib"),
+    }
+    exec(ast.get_source_segment(SERVER_SOURCE, named_function("_hash_token")), namespace)
+    for fn_name in (
+        "_client_ip",
+        "_rate_limit_subject",
+        "_should_bypass_rate_limit",
+        "_consume_rate_limit",
+        "_rate_limit_error",
+        "_require_rate_limit_key",
+        "_require_ip_rate_limit",
+    ):
+        exec(ast.get_source_segment(SERVER_SOURCE, named_function(fn_name)), namespace)
+    return (
+        namespace["_consume_rate_limit"],
+        namespace["_require_rate_limit_key"],
+        namespace["_require_ip_rate_limit"],
+        namespace["_client_ip"],
+    )
+
+
+(
+    CONSUME_RATE_LIMIT,
+    REQUIRE_RATE_LIMIT_KEY,
+    REQUIRE_IP_RATE_LIMIT,
+    CLIENT_IP,
+) = load_rate_limit_helpers()
+
+
+class _AttrDict:
+    def __init__(self, **kwargs):
+        self.__dict__.update(kwargs)
+
+
 class TestAnalyticsContract(unittest.TestCase):
+    def test_rate_limit_helper_allows_normal_requests_then_returns_429(self):
+        state = {}
+        allowed, retry_after = CONSUME_RATE_LIMIT(
+            "analytics_track_ip:test",
+            limit=2,
+            window_seconds=60,
+            now_ts=100,
+            state=state,
+        )
+        self.assertTrue(allowed)
+        self.assertEqual(retry_after, 0)
+        allowed, retry_after = CONSUME_RATE_LIMIT(
+            "analytics_track_ip:test",
+            limit=2,
+            window_seconds=60,
+            now_ts=110,
+            state=state,
+        )
+        self.assertTrue(allowed)
+        allowed, retry_after = CONSUME_RATE_LIMIT(
+            "analytics_track_ip:test",
+            limit=2,
+            window_seconds=60,
+            now_ts=115,
+            state=state,
+        )
+        self.assertFalse(allowed)
+        self.assertGreaterEqual(retry_after, 1)
+
+    def test_ip_rate_limit_uses_forwarded_ip_and_does_not_crash_when_missing(self):
+        forwarded = _AttrDict(
+            headers={"x-forwarded-for": "198.51.100.4, 10.0.0.1"},
+            client=_AttrDict(host="10.0.0.1"),
+        )
+        self.assertEqual(CLIENT_IP(forwarded), "198.51.100.4")
+        missing = _AttrDict(headers={}, client=None)
+        self.assertEqual(CLIENT_IP(missing), "")
+        REQUIRE_IP_RATE_LIMIT(
+            "analytics_track_ip",
+            missing,
+            limit=1,
+            window_seconds=60,
+            now_ts=100,
+        )
+        with self.assertRaises(Exception) as ctx:
+            REQUIRE_IP_RATE_LIMIT(
+                "analytics_track_ip",
+                missing,
+                limit=1,
+                window_seconds=60,
+                now_ts=101,
+            )
+        self.assertEqual(getattr(ctx.exception, "status_code", None), 429)
+
     def test_startup_maintenance_creates_hot_path_indexes(self):
         source = ast.get_source_segment(SERVER_SOURCE, named_function("_apply_startup_maintenance"))
         self.assertIn('await db.businesses.create_index([("id", 1)])', source)
@@ -40,6 +146,9 @@ class TestAnalyticsContract(unittest.TestCase):
 
     def test_business_appearance_events_now_stamp_slot(self):
         source = ast.get_source_segment(SERVER_SOURCE, named_function("generate_itinerary"))
+        self.assertIn('_require_ip_rate_limit(', source)
+        self.assertIn('"itinerary_generate_ip"', source)
+        self.assertIn("RATE_LIMIT_ITINERARY_GENERATE_PER_IP", source)
         self.assertIn('slot=step.get("slot", "")', source)
         self.assertIn('source_surface="tonight_page"', source)
 
@@ -58,6 +167,9 @@ class TestAnalyticsContract(unittest.TestCase):
 
     def test_track_endpoint_stamps_sponsor_tier_for_business_scoped_events(self):
         source = ast.get_source_segment(SERVER_SOURCE, named_function("track_event"))
+        self.assertIn('_require_ip_rate_limit(', source)
+        self.assertIn('"analytics_track_ip"', source)
+        self.assertIn("RATE_LIMIT_ANALYTICS_TRACK_PER_IP", source)
         self.assertIn("event.event_type in BUSINESS_SCOPED_EVENT_TYPES", source)
         self.assertIn('"visitor_id": _normalize_visitor_id(event.visitor_id) or None', source)
         self.assertIn('"qr_slug": _normalize_qr_slug(event.qr_slug) or None', source)
@@ -130,11 +242,29 @@ class TestAnalyticsContract(unittest.TestCase):
         update_source = ast.get_source_segment(SERVER_SOURCE, named_function("admin_update_hotel_qr_code"))
         deactivate_source = ast.get_source_segment(SERVER_SOURCE, named_function("admin_deactivate_hotel_qr_code"))
         delete_source = ast.get_source_segment(SERVER_SOURCE, named_function("admin_delete_hotel_qr_code"))
+        self.assertIn('_require_rate_limit_key(', create_source)
+        self.assertIn('_require_ip_rate_limit(', create_source)
+        self.assertIn('_require_rate_limit_key(', update_source)
+        self.assertIn('_require_ip_rate_limit(', update_source)
+        self.assertIn('_require_rate_limit_key(', deactivate_source)
+        self.assertIn('_require_ip_rate_limit(', deactivate_source)
+        self.assertIn('_require_rate_limit_key(', delete_source)
+        self.assertIn('_require_ip_rate_limit(', delete_source)
         self.assertIn("await db.hotel_qr_codes.insert_one(doc)", create_source)
         self.assertIn("return _hotel_qr_response(doc)", create_source)
         self.assertIn("return _hotel_qr_response(await db.hotel_qr_codes.find_one", update_source)
         self.assertIn("return _hotel_qr_response(await db.hotel_qr_codes.find_one", deactivate_source)
         self.assertIn('"deleted": _hotel_qr_response(existing)', delete_source)
+
+    def test_rate_limit_constants_cover_public_and_admin_writes(self):
+        source = SERVER_SOURCE
+        self.assertIn("RATE_LIMIT_ANALYTICS_TRACK_PER_IP = 300", source)
+        self.assertIn("RATE_LIMIT_ITINERARY_GENERATE_PER_IP = 60", source)
+        self.assertIn("RATE_LIMIT_ITINERARY_SAVE_PER_IP = 10", source)
+        self.assertIn("RATE_LIMIT_ITINERARY_SAVE_PER_EMAIL = 5", source)
+        self.assertIn("RATE_LIMIT_OWNER_INVITE_PER_ADMIN = 10", source)
+        self.assertIn("RATE_LIMIT_HOTEL_QR_ADMIN_WRITES_PER_ADMIN = 30", source)
+        self.assertIn("RATE_LIMIT_BUSINESS_CLAIM_PER_IP = 20", source)
 
     def test_image_endpoints_use_bounded_google_widths_and_longer_cache_headers(self):
         photo_source = ast.get_source_segment(SERVER_SOURCE, named_function("google_places_photo"))

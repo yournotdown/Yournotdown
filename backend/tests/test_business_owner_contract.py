@@ -112,6 +112,9 @@ class TestBusinessOwnerContract(unittest.TestCase):
 
     def test_claim_endpoint_hashes_token_and_sets_cookie(self):
         source = ast.get_source_segment(SERVER_SOURCE, named_function("business_claim"))
+        self.assertIn('_require_ip_rate_limit(', source)
+        self.assertIn('"business_claim_ip"', source)
+        self.assertIn("RATE_LIMIT_BUSINESS_CLAIM_PER_IP", source)
         self.assertIn('{"token_hash": _hash_token(raw_token)}', source)
         self.assertIn('"session_token_hash": _hash_token(session_token)', source)
         self.assertIn('response.set_cookie(', source)
@@ -170,6 +173,12 @@ class TestBusinessOwnerContract(unittest.TestCase):
 
     def test_fresh_invite_can_be_sent_again_after_revoke(self):
         source = ast.get_source_segment(SERVER_SOURCE, named_function("admin_business_owner_invite"))
+        self.assertIn('_require_rate_limit_key(', source)
+        self.assertIn('"admin_owner_invite_user"', source)
+        self.assertIn("RATE_LIMIT_OWNER_INVITE_PER_ADMIN", source)
+        self.assertIn('_require_ip_rate_limit(', source)
+        self.assertIn('"admin_owner_invite_ip"', source)
+        self.assertIn("RATE_LIMIT_OWNER_INVITE_PER_IP", source)
         self.assertIn('{"business_id": business_id, "email": email, "status": "pending"}', source)
         self.assertIn('await db.business_owner_invites.insert_one(doc)', source)
 
