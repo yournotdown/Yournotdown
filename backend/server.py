@@ -449,6 +449,7 @@ class AdminFeaturedLiveMusicEvent(BaseModel):
     active_from: str = ""
     active_until: str = ""
     image_url: str = ""
+    image_path: Optional[str] = None
     ticket_url: str = ""
     cta_label: str = "Buy Tickets"
     priority: int = 0
@@ -1872,7 +1873,26 @@ async def _public_businesses(
         q["slots"] = {"$ne": []}
     cursor = db.businesses.find(q, {"_id": 0}).sort([("featured", -1), ("order", 1)]).limit(limit)
     businesses = await cursor.to_list(limit)
-    return eligible_public_businesses(businesses, event_rows if event_rows is not None else await _today_city_events(city))
+    public_businesses = eligible_public_businesses(
+        businesses,
+        event_rows if event_rows is not None else await _today_city_events(city),
+    )
+    if category == "live-music" and featured is not False:
+        featured_live_music = await _active_featured_live_music_event(city)
+        if featured_live_music:
+            featured_business = featured_live_music_business(featured_live_music)
+            public_businesses = [
+                {
+                    **featured_business,
+                    "event": featured_live_music_step_event(featured_live_music),
+                },
+                *[
+                    business
+                    for business in public_businesses
+                    if business.get("id") != featured_business.get("id")
+                ],
+            ]
+    return public_businesses[:limit]
 
 
 async def _public_business(business_id: str) -> Optional[dict]:

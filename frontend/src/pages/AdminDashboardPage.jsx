@@ -50,6 +50,7 @@ const emptyFeaturedLiveMusic = {
   active_from: "",
   active_until: "",
   image_url: "",
+  image_path: null,
   ticket_url: "",
   cta_label: "Buy Tickets",
   priority: 0,
@@ -152,6 +153,7 @@ export default function AdminDashboardPage() {
   const [form, setForm] = useState(empty);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [featuredLiveMusicUploading, setFeaturedLiveMusicUploading] = useState(false);
   const [ownerInviteEmail, setOwnerInviteEmail] = useState("");
   const [ownerAccess, setOwnerAccess] = useState(null);
   const [ownerAccessLoading, setOwnerAccessLoading] = useState(false);
@@ -160,6 +162,7 @@ export default function AdminDashboardPage() {
   const [savingFeaturedLiveMusic, setSavingFeaturedLiveMusic] = useState(false);
   const [savingTonightMoveSponsorship, setSavingTonightMoveSponsorship] = useState(false);
   const fileInputRef = useRef(null);
+  const featuredLiveMusicFileInputRef = useRef(null);
 
   // Auth check
   useEffect(() => {
@@ -452,16 +455,20 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const uploadAdminImage = async (file) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    return api.post("/admin/upload", fd, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  };
+
   const handleUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const r = await api.post("/admin/upload", fd, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      const r = await uploadAdminImage(file);
       setForm((f) => ({ ...f, image_path: r.data.path, image_url: "" }));
       toast.success("Image uploaded");
     } catch (err) {
@@ -469,6 +476,21 @@ export default function AdminDashboardPage() {
     }
     setUploading(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleFeaturedLiveMusicUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFeaturedLiveMusicUploading(true);
+    try {
+      const r = await uploadAdminImage(file);
+      setFeaturedLiveMusic((current) => ({ ...current, image_path: r.data.path }));
+      toast.success("Featured event image uploaded");
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Upload failed");
+    }
+    setFeaturedLiveMusicUploading(false);
+    if (featuredLiveMusicFileInputRef.current) featuredLiveMusicFileInputRef.current.value = "";
   };
 
   const handleLogout = async () => {
@@ -689,6 +711,9 @@ export default function AdminDashboardPage() {
             onFeaturedLiveMusicChange={setFeaturedLiveMusic}
             onSaveFeaturedLiveMusic={handleSaveFeaturedLiveMusic}
             onDeleteFeaturedLiveMusic={handleDeleteFeaturedLiveMusic}
+            onUploadFeaturedLiveMusic={handleFeaturedLiveMusicUpload}
+            featuredLiveMusicFileInputRef={featuredLiveMusicFileInputRef}
+            featuredLiveMusicUploading={featuredLiveMusicUploading}
             savingFeaturedLiveMusic={savingFeaturedLiveMusic}
             tonightMoveSponsorship={tonightMoveSponsorship}
             onTonightMoveSponsorshipChange={setTonightMoveSponsorship}
@@ -1243,7 +1268,16 @@ function ImportReviewPanel({ businesses, summary, selected, onSelectedChange, on
   );
 }
 
-function FeaturedLiveMusicPanel({ value, onChange, onSave, onDelete, saving }) {
+function FeaturedLiveMusicPanel({
+  value,
+  onChange,
+  onSave,
+  onDelete,
+  onUpload,
+  fileInputRef,
+  uploading,
+  saving,
+}) {
   return (
     <div className="mb-8 rounded-3xl border border-white/10 bg-[#121218] p-6" data-testid="admin-featured-live-music">
       <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -1315,13 +1349,64 @@ function FeaturedLiveMusicPanel({ value, onChange, onSave, onDelete, saving }) {
             data-testid="featured-live-music-active-until"
           />
         </Field>
-        <Field label="Image URL">
-          <Input
-            value={value.image_url}
-            onChange={(e) => onChange({ ...value, image_url: e.target.value })}
-            className="bg-[#1A1A22] border-white/10 text-white"
-            data-testid="featured-live-music-image-url"
-          />
+        <Field label="Image">
+          <div className="space-y-3">
+            {(value.image_path || value.image_url) && (
+              <div className="w-full h-40 rounded-2xl overflow-hidden bg-[#1A1A22]">
+                <img
+                  src={resolveImageUrl(value, { maxWidth: 640 })}
+                  alt="Featured event preview"
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                  decoding="async"
+                  sizes="640px"
+                />
+              </div>
+            )}
+            <div className="flex flex-wrap items-center gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="border-white/10 bg-[#1A1A22] hover:bg-[#222] text-white"
+                data-testid="featured-live-music-upload-button"
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                {uploading ? "Uploading…" : "Upload image"}
+              </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={onUpload}
+                data-testid="featured-live-music-upload-input"
+              />
+              {value.image_path && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => onChange({ ...value, image_path: null })}
+                  className="text-white/70 hover:text-white hover:bg-white/5"
+                  data-testid="featured-live-music-clear-upload"
+                >
+                  Use image URL instead
+                </Button>
+              )}
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-[#0D0D12] px-4 py-3 text-xs text-[#A1A1AA]">
+              {value.image_path
+                ? "Uploaded image is currently being used. Remove it to fall back to the image URL."
+                : "If you upload an image, it will be used before the image URL."}
+            </div>
+            <Input
+              value={value.image_url}
+              onChange={(e) => onChange({ ...value, image_url: e.target.value })}
+              className="bg-[#1A1A22] border-white/10 text-white"
+              data-testid="featured-live-music-image-url"
+            />
+          </div>
         </Field>
         <Field label="Ticket URL">
           <Input
@@ -1568,6 +1653,9 @@ function SponsorshipsPanel({
   onFeaturedLiveMusicChange,
   onSaveFeaturedLiveMusic,
   onDeleteFeaturedLiveMusic,
+  onUploadFeaturedLiveMusic,
+  featuredLiveMusicFileInputRef,
+  featuredLiveMusicUploading,
   savingFeaturedLiveMusic,
   tonightMoveSponsorship,
   onTonightMoveSponsorshipChange,
@@ -1582,6 +1670,9 @@ function SponsorshipsPanel({
         onChange={onFeaturedLiveMusicChange}
         onSave={onSaveFeaturedLiveMusic}
         onDelete={onDeleteFeaturedLiveMusic}
+        onUpload={onUploadFeaturedLiveMusic}
+        fileInputRef={featuredLiveMusicFileInputRef}
+        uploading={featuredLiveMusicUploading}
         saving={savingFeaturedLiveMusic}
       />
       <TonightMoveSponsorshipPanel

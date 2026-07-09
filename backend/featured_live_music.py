@@ -44,19 +44,20 @@ def featured_event_is_active(record: dict, city_slug: str, now: Optional[datetim
         return False
 
     local_date = record.get("local_date")
-    if local_date:
-        if local_date != local_today(city_slug, now=current):
-            return False
-        return event_is_eligible(
-            {
-                "local_date": local_date,
-                "local_time": record.get("local_time"),
-                "status": "",
-            },
-            city_slug,
-            now=current,
-        )
-    return True
+    local_time = record.get("local_time")
+    if not local_date or not local_time:
+        return False
+    if local_date != local_today(city_slug, now=current):
+        return False
+    return event_is_eligible(
+        {
+            "local_date": local_date,
+            "local_time": local_time,
+            "status": "",
+        },
+        city_slug,
+        now=current,
+    )
 
 
 def active_featured_live_music_event(records: Iterable[dict], city_slug: str,
@@ -86,7 +87,7 @@ def featured_live_music_business(record: dict) -> dict:
         "name": record.get("venue_name") or record.get("title") or "Live Music",
         "description": record.get("description") or record.get("internal_notes") or "",
         "image_url": record.get("image_url", ""),
-        "image_path": None,
+        "image_path": record.get("image_path") or None,
         "website": record.get("ticket_url", ""),
         "phone": "",
         "address": "",
@@ -113,6 +114,7 @@ def featured_live_music_step_event(record: dict) -> dict:
         "booking_url": ticket_url,
         "purchase_url": ticket_url,
         "image_url": record.get("image_url", ""),
+        "image_path": record.get("image_path") or None,
         "description": record.get("description", ""),
         "cta_label": record.get("cta_label") or "Buy Tickets",
     }

@@ -6,6 +6,35 @@ The repo is currently on branch `main`. The only known worktree changes outside 
 
 ## Latest Work Session
 
+Latest local featured-event launch-blocker pass:
+- fixed the Featured Live Music admin path so active manual featured events can appear on the public `live-music` category/detail surface instead of only affecting Tonight's Move generation
+- backend changes:
+  - `backend/server.py`
+    - extended `AdminFeaturedLiveMusicEvent` with backward-compatible `image_path`
+    - updated `_public_businesses(...)` so an active valid featured live music event is injected into the `live-music` public business list only
+  - `backend/featured_live_music.py`
+    - manual featured events now preserve `image_path`
+    - manual featured events now require a valid same-day `local_date` and `local_time` before they are eligible publicly or for Tonight's Move override use
+- frontend changes:
+  - `frontend/src/pages/AdminDashboardPage.jsx`
+    - Featured Live Music form now supports both image URL and uploaded image
+    - reuses the existing admin upload endpoint
+    - previews the selected image and clearly indicates that uploaded image takes precedence over image URL
+  - `frontend/src/components/EventCard.jsx`
+    - event cards now resolve uploaded `image_path` assets the same way business cards do
+- test coverage added/updated:
+  - `backend/tests/test_city_events_filtering_contract.py`
+  - `backend/tests/test_featured_live_music_unit.py`
+  - `frontend/src/pages/pages.contract.test.js`
+- local verification for this pass:
+  - `python3 -B -m unittest backend.tests.test_business_owner_contract backend.tests.test_analytics_contract backend.tests.test_saved_itinerary_contract backend.tests.test_locked_steps_contract backend.tests.test_tonight_page_contract backend.tests.test_city_events_filtering_contract backend.tests.test_ticketmaster_events_unit backend.tests.test_contact_inquiries_contract backend.tests.test_featured_live_music_unit` passed
+  - `cd frontend && npm run build` passed
+  - `cd frontend && CI=true npm test -- --watchAll=false` passed
+- still unverified:
+  - no manual browser QA has yet confirmed that an uploaded-image featured event appears correctly on the live music category detail page in production
+  - no manual admin QA has yet confirmed the featured-event upload/edit/save flow against live storage
+  - no manual production QA has yet confirmed that an expired or inactive featured event stays hidden from the public live music surface
+
 Latest local analytics reset runbook pass:
 - added `docs/production/analytics_reset_runbook.md`
 - documented the final pre-launch analytics reset plan for:

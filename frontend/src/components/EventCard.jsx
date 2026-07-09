@@ -1,9 +1,10 @@
 import { motion } from "framer-motion";
 import { Clock, ExternalLink, MapPin } from "lucide-react";
-import { formatEventSchedule } from "../lib/api";
+import { formatEventSchedule, resolveImageUrl } from "../lib/api";
 
 export default function EventCard({ event, index }) {
   const schedule = formatEventSchedule(event);
+  const imageUrl = resolveImageUrl(event, { maxWidth: 960 });
 
   return (
     <motion.article
@@ -13,10 +14,10 @@ export default function EventCard({ event, index }) {
       className="bg-[#121218] overflow-hidden border border-white/10 shadow-2xl group"
       data-testid={`event-card-${event.id || event.external_event_id}`}
     >
-      {event.image_url && (
+      {imageUrl && (
         <div className="relative w-full h-52 bg-[#1A1A22] overflow-hidden">
           <img
-            src={event.image_url}
+            src={imageUrl}
             alt={event.title}
             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
             loading="lazy"

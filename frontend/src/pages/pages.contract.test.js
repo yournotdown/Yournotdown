@@ -5,6 +5,7 @@ const tonightPageSource = fs.readFileSync(path.join(__dirname, "TonightPage.jsx"
 const homePageSource = fs.readFileSync(path.join(__dirname, "HomePage.jsx"), "utf8");
 const vibePageSource = fs.readFileSync(path.join(__dirname, "VibePage.jsx"), "utf8");
 const adminDashboardSource = fs.readFileSync(path.join(__dirname, "AdminDashboardPage.jsx"), "utf8");
+const eventCardSource = fs.readFileSync(path.join(__dirname, "..", "components", "EventCard.jsx"), "utf8");
 const businessClaimSource = fs.readFileSync(path.join(__dirname, "BusinessClaimPage.jsx"), "utf8");
 const businessDashboardSource = fs.readFileSync(path.join(__dirname, "BusinessDashboardPage.jsx"), "utf8");
 const businessLoginSource = fs.readFileSync(path.join(__dirname, "BusinessLoginPage.jsx"), "utf8");
@@ -171,6 +172,15 @@ describe("AdminDashboardPage source contract", () => {
     expect(adminDashboardSource).toContain("Mark contacted");
     expect(adminDashboardSource).toContain("Archive");
   });
+
+  test("featured live music form supports both image upload and image url fallback", () => {
+    expect(adminDashboardSource).toContain('data-testid="featured-live-music-upload-button"');
+    expect(adminDashboardSource).toContain('data-testid="featured-live-music-upload-input"');
+    expect(adminDashboardSource).toContain('data-testid="featured-live-music-clear-upload"');
+    expect(adminDashboardSource).toContain("Uploaded image is currently being used.");
+    expect(adminDashboardSource).toContain("If you upload an image, it will be used before the image URL.");
+    expect(adminDashboardSource).toContain("Featured event image uploaded");
+  });
 });
 
 describe("Legal and contact routes source contract", () => {
@@ -265,6 +275,14 @@ describe("Business owner routes source contract", () => {
     expect(adminDashboardSource).toContain('.post(`/admin/businesses/${editing.id}/owner-access/revoke`)');
     expect(adminDashboardSource).toContain("await loadOwnerAccess(editing.id, \"\")");
     expect(adminDashboardSource).toContain('setOwnerInviteEmail("")');
+  });
+});
+
+describe("Featured live music public rendering contract", () => {
+  test("event cards can render uploaded featured-event images", () => {
+    expect(eventCardSource).toContain("resolveImageUrl(event, { maxWidth: 960 })");
+    expect(eventCardSource).toContain("const imageUrl = resolveImageUrl(event, { maxWidth: 960 });");
+    expect(eventCardSource).toContain("src={imageUrl}");
   });
 });
 

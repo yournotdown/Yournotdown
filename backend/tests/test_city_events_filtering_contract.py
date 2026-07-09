@@ -33,7 +33,14 @@ class TestCityEventsFilteringContract(unittest.TestCase):
 
     def test_public_businesses_route_uses_shared_filter_after_loading_today_events(self):
         source = ast.get_source_segment(SERVER_SOURCE, named_function("_public_businesses"))
-        self.assertIn('return eligible_public_businesses(businesses, event_rows if event_rows is not None else await _today_city_events(city))', source)
+        self.assertIn("public_businesses = eligible_public_businesses(", source)
+        self.assertIn('event_rows if event_rows is not None else await _today_city_events(city)', source)
+        self.assertIn('if category == "live-music" and featured is not False:', source)
+        self.assertIn("featured_live_music = await _active_featured_live_music_event(city)", source)
+        self.assertIn("featured_business = featured_live_music_business(featured_live_music)", source)
+        self.assertIn('"event": featured_live_music_step_event(featured_live_music)', source)
+        self.assertIn('if business.get("id") != featured_business.get("id")', source)
+        self.assertIn("return public_businesses[:limit]", source)
 
     def test_itinerary_generation_uses_filtered_today_events(self):
         source = ast.get_source_segment(SERVER_SOURCE, named_function("generate_itinerary"))

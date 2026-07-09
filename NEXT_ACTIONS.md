@@ -1,5 +1,14 @@
 ## Immediate Follow-Up
 
+0. Manually QA the featured live music launch-blocker fix after the next deploy:
+   - create or edit one active Featured Live Music event in admin with a same-day date and time
+   - confirm it appears on the public `/nashville/live-music` category detail page
+   - confirm it appears in the Tonight's Shows section and the live music venue list
+   - confirm an uploaded image renders publicly and in the admin preview
+   - confirm uploaded image takes precedence over image URL when both are present
+   - confirm inactive, expired, wrong-city, or missing-date/time featured events do not surface publicly
+   - confirm the normal Ticketmaster-backed live music behavior still remains intact when no active featured event is eligible
+
 0. Use `docs/production/analytics_reset_runbook.md` for the final launch analytics reset:
    - run all QA and manual cleanup first
    - confirm backup/snapshot first
