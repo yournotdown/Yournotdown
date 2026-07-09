@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
 import { api, trackEvent } from "../lib/api";
 import { activeCitySlug, cityPath } from "../lib/cities";
+import PublicFooter from "../components/PublicFooter";
 
 export default function CategoriesPage() {
   const navigate = useNavigate();
@@ -82,6 +83,8 @@ export default function CategoriesPage() {
                 </motion.button>
               ))}
         </div>
+
+        <PublicFooter className="mt-12 border-t border-white/10 pt-5" />
       </div>
     </div>
   );

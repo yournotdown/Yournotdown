@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
+import PublicFooter from "../components/PublicFooter";
 
 const ownerSessionError = (err) => {
   const detail = err?.response?.data?.detail || "";
@@ -145,6 +146,8 @@ export default function BusinessDashboardPage() {
             </div>
           ))}
         </div>
+
+        <PublicFooter className="mt-10 border-t border-white/10 pt-5" />
       </div>
     </div>
   );

@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { trackEvent } from "../lib/api";
 import { activeCitySlug, cityPath } from "../lib/cities";
+import PublicFooter from "../components/PublicFooter";
 
 const VIBES = [
   { slug: "just-vibing", emoji: "😇", label: "Take It Easy" },
@@ -122,6 +123,7 @@ export default function VibePage() {
       </motion.div>
 
       {/* Marquee */}
+      <PublicFooter className="absolute bottom-16 left-6 z-20" compact />
       <div className="absolute bottom-0 inset-x-0 z-10 border-t border-white/10 bg-black/80 backdrop-blur-sm overflow-hidden">
         <div className="marquee-track flex whitespace-nowrap py-3 sm:py-4">
           {Array.from({ length: 12 }).map((_, i) => (

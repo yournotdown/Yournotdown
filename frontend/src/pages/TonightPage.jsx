@@ -6,6 +6,7 @@ import { api, formatEventTime, trackEvent, resolveImageUrl } from "../lib/api";
 import { getVisitorId } from "../lib/visitor";
 import { getCurrentQrSlug } from "../lib/qr";
 import { activeCitySlug, cityPath } from "../lib/cities";
+import PublicFooter from "../components/PublicFooter";
 
 const VIBE_LABELS = {
   "just-vibing": { emoji: "😇", label: "Take It Easy" },
@@ -497,6 +498,9 @@ export default function TonightPage() {
                       {saveError}
                     </div>
                   ) : null}
+                  <div className="mt-4 text-[11px] leading-5 text-white/35">
+                    By saving, you agree to our <a href="/terms" className="text-white/70 hover:text-[#C6FF00]">Terms</a> and <a href="/privacy" className="text-white/70 hover:text-[#C6FF00]">Privacy</a>.
+                  </div>
                 </>
               )}
 
@@ -527,6 +531,7 @@ export default function TonightPage() {
       )}
 
       {/* Marquee */}
+      <PublicFooter className="absolute bottom-16 left-6 z-20" compact />
       <div className="absolute bottom-0 inset-x-0 z-10 border-t border-white/10 bg-black/80 backdrop-blur-sm overflow-hidden">
         <div className="marquee-track flex whitespace-nowrap py-3 sm:py-4">
           {Array.from({ length: 16 }).map((_, i) => (

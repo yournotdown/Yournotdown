@@ -6,6 +6,58 @@ The repo is currently on branch `main`. The only known worktree changes outside 
 
 ## Latest Work Session
 
+Latest local launch legal/safety + business contact intake pass:
+- added public legal/contact surfaces for launch:
+  - `/terms`
+  - `/privacy`
+  - `/contact`
+- added launch-safe plain-language copy:
+  - `Terms` covers recommendation-only positioning, third-party venue/event disclaimers, user responsibility, changing venue/event details, sponsored placement labeling, third-party links, emergency guidance, and limitation-of-liability language using `to the fullest extent permitted by law`
+  - `Privacy` covers saved-itinerary emails, business inquiry submissions, business-owner access emails, visitor_id analytics, QR slug attribution, basic technical logs, Resend usage, no-sale language, and deletion/contact questions
+- added reusable public/footer links via `frontend/src/components/PublicFooter.jsx`
+  - linked `Terms`, `Privacy`, and `Contact`
+  - wired into public app surfaces and business-owner access surfaces
+  - added small legal links inside the Tonight save/email overlay
+- added `frontend/src/pages/ContactPage.jsx`
+  - YND-branded public business inquiry form for sponsorships, hotel QR placements, venue listings, restaurant/bar partnerships, press/media, and general inquiries
+  - success copy is generic and does not expose whether any admin email notification was sent
+  - includes a hidden honeypot field for spam filtering
+- backend changes in `backend/server.py`:
+  - added `POST /api/contact/inquiries`
+  - added `GET /api/admin/contact-inquiries`
+  - added `PATCH /api/admin/contact-inquiries/{id}`
+  - added `contact_inquiries` startup indexes for:
+    - `created_at`
+    - `status + created_at`
+    - `inquiry_type + created_at`
+    - `email`
+  - contact submissions now:
+    - normalize email
+    - validate required fields
+    - cap field lengths
+    - silently absorb honeypot spam with a generic success response
+    - hash request IP before storage instead of storing raw IP
+    - rate-limit by IP and email
+    - optionally send an internal Resend notification only if `CONTACT_NOTIFY_EMAIL` and normal Resend env vars are configured
+    - keep storing inquiries even when notification is unconfigured or notification send fails
+  - logging avoids full message-body logging and notification failure logs hash the email
+- admin changes in `frontend/src/pages/AdminDashboardPage.jsx`:
+  - added a `Contact` tab
+  - admin can review newest inquiries first
+  - shows inquiry type, status, business/name/email, message preview, created timestamp
+  - supports marking `contacted` and `archived`
+- test coverage added/updated:
+  - `backend/tests/test_contact_inquiries_contract.py`
+  - `frontend/src/pages/pages.contract.test.js`
+- local verification for this pass:
+  - `python3 -B -m unittest backend.tests.test_business_owner_contract backend.tests.test_analytics_contract backend.tests.test_saved_itinerary_contract backend.tests.test_locked_steps_contract backend.tests.test_tonight_page_contract backend.tests.test_city_events_filtering_contract backend.tests.test_ticketmaster_events_unit backend.tests.test_contact_inquiries_contract` passed
+  - `cd frontend && npm run build` passed
+  - `cd frontend && CI=true npm test -- --watchAll=false` passed
+- still unverified:
+  - no manual browser QA has yet confirmed the new public footer/legal links across all launch surfaces on mobile
+  - no manual admin QA has yet confirmed the end-to-end contact submission workflow and status updates against a live database
+  - no live `CONTACT_NOTIFY_EMAIL` notification QA was run in this pass
+
 Latest local business-owner portal access UX polish pass:
 - refined the owner-facing portal copy so dashboard access feels persistent rather than temporary
 - updated `frontend/src/pages/BusinessDashboardPage.jsx`:

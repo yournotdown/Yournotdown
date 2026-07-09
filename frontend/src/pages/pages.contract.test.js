@@ -2,11 +2,16 @@ import fs from "fs";
 import path from "path";
 
 const tonightPageSource = fs.readFileSync(path.join(__dirname, "TonightPage.jsx"), "utf8");
+const homePageSource = fs.readFileSync(path.join(__dirname, "HomePage.jsx"), "utf8");
 const vibePageSource = fs.readFileSync(path.join(__dirname, "VibePage.jsx"), "utf8");
 const adminDashboardSource = fs.readFileSync(path.join(__dirname, "AdminDashboardPage.jsx"), "utf8");
 const businessClaimSource = fs.readFileSync(path.join(__dirname, "BusinessClaimPage.jsx"), "utf8");
 const businessDashboardSource = fs.readFileSync(path.join(__dirname, "BusinessDashboardPage.jsx"), "utf8");
 const businessLoginSource = fs.readFileSync(path.join(__dirname, "BusinessLoginPage.jsx"), "utf8");
+const contactPageSource = fs.readFileSync(path.join(__dirname, "ContactPage.jsx"), "utf8");
+const termsPageSource = fs.readFileSync(path.join(__dirname, "TermsPage.jsx"), "utf8");
+const privacyPageSource = fs.readFileSync(path.join(__dirname, "PrivacyPage.jsx"), "utf8");
+const publicFooterSource = fs.readFileSync(path.join(__dirname, "..", "components", "PublicFooter.jsx"), "utf8");
 const appSource = fs.readFileSync(path.join(__dirname, "..", "App.js"), "utf8");
 const indexHtmlSource = fs.readFileSync(path.join(__dirname, "..", "..", "public", "index.html"), "utf8");
 const visitorHelperSource = fs.readFileSync(path.join(__dirname, "..", "lib", "visitor.js"), "utf8");
@@ -156,6 +161,60 @@ describe("AdminDashboardPage source contract", () => {
     expect(adminDashboardSource).toContain('data-testid="admin-audience-prev"');
     expect(adminDashboardSource).toContain('data-testid="admin-audience-next"');
   });
+
+  test("admin dashboard contains contact inquiry section", () => {
+    expect(adminDashboardSource).toContain('{ id: "contact", label: "Contact", icon: Mail }');
+    expect(adminDashboardSource).toContain("Contact Inquiries");
+    expect(adminDashboardSource).toContain("admin-contact-panel");
+    expect(adminDashboardSource).toContain('api.get("/admin/contact-inquiries"');
+    expect(adminDashboardSource).toContain('api.patch(`/admin/contact-inquiries/${inquiryId}`');
+    expect(adminDashboardSource).toContain("Mark contacted");
+    expect(adminDashboardSource).toContain("Archive");
+  });
+});
+
+describe("Legal and contact routes source contract", () => {
+  test("terms, privacy, and contact routes exist", () => {
+    expect(appSource).toContain('path="/terms"');
+    expect(appSource).toContain('path="/privacy"');
+    expect(appSource).toContain('path="/contact"');
+  });
+
+  test("contact page includes business inquiry fields without password or signup copy", () => {
+    expect(contactPageSource).toContain("Work With YourNotDown");
+    expect(contactPageSource).toContain("For sponsorships, hotel QR placements, venue listings, and business inquiries.");
+    expect(contactPageSource).toContain('data-testid="contact-name"');
+    expect(contactPageSource).toContain('data-testid="contact-email"');
+    expect(contactPageSource).toContain('data-testid="contact-business-name"');
+    expect(contactPageSource).toContain('data-testid="contact-phone"');
+    expect(contactPageSource).toContain('data-testid="contact-inquiry-type"');
+    expect(contactPageSource).toContain('data-testid="contact-message"');
+    expect(contactPageSource).toContain('data-testid="contact-honeypot"');
+    expect(contactPageSource).toContain('api.post("/contact/inquiries", form)');
+    expect(contactPageSource).toContain("Got it. We’ll review your inquiry and get back to you if it’s a fit.");
+    expect(contactPageSource).not.toContain("password");
+    expect(contactPageSource).not.toContain("sign up");
+    expect(contactPageSource).not.toContain("MVP");
+  });
+
+  test("terms and privacy pages contain launch-safe legal copy", () => {
+    expect(termsPageSource).toContain("YourNotDown provides nightlife and activity recommendations for discovery purposes only.");
+    expect(termsPageSource).toContain("call 911 or your local emergency services immediately");
+    expect(termsPageSource).toContain("To the fullest extent permitted by law");
+    expect(privacyPageSource).toContain("We do not sell personal information.");
+    expect(privacyPageSource).toContain("visitor_id-style analytics");
+    expect(privacyPageSource).toContain("QR slug attribution");
+    expect(privacyPageSource).toContain("Resend for email delivery");
+  });
+
+  test("public footer exposes legal and contact links", () => {
+    expect(publicFooterSource).toContain('href="/terms"');
+    expect(publicFooterSource).toContain('href="/privacy"');
+    expect(publicFooterSource).toContain('href="/contact"');
+    expect(homePageSource).toContain("PublicFooter");
+    expect(vibePageSource).toContain("PublicFooter");
+    expect(tonightPageSource).toContain("PublicFooter");
+  });
 });
 
 describe("Business owner routes source contract", () => {
@@ -238,7 +297,6 @@ describe("Visitor tracking contract", () => {
   });
 
   test("homepage stores qr slug and fires the hotel qr scan event", () => {
-    const homePageSource = fs.readFileSync(path.join(__dirname, "HomePage.jsx"), "utf8");
     expect(homePageSource).toContain("rememberQrSlugFromSearch(location.search)");
     expect(homePageSource).toContain('trackEvent("hotel_qr_scan", { city_slug: citySlug, qr_slug: qrSlug })');
   });

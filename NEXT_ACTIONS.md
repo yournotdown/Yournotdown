@@ -1,5 +1,22 @@
 ## Immediate Follow-Up
 
+0. Manually QA the new public legal/contact launch surfaces after the next deploy:
+   - open `/terms`, `/privacy`, and `/contact`
+   - confirm footer/legal links render cleanly on homepage, vibe, tonight, categories, category detail, and business-owner portal pages
+   - confirm the Tonight save overlay legal links are readable on mobile
+
+0. Manually QA end-to-end contact intake after the next deploy:
+   - submit a real business inquiry through `/contact`
+   - confirm it appears in the admin `Contact` tab
+   - confirm `Mark contacted` and `Archive` update the row status cleanly
+   - if `CONTACT_NOTIFY_EMAIL` is configured, confirm the internal Resend notification arrives
+   - if not configured, confirm the inquiry still stores successfully with no public-facing failure
+
+0. Before launch, review the admin `Contact` tab for any spam/test rows and keep statuses clean:
+   - new
+   - contacted
+   - archived
+
 0. Manually QA the owner portal access messaging after the next deploy:
    - confirm the dashboard now clearly communicates that access stays active after the original invite is claimed
    - confirm the `Account Access` section shows the correct owner email, business name, and sponsor tier

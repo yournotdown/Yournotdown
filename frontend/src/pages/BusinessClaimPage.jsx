@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api } from "../lib/api";
+import PublicFooter from "../components/PublicFooter";
 
 const ownerSessionError = (err, fallback) => {
   const detail = err?.response?.data?.detail || "";
@@ -48,6 +49,7 @@ export default function BusinessClaimPage() {
             Verifying your secure access link and activating your portal access…
           </p>
         )}
+        <PublicFooter className="mt-8 border-t border-white/10 pt-5" />
       </div>
     </div>
   );

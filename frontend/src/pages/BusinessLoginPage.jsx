@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api } from "../lib/api";
+import PublicFooter from "../components/PublicFooter";
 
 const loginClaimError = (err) => {
   const detail = err?.response?.data?.detail || "";
@@ -111,6 +112,7 @@ export default function BusinessLoginPage() {
             {error}
           </p>
         ) : null}
+        <PublicFooter className="mt-8 border-t border-white/10 pt-5" />
       </div>
     </div>
   );

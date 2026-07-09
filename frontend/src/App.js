@@ -11,6 +11,9 @@ import AdminBusinessAnalyticsPage from "./pages/AdminBusinessAnalyticsPage";
 import BusinessClaimPage from "./pages/BusinessClaimPage";
 import BusinessDashboardPage from "./pages/BusinessDashboardPage";
 import BusinessLoginPage from "./pages/BusinessLoginPage";
+import TermsPage from "./pages/TermsPage";
+import PrivacyPage from "./pages/PrivacyPage";
+import ContactPage from "./pages/ContactPage";
 import AuthCallback from "./pages/AuthCallback";
 import { cityPath, DEFAULT_CITY_SLUG } from "./lib/cities";
 import "@/index.css";
@@ -40,6 +43,9 @@ function AppRouter() {
       <Route path="/business/claim/:token" element={<BusinessClaimPage />} />
       <Route path="/business/login" element={<BusinessLoginPage />} />
       <Route path="/business/dashboard" element={<BusinessDashboardPage />} />
+      <Route path="/terms" element={<TermsPage />} />
+      <Route path="/privacy" element={<PrivacyPage />} />
+      <Route path="/contact" element={<ContactPage />} />
       <Route path="/" element={<NashvilleRedirect />} />
       <Route path="/vibe" element={<NashvilleRedirect path="vibe" />} />
       <Route path="/tonight" element={<NashvilleRedirect path="tonight" />} />

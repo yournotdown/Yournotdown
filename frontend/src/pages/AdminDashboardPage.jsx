@@ -129,6 +129,10 @@ export default function AdminDashboardPage() {
     limit: 100,
     offset: 0,
   });
+  const [contactInquiries, setContactInquiries] = useState([]);
+  const [contactInquiriesLoading, setContactInquiriesLoading] = useState(false);
+  const [contactInquiriesError, setContactInquiriesError] = useState("");
+  const [contactInquiriesStatus, setContactInquiriesStatus] = useState("all");
   const [hotelQrRows, setHotelQrRows] = useState([]);
   const [hotelQrLoading, setHotelQrLoading] = useState(false);
   const [hotelQrError, setHotelQrError] = useState("");
@@ -249,6 +253,26 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     if (user) loadAudience();
   }, [user, loadAudience]);
+
+  const loadContactInquiries = useCallback(async () => {
+    if (!user) return;
+    setContactInquiriesLoading(true);
+    setContactInquiriesError("");
+    try {
+      const response = await api.get("/admin/contact-inquiries", { params: { status: contactInquiriesStatus } });
+      setContactInquiries(Array.isArray(response?.data?.rows) ? response.data.rows : []);
+    } catch (e) {
+      setContactInquiries([]);
+      setContactInquiriesError(e?.response?.data?.detail || "Couldn’t load contact inquiries right now.");
+      toast.error("Failed to load contact inquiries");
+    } finally {
+      setContactInquiriesLoading(false);
+    }
+  }, [contactInquiriesStatus, user]);
+
+  useEffect(() => {
+    if (user) loadContactInquiries();
+  }, [user, loadContactInquiries]);
 
   const loadHotelQr = useCallback(async () => {
     if (!user) return;
@@ -556,6 +580,16 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const handleUpdateContactInquiryStatus = async (inquiryId, status) => {
+    try {
+      await api.patch(`/admin/contact-inquiries/${inquiryId}`, { status });
+      setContactInquiries((prev) => prev.map((row) => (row.id === inquiryId ? { ...row, status } : row)));
+      toast.success(status === "contacted" ? "Inquiry marked contacted" : "Inquiry archived");
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Failed to update inquiry");
+    }
+  };
+
   const handleCopyHotelQrUrl = async (value) => {
     try {
       await navigator.clipboard.writeText(value);
@@ -615,6 +649,7 @@ export default function AdminDashboardPage() {
             { id: "imports", label: `Import Review${importSummary?.pending ? ` (${importSummary.pending})` : ""}`, icon: ClipboardCheck },
             { id: "analytics", label: "Analytics", icon: BarChart3 },
             { id: "audience", label: "Audience", icon: Mail },
+            { id: "contact", label: "Contact", icon: Mail },
             { id: "hotel-qr", label: "Hotel QR", icon: Building2 },
           ].map((t) => (
             <button
@@ -690,6 +725,17 @@ export default function AdminDashboardPage() {
             audienceError={audienceError}
             filters={audienceFilters}
             onFiltersChange={setAudienceFilters}
+          />
+        )}
+        {tab === "contact" && (
+          <ContactInquiriesPanel
+            rows={contactInquiries}
+            loading={contactInquiriesLoading}
+            error={contactInquiriesError}
+            status={contactInquiriesStatus}
+            onStatusChange={setContactInquiriesStatus}
+            onMarkContacted={(id) => handleUpdateContactInquiryStatus(id, "contacted")}
+            onArchive={(id) => handleUpdateContactInquiryStatus(id, "archived")}
           />
         )}
         {tab === "hotel-qr" && (
@@ -2274,6 +2320,137 @@ function AudiencePanel({ audience, audienceLoading, audienceError, filters, onFi
             Next
           </Button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function ContactInquiriesPanel({ rows, loading, error, status, onStatusChange, onMarkContacted, onArchive }) {
+  const statusCards = [
+    { label: "New", value: rows.filter((row) => row.status === "new").length },
+    { label: "Contacted", value: rows.filter((row) => row.status === "contacted").length },
+    { label: "Archived", value: rows.filter((row) => row.status === "archived").length },
+  ];
+
+  return (
+    <div className="space-y-8" data-testid="admin-contact-panel">
+      <div className="flex items-end justify-between gap-4 flex-wrap">
+        <div>
+          <h2 className="font-display text-3xl font-bold">Contact Inquiries</h2>
+          <p className="text-sm text-[#A1A1AA] mt-1">Business inquiries submitted from the public Work With YourNotDown page.</p>
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          {[
+            { value: "all", label: "All" },
+            { value: "new", label: "New" },
+            { value: "contacted", label: "Contacted" },
+            { value: "archived", label: "Archived" },
+          ].map((option) => (
+            <button
+              key={option.value}
+              onClick={() => onStatusChange(option.value)}
+              className={`px-3 py-2 rounded-full border text-xs font-bold ${
+                status === option.value
+                  ? "border-[#7C3AED] text-white bg-[#7C3AED]/15"
+                  : "border-white/10 text-[#A1A1AA]"
+              }`}
+              data-testid={`admin-contact-filter-${option.value}`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {statusCards.map((card) => (
+          <AnalyticsStatCard key={card.label} label={card.label} value={card.value} icon={Mail} helper="Public business inquiry status counts." />
+        ))}
+      </div>
+
+      {error ? (
+        <div className="rounded-3xl border border-red-400/15 bg-red-500/[0.06] px-5 py-4 text-sm text-red-100" data-testid="admin-contact-error">
+          {error}
+        </div>
+      ) : null}
+
+      <div className="bg-[#121218] rounded-3xl border border-white/10 overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-xs uppercase tracking-wide text-[#A1A1AA]">
+              <th className="px-5 py-4">Contact</th>
+              <th className="px-3 py-4">Type</th>
+              <th className="px-3 py-4">Status</th>
+              <th className="px-3 py-4">Message</th>
+              <th className="px-3 py-4">Created</th>
+              <th className="px-5 py-4">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr>
+                <td colSpan={6} className="px-5 py-12 text-center text-[#A1A1AA]">Loading inquiries…</td>
+              </tr>
+            ) : rows.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="px-5 py-12 text-center text-[#A1A1AA]">No contact inquiries yet.</td>
+              </tr>
+            ) : rows.map((row) => (
+              <tr key={row.id} className="border-t border-white/5" data-testid={`admin-contact-row-${row.id}`}>
+                <td className="px-5 py-4">
+                  <div className="font-medium text-white">{row.business_name || row.name}</div>
+                  <div className="mt-1 text-xs text-[#A1A1AA]">{row.name}</div>
+                  <div className="mt-1 text-xs text-[#A1A1AA] break-all">{row.email}</div>
+                  {row.phone ? <div className="mt-1 text-xs text-[#A1A1AA]">{row.phone}</div> : null}
+                </td>
+                <td className="px-3 py-4 text-[#A1A1AA]">{row.inquiry_type}</td>
+                <td className="px-3 py-4">
+                  <span className={`inline-flex rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] ${
+                    row.status === "new"
+                      ? "bg-[#C6FF00]/10 text-[#D7FF6B]"
+                      : row.status === "contacted"
+                        ? "bg-white/5 text-white/75"
+                        : "bg-white/5 text-white/45"
+                  }`}>
+                    {row.status}
+                  </span>
+                </td>
+                <td className="px-3 py-4 max-w-[340px]">
+                  <div className="text-white/78 line-clamp-3">{row.message}</div>
+                </td>
+                <td className="px-3 py-4 text-[#A1A1AA]">{row.created_at || "—"}</td>
+                <td className="px-5 py-4">
+                  <div className="flex flex-wrap gap-2">
+                    {row.status !== "contacted" ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onMarkContacted(row.id)}
+                        className="border-white/10 bg-transparent text-white/70 hover:bg-white/5 hover:text-white"
+                        data-testid={`admin-contact-contacted-${row.id}`}
+                      >
+                        Mark contacted
+                      </Button>
+                    ) : null}
+                    {row.status !== "archived" ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onArchive(row.id)}
+                        className="border-white/10 bg-transparent text-white/70 hover:bg-white/5 hover:text-white"
+                        data-testid={`admin-contact-archive-${row.id}`}
+                      >
+                        Archive
+                      </Button>
+                    ) : null}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );

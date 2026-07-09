@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { trackEvent } from "../lib/api";
 import { activeCitySlug, cityDisplayName, cityPath } from "../lib/cities";
 import { rememberQrSlugFromSearch } from "../lib/qr";
+import PublicFooter from "../components/PublicFooter";
 
 const MARQUEE = "NO BORING NIGHTS";
 
@@ -124,6 +125,7 @@ export default function HomePage() {
       >
         admin
       </button>
+      <PublicFooter className="absolute bottom-16 left-6 z-20" compact />
     </div>
   );
 }

@@ -119,6 +119,8 @@ RATE_LIMIT_OWNER_INVITE_PER_IP = 10
 RATE_LIMIT_OWNER_LOGIN_REQUEST_PER_IP = 20
 RATE_LIMIT_OWNER_LOGIN_REQUEST_PER_EMAIL = 5
 RATE_LIMIT_OWNER_LOGIN_CLAIM_PER_IP = 20
+RATE_LIMIT_CONTACT_INQUIRIES_PER_IP = 10
+RATE_LIMIT_CONTACT_INQUIRIES_PER_EMAIL = 5
 RATE_LIMIT_HOTEL_QR_ADMIN_WRITES_PER_ADMIN = 30
 RATE_LIMIT_HOTEL_QR_ADMIN_WRITES_PER_IP = 30
 RATE_LIMIT_BUSINESS_CLAIM_PER_IP = 20
@@ -272,6 +274,15 @@ SLOT_LABELS = [
 SPONSOR_WEIGHTS = {"none": 1, "silver": 5, "gold": 10, "platinum": 20}
 VALID_TIERS = set(SPONSOR_WEIGHTS.keys())
 VALID_IMPORT_STATUSES = {"pending", "approved", "rejected"}
+VALID_CONTACT_INQUIRY_TYPES = {
+    "Sponsor inquiry",
+    "Hotel QR placement",
+    "Venue listing",
+    "Restaurant/bar partnership",
+    "Press/media",
+    "General",
+}
+VALID_CONTACT_INQUIRY_STATUSES = {"new", "contacted", "archived"}
 
 class Business(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -498,6 +509,20 @@ class BusinessOwnerLoginClaimRequest(BaseModel):
     token: str
 
 
+class ContactInquiryCreate(BaseModel):
+    name: str
+    email: str
+    business_name: str = ""
+    phone: str = ""
+    inquiry_type: str
+    message: str
+    website: str = ""
+
+
+class ContactInquiryUpdate(BaseModel):
+    status: str
+
+
 class HotelQrCodeCreate(BaseModel):
     name: str
     city_slug: str = "nashville"
@@ -593,6 +618,11 @@ async def _apply_startup_maintenance():
     await db.audience_contacts.create_index([("visitor_id", 1)])
     await db.audience_contacts.create_index([("marketing_opt_in", 1), ("last_saved_at", -1)])
     await db.audience_contacts.create_index([("last_saved_at", -1)])
+
+    await db.contact_inquiries.create_index([("created_at", -1)])
+    await db.contact_inquiries.create_index([("status", 1), ("created_at", -1)])
+    await db.contact_inquiries.create_index([("inquiry_type", 1), ("created_at", -1)])
+    await db.contact_inquiries.create_index([("email", 1)])
 
     await db.visitor_profiles.create_index("visitor_id", unique=True)
     await db.visitor_profiles.create_index([("email_normalized", 1)])
@@ -1297,6 +1327,10 @@ def _normalize_qr_slug(value: Optional[str]) -> str:
     return re.sub(r"[^a-z0-9-]+", "", (value or "").strip().lower())
 
 
+def _trimmed_limited(value: Optional[str], limit: int) -> str:
+    return (value or "").strip()[:max(0, int(limit or 0))]
+
+
 def _slugify_qr_name(value: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", (value or "").strip().lower()).strip("-")
     return slug or "hotel-qr"
@@ -1366,6 +1400,26 @@ def _hotel_qr_response(doc: Optional[dict]) -> Optional[dict]:
             "conversion_rate": float(doc["analytics"].get("conversion_rate", 0)),
         }
     return payload
+
+
+def _contact_inquiry_response(doc: Optional[dict]) -> Optional[dict]:
+    if not doc:
+        return None
+    return {
+        "id": doc.get("id", ""),
+        "name": doc.get("name", ""),
+        "email": doc.get("email", ""),
+        "business_name": doc.get("business_name", ""),
+        "phone": doc.get("phone", ""),
+        "inquiry_type": doc.get("inquiry_type", ""),
+        "message": doc.get("message", ""),
+        "status": doc.get("status", "new"),
+        "source": doc.get("source", ""),
+        "created_at": doc.get("created_at"),
+        "updated_at": doc.get("updated_at"),
+        "notification_status": doc.get("notification_status", ""),
+        "notification_error_type": doc.get("notification_error_type", ""),
+    }
 
 
 async def _upsert_visitor_profile(
@@ -1672,6 +1726,90 @@ def _send_business_owner_login_email(doc: dict, login_url: str, business_name: s
         "email_provider": "resend",
         "provider_message_id": data.get("id", ""),
         "sent_at": now_iso(),
+    }
+
+
+def _contact_notification_result() -> dict:
+    notify_email = os.environ.get("CONTACT_NOTIFY_EMAIL", "").strip()
+    resend_api_key = os.environ.get("RESEND_API_KEY", "").strip()
+    resend_from_email = os.environ.get("RESEND_FROM_EMAIL", "").strip()
+    if not notify_email or not resend_api_key or not resend_from_email:
+        return {
+            "notification_status": "not_configured",
+            "notification_error_type": "",
+        }
+    return {
+        "notification_status": "pending",
+        "notification_error_type": "",
+    }
+
+
+def _send_contact_inquiry_notification(doc: dict) -> dict:
+    notify_email = os.environ.get("CONTACT_NOTIFY_EMAIL", "").strip()
+    api_key = os.environ.get("RESEND_API_KEY", "").strip()
+    from_email = os.environ.get("RESEND_FROM_EMAIL", "").strip()
+    reply_to = os.environ.get("RESEND_REPLY_TO", "").strip()
+    if not notify_email or not api_key or not from_email:
+        return _contact_notification_result()
+    safe_business_name = doc.get("business_name") or "Business inquiry"
+    safe_name = doc.get("name") or "Contact"
+    message_preview = _trimmed_limited(doc.get("message", ""), 600)
+    text_body = "\n".join([
+        "YOURNOTDOWN",
+        "New business inquiry",
+        "",
+        f"Type: {doc.get('inquiry_type', '')}",
+        f"Business: {safe_business_name}",
+        f"Name: {safe_name}",
+        f"Email: {doc.get('email', '')}",
+        f"Phone: {doc.get('phone', '') or '—'}",
+        "",
+        "Message:",
+        message_preview,
+    ])
+    html_body = f"""
+<!DOCTYPE html>
+<html lang="en">
+  <body style="margin:0;background:#020202;color:#ffffff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+    <div style="padding:24px;background:#020202;">
+      <div style="max-width:680px;margin:0 auto;border:1px solid rgba(255,255,255,0.08);background:#0a0a0a;padding:24px;">
+        <div style="font-size:24px;letter-spacing:0.24em;font-weight:800;color:#C6FF00;">YND <span style="font-size:12px;color:rgba(255,255,255,0.55);">/ EST. 26</span></div>
+        <div style="margin-top:14px;font-size:11px;letter-spacing:0.24em;text-transform:uppercase;color:rgba(255,255,255,0.45);">New business inquiry</div>
+        <h1 style="margin:12px 0 0;font-size:32px;line-height:1.05;">{safe_business_name}</h1>
+        <div style="margin-top:20px;border:1px solid rgba(255,255,255,0.08);background:#121218;padding:18px;">
+          <p style="margin:0 0 10px;font-size:14px;color:rgba(255,255,255,0.78);"><strong>Type:</strong> {doc.get("inquiry_type", "")}</p>
+          <p style="margin:0 0 10px;font-size:14px;color:rgba(255,255,255,0.78);"><strong>Name:</strong> {safe_name}</p>
+          <p style="margin:0 0 10px;font-size:14px;color:rgba(255,255,255,0.78);"><strong>Email:</strong> {doc.get("email", "")}</p>
+          <p style="margin:0 0 10px;font-size:14px;color:rgba(255,255,255,0.78);"><strong>Phone:</strong> {doc.get("phone", "") or "—"}</p>
+          <p style="margin:16px 0 0;font-size:14px;line-height:1.7;color:rgba(255,255,255,0.78);white-space:pre-wrap;">{message_preview}</p>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
+""".strip()
+    payload = {
+        "from": from_email,
+        "to": [notify_email],
+        "subject": f"New YourNotDown inquiry: {doc.get('inquiry_type', 'General')}",
+        "text": text_body,
+        "html": html_body,
+    }
+    if reply_to:
+        payload["reply_to"] = [reply_to]
+    response = requests.post(
+        "https://api.resend.com/emails",
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        json=payload,
+        timeout=15,
+    )
+    response.raise_for_status()
+    return {
+        "notification_status": "sent",
+        "notification_error_type": "",
     }
 
 
@@ -2249,6 +2387,87 @@ async def save_itinerary(payload: SaveItineraryRequest, request: Request):
     }
 
 
+@api_router.post("/contact/inquiries")
+async def create_contact_inquiry(payload: ContactInquiryCreate, request: Request):
+    _require_ip_rate_limit(
+        "contact_inquiry_ip",
+        request,
+        limit=RATE_LIMIT_CONTACT_INQUIRIES_PER_IP,
+        window_seconds=RATE_LIMIT_HOUR_SECONDS,
+    )
+    email = _normalize_email(payload.email)
+    if email:
+        _require_rate_limit_key(
+            "contact_inquiry_email",
+            email,
+            limit=RATE_LIMIT_CONTACT_INQUIRIES_PER_EMAIL,
+            window_seconds=RATE_LIMIT_HOUR_SECONDS,
+        )
+    generic_response = {
+        "ok": True,
+        "message": "Got it. We’ll review your inquiry and get back to you if it’s a fit.",
+    }
+    if _trimmed_limited(payload.website, 200):
+        return generic_response
+
+    name = _trimmed_limited(payload.name, 120)
+    business_name = _trimmed_limited(payload.business_name, 160)
+    phone = _trimmed_limited(payload.phone, 40)
+    inquiry_type = _trimmed_limited(payload.inquiry_type, 60)
+    message = _trimmed_limited(payload.message, 4000)
+    if not name:
+        raise HTTPException(status_code=400, detail="Enter your name.")
+    if not email or not _valid_email(email):
+        raise HTTPException(status_code=400, detail="Enter a valid email.")
+    if inquiry_type not in VALID_CONTACT_INQUIRY_TYPES:
+        raise HTTPException(status_code=400, detail="Select an inquiry type.")
+    if not message:
+        raise HTTPException(status_code=400, detail="Enter a message.")
+
+    notification = _contact_notification_result()
+    doc = {
+        "id": str(uuid.uuid4()),
+        "name": name,
+        "email": email,
+        "business_name": business_name,
+        "phone": phone,
+        "inquiry_type": inquiry_type,
+        "message": message,
+        "status": "new",
+        "source": "public_contact_page",
+        "user_agent": request.headers.get("user-agent", ""),
+        "ip_hash": _hash_token(_client_ip(request)) if _client_ip(request) else "",
+        "created_at": now_iso(),
+        "updated_at": now_iso(),
+        "notification_status": notification["notification_status"],
+        "notification_error_type": notification["notification_error_type"],
+    }
+    await db.contact_inquiries.insert_one(doc)
+    if notification["notification_status"] != "not_configured":
+        try:
+            notification = await run_in_threadpool(_send_contact_inquiry_notification, doc)
+        except requests.RequestException as exc:
+            logger.warning(
+                "contact inquiry notification failed: inquiry_type=%s email_hash=%s error_type=%s",
+                inquiry_type,
+                _hash_token(email)[:12],
+                type(exc).__name__,
+            )
+            notification = {
+                "notification_status": "failed",
+                "notification_error_type": type(exc).__name__,
+            }
+        await db.contact_inquiries.update_one(
+            {"id": doc["id"]},
+            {"$set": {
+                "notification_status": notification["notification_status"],
+                "notification_error_type": notification["notification_error_type"],
+                "updated_at": now_iso(),
+            }},
+        )
+    return generic_response
+
+
 @api_router.get("/admin/audience")
 async def admin_audience(
     q: str = "",
@@ -2381,6 +2600,31 @@ async def admin_audience(
             "prev_offset": max(offset - limit, 0) if offset > 0 else None,
         },
     }
+
+
+@api_router.get("/admin/contact-inquiries")
+async def admin_contact_inquiries(status: str = "all", user=Depends(require_admin)):
+    query = {}
+    if status != "all":
+        if status not in VALID_CONTACT_INQUIRY_STATUSES:
+            raise HTTPException(status_code=400, detail="Invalid status")
+        query["status"] = status
+    rows = await db.contact_inquiries.find(query, {"_id": 0}).sort([("created_at", -1)]).limit(200).to_list(200)
+    return {"rows": [_contact_inquiry_response(row) for row in rows]}
+
+
+@api_router.patch("/admin/contact-inquiries/{inquiry_id}")
+async def admin_update_contact_inquiry(inquiry_id: str, payload: ContactInquiryUpdate, user=Depends(require_admin)):
+    status = _trimmed_limited(payload.status, 20)
+    if status not in VALID_CONTACT_INQUIRY_STATUSES:
+        raise HTTPException(status_code=400, detail="Invalid status")
+    result = await db.contact_inquiries.update_one(
+        {"id": inquiry_id},
+        {"$set": {"status": status, "updated_at": now_iso()}},
+    )
+    if not result.matched_count:
+        raise HTTPException(status_code=404, detail="Contact inquiry not found")
+    return _contact_inquiry_response(await db.contact_inquiries.find_one({"id": inquiry_id}, {"_id": 0}))
 
 
 @api_router.get("/admin/hotel-qr")

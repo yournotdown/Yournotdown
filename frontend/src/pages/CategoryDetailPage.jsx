@@ -5,6 +5,7 @@ import { ArrowLeft, Phone, Navigation, Globe, Flame, ExternalLink } from "lucide
 import { api, formatEventSchedule, matchedEventsForBusinesses, trackEvent, resolveImageUrl } from "../lib/api";
 import { activeCitySlug } from "../lib/cities";
 import EventCard from "../components/EventCard";
+import PublicFooter from "../components/PublicFooter";
 
 export default function CategoryDetailPage() {
   const { citySlug: routeCitySlug, slug } = useParams();
@@ -236,6 +237,9 @@ export default function CategoryDetailPage() {
             </section>
           </>
         )}
+      </div>
+      <div className="max-w-2xl mx-auto px-6">
+        <PublicFooter className="mt-6 border-t border-white/10 pt-5" />
       </div>
     </div>
   );
