@@ -6,6 +6,29 @@ The repo is currently on branch `main`. The only known worktree changes outside 
 
 ## Latest Work Session
 
+Latest local analytics reset runbook pass:
+- added `docs/production/analytics_reset_runbook.md`
+- documented the final pre-launch analytics reset plan for:
+  - `analytics_events`
+  - `visitor_profiles`
+  - `audience_contacts`
+  - `saved_itineraries`
+- intentionally left `itineraries` as optional and not recommended for the required launch analytics reset
+- documented:
+  - destructive warning language
+  - backup confirmation
+  - manual confirmation phrase
+  - before-count commands
+  - approved `deleteMany({})` commands
+  - after-count commands
+  - collections not to touch
+  - final launch order
+  - the warning not to browse/test public flows after reset
+- this was a docs-only pass with no app behavior changes
+- still unverified:
+  - the runbook has not yet been exercised against production
+  - launch-day operator flow should still be reviewed before execution
+
 Latest local launch legal/safety + business contact intake pass:
 - added public legal/contact surfaces for launch:
   - `/terms`

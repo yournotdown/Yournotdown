@@ -1,5 +1,12 @@
 ## Immediate Follow-Up
 
+0. Use `docs/production/analytics_reset_runbook.md` for the final launch analytics reset:
+   - run all QA and manual cleanup first
+   - confirm backup/snapshot first
+   - reset only the approved analytics collections
+   - run analytics reset last before launch
+   - avoid public browsing/testing after reset unless new non-zero analytics are acceptable
+
 0. Manually QA the new public legal/contact launch surfaces after the next deploy:
    - open `/terms`, `/privacy`, and `/contact`
    - confirm footer/legal links render cleanly on homepage, vibe, tonight, categories, category detail, and business-owner portal pages
