@@ -1,5 +1,16 @@
 ## Immediate Follow-Up
 
+0. Manually QA the admin session transition after the next deploy:
+   - confirm a fresh admin login still succeeds through the existing `/api/auth/session` flow
+   - confirm `/api/auth/me` succeeds with the new hashed admin session rows
+   - confirm `Logout` clears the admin session cleanly
+   - if any legacy raw admin sessions still exist, confirm they either upgrade cleanly on first authenticated request or fail cleanly with a re-login prompt
+   - confirm business-owner login/session behavior is unchanged and still separate from admin auth
+
+0. If the backend moves behind `api.yournotdown.com`, re-run admin session QA specifically in Safari and mobile browsers:
+   - confirm the `Secure` / `HttpOnly` / `SameSite=None` admin cookie still sticks correctly
+   - confirm login/logout behavior remains stable across the same-site custom-domain setup
+
 0. Manually QA the updated admin `Analytics` top cards after the next deploy:
    - confirm the cards read clearly as:
      - `Total Visits`

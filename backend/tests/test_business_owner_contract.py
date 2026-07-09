@@ -77,6 +77,32 @@ def load_owner_helpers():
 
 
 class TestBusinessOwnerContract(unittest.TestCase):
+    def test_admin_session_endpoint_stores_hash_not_raw_token(self):
+        source = ast.get_source_segment(SERVER_SOURCE, named_function("auth_session"))
+        self.assertIn('"session_token_hash": _hash_token(session_token)', source)
+        self.assertNotIn('"session_token": session_token', source)
+        self.assertIn('key=ADMIN_SESSION_COOKIE', source)
+        self.assertIn('httponly=True', source)
+        self.assertIn('secure=True', source)
+        self.assertIn('samesite="none"', source)
+        self.assertIn('return {"user": user}', source)
+
+    def test_admin_auth_supports_hashed_sessions_with_legacy_fallback(self):
+        source = ast.get_source_segment(SERVER_SOURCE, named_function("get_current_user"))
+        self.assertIn('token_hash = _hash_token(token)', source)
+        self.assertIn('await db.user_sessions.find_one({"session_token_hash": token_hash}', source)
+        self.assertIn('legacy_sess = await db.user_sessions.find_one({"session_token": token}', source)
+        self.assertIn('"session_token_hash": token_hash', source)
+        self.assertIn('"session_token": ""', source)
+        self.assertIn('HTTPException(status_code=401, detail="Invalid session")', source)
+        self.assertIn('HTTPException(status_code=401, detail="Session expired")', source)
+
+    def test_admin_logout_revokes_hashed_and_legacy_raw_sessions(self):
+        source = ast.get_source_segment(SERVER_SOURCE, named_function("logout"))
+        self.assertIn('{"session_token_hash": _hash_token(session_token)}', source)
+        self.assertIn('{"session_token": session_token}', source)
+        self.assertIn('response.delete_cookie(ADMIN_SESSION_COOKIE, path="/", secure=True, samesite="none")', source)
+
     def test_invite_endpoint_stores_token_hash_not_raw_token(self):
         source = ast.get_source_segment(SERVER_SOURCE, named_function("admin_business_owner_invite"))
         self.assertIn('"token_hash": _hash_token(raw_token)', source)
@@ -103,14 +129,26 @@ class TestBusinessOwnerContract(unittest.TestCase):
         self.assertIn('if invite.get("status") != "pending":', source)
 
     def test_owner_auth_and_me_endpoints_are_business_scoped(self):
+        admin_source = ast.get_source_segment(SERVER_SOURCE, named_function("get_current_user"))
         auth_source = ast.get_source_segment(SERVER_SOURCE, named_function("get_current_business_owner"))
+        self.assertIn('session_token: Optional[str] = Cookie(None)', admin_source)
+        self.assertIn('ADMIN_SESSION_COOKIE = "session_token"', SERVER_SOURCE)
         self.assertIn('business_owner_session: Optional[str] = Cookie(None)', auth_source)
+        self.assertIn('BUSINESS_OWNER_SESSION_COOKIE = "business_owner_session"', SERVER_SOURCE)
         self.assertIn('raise HTTPException(status_code=401, detail="Not authenticated")', auth_source)
         self.assertIn('await db.business_owner_sessions.find_one({"session_token_hash": token_hash}', auth_source)
         self.assertIn('await db.businesses.find_one({"id": owner["business_id"]}', auth_source)
         me_source = ast.get_source_segment(SERVER_SOURCE, named_function("business_me"))
         self.assertIn("Depends(get_current_business_owner)", me_source)
         self.assertIn('_owner_safe(owner_ctx["owner"], owner_ctx["business"])', me_source)
+        self.assertNotIn("db.user_sessions", auth_source)
+
+    def test_business_owner_claim_and_session_storage_remain_separate_from_admin(self):
+        claim_source = ast.get_source_segment(SERVER_SOURCE, named_function("business_claim"))
+        self.assertIn('"session_token_hash": _hash_token(session_token)', claim_source)
+        self.assertIn('await db.business_owner_sessions.insert_one(session_doc)', claim_source)
+        self.assertIn('key=BUSINESS_OWNER_SESSION_COOKIE', claim_source)
+        self.assertNotIn('db.user_sessions.insert_one', claim_source)
 
     def test_owner_access_summary_only_returns_pending_invites_and_active_owner(self):
         summary_source = ast.get_source_segment(SERVER_SOURCE, named_function("_owner_access_summary"))

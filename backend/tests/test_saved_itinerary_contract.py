@@ -33,6 +33,11 @@ def template_named_function(name: str):
 
 
 def load_save_helpers():
+    class RequestsStub:
+        @staticmethod
+        def post(*args, **kwargs):
+            raise AssertionError("requests.post should be mocked in this test")
+
     namespace = {
         "SLOT_LABELS": [
             {"slot": "dinner", "label": "Dinner", "emoji": "🍽️", "number": 1},
@@ -43,7 +48,7 @@ def load_save_helpers():
         "Optional": Optional,
         "List": List,
         "os": os,
-        "requests": __import__("requests"),
+        "requests": RequestsStub,
         "saved_itinerary_email_content": None,
         "saved_itinerary_email_subject": None,
         "now_iso": lambda: datetime(2026, 7, 6, 17, 0, tzinfo=timezone.utc).isoformat(),

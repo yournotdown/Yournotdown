@@ -6,6 +6,44 @@ The repo is currently on branch `main`. The only known worktree changes outside 
 
 ## Latest Work Session
 
+Latest local production-readiness P0E admin/session security cleanup pass:
+- hardened admin session storage in `backend/server.py` without changing public Tonight’s Move behavior, sponsorship weighting, or analytics event names
+- new admin sessions now store `session_token_hash` in `user_sessions` instead of raw `session_token`
+- admin auth lookup now:
+  - hashes the presented cookie/bearer token first
+  - checks hashed session rows by default
+  - supports a temporary legacy fallback for older raw-token rows
+  - upgrades a matched legacy raw row in place to `session_token_hash` and removes the raw token field
+- admin logout now revokes both:
+  - hashed session rows
+  - any still-legacy raw token rows
+- expired admin sessions are cleaned up on lookup failure instead of lingering indefinitely
+- admin session cookies remain:
+  - `HttpOnly`
+  - `Secure`
+  - `SameSite=None`
+  - path `/`
+- business-owner auth remains separate and unchanged:
+  - separate cookie name
+  - separate collection
+  - hashed owner session tokens still in place
+- reviewed frontend auth flow and confirmed no admin token is moved into `localStorage` or returned in admin API responses
+- reviewed CORS/origin handling and left it functionally unchanged in this pass; the existing explicit-origin allowlist remains in place, and the separate `api.yournotdown.com` same-site/custom-domain follow-up is still documented as a deploy-time infra step
+- added/updated source-contract coverage for:
+  - hashed admin session storage
+  - hashed admin session lookup with legacy fallback
+  - invalid/expired admin session rejection branches
+  - logout revoking hashed + legacy admin sessions
+  - admin/owner session separation
+  - `user_sessions` hashed-token indexes
+- local verification for this pass:
+  - `python3 -m unittest backend.tests.test_business_owner_contract backend.tests.test_analytics_contract backend.tests.test_saved_itinerary_contract backend.tests.test_locked_steps_contract backend.tests.test_tonight_page_contract backend.tests.test_city_events_filtering_contract backend.tests.test_ticketmaster_events_unit` passed
+  - `cd frontend && npm run build` passed
+  - `cd frontend && CI=true npm test -- --watchAll=false` passed
+- still unverified:
+  - no manual browser QA has yet confirmed an already-active legacy raw admin session upgrades cleanly after the next deploy
+  - no manual cross-site cookie QA has yet reconfirmed admin login/logout behavior in Safari/mobile after deploy
+
 Latest local Hotel QR styling + analytics clarity pass:
 - updated the admin Hotel QR preview and downloaded PNG generation to use a centralized white-on-black QR style
 - the QR image itself no longer uses lime green; lime remains available elsewhere in the UI

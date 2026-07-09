@@ -29,6 +29,8 @@ class TestAnalyticsContract(unittest.TestCase):
         self.assertIn('await db.hotel_qr_codes.create_index([("city_slug", 1), ("active", 1), ("created_at", -1)])', source)
         self.assertIn('await db.business_owner_invites.create_index([("business_id", 1), ("status", 1), ("created_at", -1)])', source)
         self.assertIn('await db.business_owner_sessions.create_index([("business_id", 1), ("revoked_at", 1)])', source)
+        self.assertIn('await db.user_sessions.create_index([("session_token_hash", 1)])', source)
+        self.assertIn('await db.user_sessions.create_index([("expires_at", 1)])', source)
 
     def test_business_scoped_events_include_ticket_locked_and_saved_types(self):
         source = SERVER_SOURCE
@@ -151,6 +153,7 @@ class TestAnalyticsContract(unittest.TestCase):
         self.assertNotIn('await db.businesses.create_index("id", unique=True)', source)
         self.assertNotIn('await db.business_owner_invites.create_index([("token_hash", 1)], unique=True)', source)
         self.assertNotIn('await db.business_owner_sessions.create_index([("session_token_hash", 1)], unique=True)', source)
+        self.assertNotIn('await db.user_sessions.create_index([("session_token_hash", 1)], unique=True)', source)
 
     def test_hotel_qr_delete_removes_only_config_row_and_handles_missing(self):
         source = ast.get_source_segment(SERVER_SOURCE, named_function("admin_delete_hotel_qr_code"))

@@ -102,6 +102,8 @@ EVENT_START_GRACE_MINUTES = max(0, int(os.environ.get("EVENT_START_GRACE_MINUTES
 
 EMERGENT_AUTH_URL = "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data"
 ADMIN_EMAILS = [e.strip().lower() for e in os.environ.get("ADMIN_EMAILS", "").split(",") if e.strip()]
+ADMIN_SESSION_DAYS = 7
+ADMIN_SESSION_COOKIE = "session_token"
 BUSINESS_OWNER_INVITE_DAYS = 7
 BUSINESS_OWNER_SESSION_DAYS = 30
 BUSINESS_OWNER_SESSION_COOKIE = "business_owner_session"
@@ -493,8 +495,9 @@ async def _apply_startup_maintenance():
     await db.business_owner_sessions.create_index([("business_id", 1), ("revoked_at", 1)])
     await db.business_owner_sessions.create_index([("expires_at", 1)])
 
-    await db.user_sessions.create_index([("session_token", 1)])
+    await db.user_sessions.create_index([("session_token_hash", 1)])
     await db.user_sessions.create_index([("user_id", 1), ("expires_at", 1)])
+    await db.user_sessions.create_index([("expires_at", 1)])
 
     await db.admin_featured_events.create_index([("city_slug", 1), ("slot", 1), ("priority", -1), ("updated_at", -1)])
     await db.admin_sponsorships.create_index([("city_slug", 1), ("placement", 1), ("priority", -1), ("updated_at", -1)])
@@ -621,7 +624,24 @@ async def get_current_user(
     if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
-    sess = await db.user_sessions.find_one({"session_token": token}, {"_id": 0})
+    token_hash = _hash_token(token)
+    sess = await db.user_sessions.find_one({"session_token_hash": token_hash}, {"_id": 0})
+    if not sess:
+        legacy_sess = await db.user_sessions.find_one({"session_token": token}, {"_id": 0})
+        if legacy_sess:
+            sess = legacy_sess
+            await db.user_sessions.update_one(
+                {"user_id": legacy_sess["user_id"], "session_token": token},
+                {
+                    "$set": {
+                        "session_token_hash": token_hash,
+                        "updated_at": now_iso(),
+                    },
+                    "$unset": {
+                        "session_token": "",
+                    },
+                },
+            )
     if not sess:
         raise HTTPException(status_code=401, detail="Invalid session")
     expires_at = sess["expires_at"]
@@ -630,11 +650,26 @@ async def get_current_user(
     if expires_at.tzinfo is None:
         expires_at = expires_at.replace(tzinfo=timezone.utc)
     if expires_at < datetime.now(timezone.utc):
+        await db.user_sessions.delete_many({
+            "$or": [
+                {"session_token_hash": token_hash},
+                {"session_token": token},
+            ]
+        })
         raise HTTPException(status_code=401, detail="Session expired")
 
     user = await db.users.find_one({"user_id": sess["user_id"]}, {"_id": 0})
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
+    await db.user_sessions.update_many(
+        {
+            "$or": [
+                {"session_token_hash": token_hash},
+                {"session_token": token},
+            ]
+        },
+        {"$set": {"last_seen_at": now_iso()}},
+    )
     return user
 
 
@@ -2324,18 +2359,20 @@ async def auth_session(request: Request, response: Response):
             "created_at": now_iso(),
         })
 
-    expires_at = datetime.now(timezone.utc) + timedelta(days=7)
+    expires_at = datetime.now(timezone.utc) + timedelta(days=ADMIN_SESSION_DAYS)
     await db.user_sessions.insert_one({
+        "session_id": str(uuid.uuid4()),
         "user_id": user_id,
-        "session_token": session_token,
+        "session_token_hash": _hash_token(session_token),
         "expires_at": expires_at.isoformat(),
         "created_at": now_iso(),
+        "last_seen_at": now_iso(),
     })
 
     response.set_cookie(
-        key="session_token",
+        key=ADMIN_SESSION_COOKIE,
         value=session_token,
-        max_age=7 * 24 * 60 * 60,
+        max_age=ADMIN_SESSION_DAYS * 24 * 60 * 60,
         httponly=True,
         secure=True,
         samesite="none",
@@ -2354,8 +2391,13 @@ async def auth_me(user=Depends(get_current_user)):
 @api_router.post("/auth/logout")
 async def logout(response: Response, session_token: Optional[str] = Cookie(None)):
     if session_token:
-        await db.user_sessions.delete_one({"session_token": session_token})
-    response.delete_cookie("session_token", path="/")
+        await db.user_sessions.delete_many({
+            "$or": [
+                {"session_token_hash": _hash_token(session_token)},
+                {"session_token": session_token},
+            ]
+        })
+    response.delete_cookie(ADMIN_SESSION_COOKIE, path="/", secure=True, samesite="none")
     return {"ok": True}
 
 
