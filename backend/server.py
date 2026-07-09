@@ -29,8 +29,8 @@ from google_places_photos import (
 from featured_live_music import (
     FEATURED_LIVE_MUSIC_SLOT,
     active_featured_live_music_event,
-    featured_live_music_business,
-    featured_live_music_step_event,
+    featured_live_music_pick,
+    promote_featured_live_music_step_first,
     normalize_live_music_event_mode,
 )
 from ticketmaster_events import (
@@ -1880,8 +1880,7 @@ async def _public_businesses(
     if category == "live-music" and featured is not False:
         featured_live_music = await _active_featured_live_music_event(city)
         if featured_live_music:
-            featured_business = featured_live_music_business(featured_live_music)
-            featured_event = featured_live_music_step_event(featured_live_music)
+            featured_business, featured_event = featured_live_music_pick(featured_live_music)
             featured_event_id = featured_event.get("external_event_id") or featured_event.get("id")
             public_businesses = [
                 {
@@ -1917,7 +1916,7 @@ async def _active_featured_live_music_event(city: str) -> Optional[dict]:
     rows = await db.admin_featured_events.find(
         {"city_slug": city, "slot": FEATURED_LIVE_MUSIC_SLOT},
         {"_id": 0},
-    ).sort([("priority", -1), ("updated_at", -1)]).to_list(200)
+    ).sort([("priority", 1), ("local_time", 1), ("created_at", -1), ("updated_at", -1)]).to_list(200)
     return active_featured_live_music_event(rows, city)
 
 
@@ -1989,8 +1988,7 @@ async def generate_itinerary(req: ItineraryRequest, request: Request):
             if label["slot"] == "entertainment":
                 event_candidates = [business for business in candidates if business_supports_live_music_event(business)]
                 if featured_live_music:
-                    pick = featured_live_music_business(featured_live_music)
-                    forced_event = featured_live_music_step_event(featured_live_music)
+                    pick, forced_event = featured_live_music_pick(featured_live_music)
                 elif live_music_event_mode in {"ticketmaster", "ticketmaster_preferred"}:
                     pick, forced_event = itinerary_event_pick(
                         event_candidates,
@@ -2028,6 +2026,10 @@ async def generate_itinerary(req: ItineraryRequest, request: Request):
                     steps.append(step)
                 else:
                     steps.append(attach_event_to_step(step, today_events_by_business))
+
+        if featured_live_music and "entertainment" not in locked_steps_by_slot:
+            featured_event_id = featured_live_music.get("id", "")
+            steps = promote_featured_live_music_step_first(steps, featured_event_id)
 
         itin_id = str(uuid.uuid4())
         itinerary = {

@@ -6,6 +6,73 @@ The repo is currently on branch `main`. The only known worktree changes outside 
 
 ## Latest Work Session
 
+Latest local featured-live-music first-card launch-blocker pass:
+- confirmed the tracked dirty files matched the expected featured-live-music workset before editing; there were no unrelated tracked dirty files
+- clarified the real remaining blocker:
+  - every vibe did **not** previously guarantee the featured live-music event as the first Tonight's Move card
+  - the generator selected the featured live-music record for the `entertainment` slot, but still built the itinerary in fixed slot order:
+    - dinner
+    - drinks
+    - entertainment
+    - late-night
+  - that meant the featured event could still appear third even when it was correctly selected
+- backend changes:
+  - `backend/featured_live_music.py`
+    - added `promote_featured_live_music_step_first(...)`
+    - added `_renumber_itinerary_steps(...)`
+    - added shared `featured_live_music_pick(...)` usage for both public and itinerary paths
+  - `backend/server.py`
+    - after itinerary step construction, if a valid featured live-music event exists and the entertainment slot is not locked, the matching featured step is promoted to the first card
+    - step numbers are renumbered after promotion
+    - duplicate entertainment placement remains prevented because the generator still only builds one entertainment step and `chosen_ids` still excludes reused business IDs
+    - locked entertainment selections are respected because promotion is skipped when `locked_steps_by_slot` already contains `entertainment`
+- tests updated:
+  - `backend/tests/test_city_events_filtering_contract.py`
+  - `backend/tests/test_featured_live_music_unit.py`
+- local verification for this pass:
+  - `python3 -B -m unittest backend.tests.test_city_events_filtering_contract backend.tests.test_featured_live_music_unit backend.tests.test_tonight_page_contract backend.tests.test_ticketmaster_events_unit` passed
+  - `python3 -B -m unittest backend.tests.test_business_owner_contract backend.tests.test_analytics_contract backend.tests.test_saved_itinerary_contract backend.tests.test_locked_steps_contract backend.tests.test_tonight_page_contract backend.tests.test_city_events_filtering_contract backend.tests.test_ticketmaster_events_unit backend.tests.test_contact_inquiries_contract backend.tests.test_featured_live_music_unit` passed
+  - `cd frontend && npm run build` passed
+  - `cd frontend && CI=true npm test -- --watchAll=false` passed
+- still unverified:
+  - no live browser QA has yet confirmed that the featured live-music event now renders as card 1 across all launch vibes in production
+  - no manual reroll QA has yet confirmed that `Run It Back` keeps the featured live-music card first while unlocked
+
+Latest local featured-live-music launch-blocker follow-up pass:
+- confirmed there was no unpushed featured-event commit before starting; branch was `main...origin/main` with only unrelated untracked helper files
+- clarified the real current behavior:
+  - there is no separate backend `Override Nashville` flag for featured live music
+  - the admin UI language was still calling the active featured event an `override`, which was misleading
+  - the itinerary generator already forced the active featured live-music event whenever the `entertainment` slot was being generated, but the shared selection path still had inconsistent query ordering and confusing admin copy
+- backend changes:
+  - `backend/featured_live_music.py`
+    - added `featured_live_music_pick(...)` so public live-music injection and Tonight's Move use the same business/event mapping helper
+  - `backend/server.py`
+    - updated `_active_featured_live_music_event(...)` query sort to align with launch priority semantics:
+      - `priority` ascending
+      - `local_time` ascending
+      - `created_at` descending
+      - `updated_at` descending
+    - updated both the public live-music list path and the itinerary `entertainment` path to use the shared `featured_live_music_pick(...)` helper
+- frontend changes:
+  - `frontend/src/pages/AdminDashboardPage.jsx`
+    - removed misleading `override` wording from the featured live music panel
+    - helper copy now explains that the top active same-day featured event is the live-music pick while active
+    - priority helper copy now says `1 appears first and is used as the featured Live Music pick while active.`
+    - active checkbox label now reads `Active featured event`
+- tests updated:
+  - `backend/tests/test_city_events_filtering_contract.py`
+  - `backend/tests/test_featured_live_music_unit.py`
+  - `frontend/src/pages/pages.contract.test.js`
+- local verification for this pass:
+  - `python3 -B -m unittest backend.tests.test_city_events_filtering_contract backend.tests.test_featured_live_music_unit backend.tests.test_tonight_page_contract backend.tests.test_ticketmaster_events_unit` passed
+  - `python3 -B -m unittest backend.tests.test_business_owner_contract backend.tests.test_analytics_contract backend.tests.test_saved_itinerary_contract backend.tests.test_locked_steps_contract backend.tests.test_tonight_page_contract backend.tests.test_city_events_filtering_contract backend.tests.test_ticketmaster_events_unit backend.tests.test_contact_inquiries_contract backend.tests.test_featured_live_music_unit` passed
+  - `cd frontend && npm run build` passed
+  - `cd frontend && CI=true npm test -- --watchAll=false` passed
+- still unverified:
+  - no live browser QA has yet confirmed the exact admin workflow Blake is calling `Override Nashville`
+  - no manual production QA has yet confirmed that a priority-1 active same-day Nashville featured event is visibly pinned in Tonight's Move without relying on any admin mental-model workaround
+
 Latest local featured-event priority launch-blocker pass:
 - fixed Featured Live Music priority semantics so lower positive numbers win instead of higher numbers
 - backend changes:

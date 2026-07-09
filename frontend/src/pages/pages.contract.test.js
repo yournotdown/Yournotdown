@@ -173,6 +173,12 @@ describe("AdminDashboardPage source contract", () => {
     expect(adminDashboardSource).toContain("Archive");
   });
 
+  test("featured live music copy explains active priority behavior without override wording", () => {
+    expect(adminDashboardSource).toContain("The top active same-day featured event is used as the Live Music pick while active.");
+    expect(adminDashboardSource).toContain("1 appears first and is used as the featured Live Music pick while active.");
+    expect(adminDashboardSource).toContain("Active featured event");
+  });
+
   test("featured live music form supports both image upload and image url fallback", () => {
     expect(adminDashboardSource).toContain('data-testid="featured-live-music-upload-button"');
     expect(adminDashboardSource).toContain('data-testid="featured-live-music-upload-input"');
@@ -180,7 +186,9 @@ describe("AdminDashboardPage source contract", () => {
     expect(adminDashboardSource).toContain("Uploaded image is currently being used.");
     expect(adminDashboardSource).toContain("If you upload an image, it will be used before the image URL.");
     expect(adminDashboardSource).toContain("Featured event image uploaded");
-    expect(adminDashboardSource).toContain("1 appears first.");
+    expect(adminDashboardSource).toContain("The top active same-day featured event is used as the Live Music pick while active.");
+    expect(adminDashboardSource).toContain("1 appears first and is used as the featured Live Music pick while active.");
+    expect(adminDashboardSource).toContain("Active featured event");
   });
 });
 

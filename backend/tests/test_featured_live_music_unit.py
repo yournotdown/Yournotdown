@@ -12,6 +12,8 @@ from featured_live_music import (  # noqa: E402
     active_featured_live_music_event,
     featured_event_is_active,
     featured_live_music_business,
+    featured_live_music_pick,
+    promote_featured_live_music_step_first,
     featured_live_music_step_event,
     normalize_live_music_event_mode,
 )
@@ -206,6 +208,50 @@ class TestFeaturedLiveMusic(unittest.TestCase):
         self.assertEqual(business["image_url"], "https://example.com/fallback.jpg")
         self.assertEqual(event["image_path"], "your-not-down/images/admin/uploaded.webp")
         self.assertEqual(event["image_url"], "https://example.com/fallback.jpg")
+
+    def test_featured_pick_returns_business_and_event_without_override_flag(self):
+        record = {
+            "id": "feature-3",
+            "city_slug": "nashville",
+            "slot": "live_music",
+            "active": True,
+            "priority": 1,
+            "title": "Priority One Show",
+            "venue_name": "The Basement East",
+            "local_date": "2026-07-05",
+            "local_time": "20:30:00",
+        }
+        business, event = featured_live_music_pick(record)
+        self.assertEqual(business["id"], "featured-live-music-feature-3")
+        self.assertEqual(event["source"], "admin_featured_event")
+        self.assertEqual(event["title"], "Priority One Show")
+
+    def test_promotes_featured_live_music_step_to_first_card(self):
+        steps = [
+            {"slot": "dinner", "number": 1, "business": {"id": "dinner-1"}},
+            {"slot": "drinks", "number": 2, "business": {"id": "drinks-1"}},
+            {
+                "slot": "entertainment",
+                "number": 3,
+                "business": {"id": "featured-live-music-feature-3"},
+                "event": {"id": "feature-3", "external_event_id": "feature-3"},
+            },
+            {"slot": "late-night", "number": 4, "business": {"id": "late-1"}},
+        ]
+        reordered = promote_featured_live_music_step_first(steps, "feature-3")
+        self.assertEqual(reordered[0]["slot"], "entertainment")
+        self.assertEqual(reordered[0]["event"]["external_event_id"], "feature-3")
+        self.assertEqual([step["number"] for step in reordered], [1, 2, 3, 4])
+        self.assertEqual(len([step for step in reordered if step["slot"] == "entertainment"]), 1)
+
+    def test_promote_helper_leaves_steps_unchanged_when_featured_missing(self):
+        steps = [
+            {"slot": "dinner", "number": 1, "business": {"id": "dinner-1"}},
+            {"slot": "drinks", "number": 2, "business": {"id": "drinks-1"}},
+        ]
+        reordered = promote_featured_live_music_step_first(steps, "missing-feature")
+        self.assertEqual([step["slot"] for step in reordered], ["dinner", "drinks"])
+        self.assertEqual([step["number"] for step in reordered], [1, 2])
 
     def test_normalizes_first_load_mode(self):
         self.assertEqual(

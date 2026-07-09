@@ -1284,7 +1284,7 @@ function FeaturedLiveMusicPanel({
         <div>
           <h2 className="font-display text-3xl font-bold">Featured Live Music Event</h2>
           <p className="mt-1 text-sm text-[#A1A1AA]">
-            Overrides the Tonight page LIVE MUSIC step while active. If none is active, the normal Ticketmaster cadence applies.
+            The top active same-day featured event is used as the Live Music pick while active. If none is active, the normal Ticketmaster fallback applies.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -1433,7 +1433,7 @@ function FeaturedLiveMusicPanel({
               className="bg-[#1A1A22] border-white/10 text-white"
               data-testid="featured-live-music-priority"
             />
-            <p className="text-xs text-[#A1A1AA]">1 appears first.</p>
+            <p className="text-xs text-[#A1A1AA]">1 appears first and is used as the featured Live Music pick while active.</p>
           </div>
         </Field>
       </div>
@@ -1467,7 +1467,7 @@ function FeaturedLiveMusicPanel({
             onChange={(e) => onChange({ ...value, active: e.target.checked })}
             className="h-4 w-4 accent-[#C6FF00]"
           />
-          <span>Active override</span>
+          <span>Active featured event</span>
         </label>
         <Input
           value={value.city_slug}

@@ -37,8 +37,7 @@ class TestCityEventsFilteringContract(unittest.TestCase):
         self.assertIn('event_rows if event_rows is not None else await _today_city_events(city)', source)
         self.assertIn('if category == "live-music" and featured is not False:', source)
         self.assertIn("featured_live_music = await _active_featured_live_music_event(city)", source)
-        self.assertIn("featured_business = featured_live_music_business(featured_live_music)", source)
-        self.assertIn("featured_event = featured_live_music_step_event(featured_live_music)", source)
+        self.assertIn("featured_business, featured_event = featured_live_music_pick(featured_live_music)", source)
         self.assertIn("featured_event_id = featured_event.get(", source)
         self.assertIn('"event": featured_event', source)
         self.assertIn('if business.get("id") != featured_business.get("id")', source)
@@ -64,8 +63,7 @@ class TestCityEventsFilteringContract(unittest.TestCase):
         self.assertIn('event_candidates = [business for business in candidates if business_supports_live_music_event(business)]', source)
         self.assertIn('slot_history_excludes = exclude_ids_by_slot.get(label["slot"], set())', source)
         self.assertIn("if featured_live_music:", source)
-        self.assertIn("featured_live_music_business(featured_live_music)", source)
-        self.assertIn("featured_live_music_step_event(featured_live_music)", source)
+        self.assertIn("featured_live_music_pick(featured_live_music)", source)
         self.assertIn('elif live_music_event_mode in {"ticketmaster", "ticketmaster_preferred"}:', source)
         self.assertIn("pick, forced_event = itinerary_event_pick(", source)
         self.assertIn("exclude_event_ids,", source)
@@ -80,6 +78,8 @@ class TestCityEventsFilteringContract(unittest.TestCase):
         self.assertIn('"tonight_move_sponsorship": tonight_move_sponsorship', source)
         self.assertIn("event_candidates or candidates,", source)
         self.assertIn("candidates,", source)
+        self.assertIn('if featured_live_music and "entertainment" not in locked_steps_by_slot:', source)
+        self.assertIn('steps = promote_featured_live_music_step_first(steps, featured_event_id)', source)
 
     def test_locked_steps_are_checked_before_entertainment_generation(self):
         source = ast.get_source_segment(SERVER_SOURCE, named_function("generate_itinerary"))
@@ -87,6 +87,10 @@ class TestCityEventsFilteringContract(unittest.TestCase):
             source.index('locked_step = locked_steps_by_slot.get(label["slot"])'),
             source.index('if label["slot"] == "entertainment":'),
         )
+
+    def test_featured_live_music_query_sorts_priority_one_first(self):
+        source = ast.get_source_segment(SERVER_SOURCE, named_function("_active_featured_live_music_event"))
+        self.assertIn('.sort([("priority", 1), ("local_time", 1), ("created_at", -1), ("updated_at", -1)])', source)
 
 
 if __name__ == "__main__":

@@ -1,5 +1,23 @@
 ## Immediate Follow-Up
 
+0. Manually QA the featured-live-music first-card behavior after the next deploy:
+   - select each launch vibe and confirm the active same-day priority-`1` featured live-music event is card 1 on first load
+   - click `Run It Back` repeatedly and confirm the featured live-music card stays first while it remains active and unlocked
+   - lock a non-entertainment card and confirm the featured live-music card still stays first
+   - lock the live-music card itself and confirm the locked selection is respected
+   - confirm the featured event does not appear again later in the same itinerary
+   - confirm the public live-music category/detail list still shows the same featured event first without duplication
+
+0. Manually QA the featured-live-music launch-blocker follow-up after the next deploy:
+   - create one active same-day Nashville featured live-music event with priority `1`
+   - confirm it appears as the live-music card in Tonight's Move on first load without relying on any separate override behavior
+   - confirm `Run It Back` preserves that featured live-music card while the event remains active and unlocked
+   - confirm the public live-music category list still shows the same featured event first without duplication
+   - confirm the admin copy is now clear:
+     - `Active featured event`
+     - `1 appears first and is used as the featured Live Music pick while active.`
+   - if Blake still sees a separate `Override Nashville` workflow in the UI, capture the exact screen/copy because the current code path does not have a separate backend override flag for featured live music
+
 0. Manually QA the featured live music priority fix after the next deploy:
    - create two active same-day Featured Live Music events with priorities `1` and `2`
    - confirm the priority-`1` event appears first on the public live music page

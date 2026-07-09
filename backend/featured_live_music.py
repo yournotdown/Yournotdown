@@ -136,6 +136,40 @@ def featured_live_music_step_event(record: dict) -> dict:
     }
 
 
+def featured_live_music_pick(record: dict) -> tuple[dict, dict]:
+    return featured_live_music_business(record), featured_live_music_step_event(record)
+
+
+def promote_featured_live_music_step_first(steps: list[dict], featured_event_id: str) -> list[dict]:
+    if not steps or not featured_event_id:
+        return steps
+    featured_index = next(
+        (
+            index
+            for index, step in enumerate(steps)
+            if (
+                ((step.get("event") or {}).get("external_event_id") or (step.get("event") or {}).get("id"))
+                == featured_event_id
+            )
+        ),
+        None,
+    )
+    if featured_index in {None, 0}:
+        return _renumber_itinerary_steps(steps)
+    reordered = [steps[featured_index], *steps[:featured_index], *steps[featured_index + 1:]]
+    return _renumber_itinerary_steps(reordered)
+
+
+def _renumber_itinerary_steps(steps: list[dict]) -> list[dict]:
+    return [
+        {
+            **step,
+            "number": index + 1,
+        }
+        for index, step in enumerate(steps)
+    ]
+
+
 def normalize_live_music_event_mode(value: str) -> str:
     mode = (value or LIVE_MUSIC_EVENT_MODE_NORMAL).strip().lower()
     return mode if mode in LIVE_MUSIC_EVENT_MODES else LIVE_MUSIC_EVENT_MODE_NORMAL
