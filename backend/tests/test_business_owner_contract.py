@@ -49,11 +49,18 @@ def load_owner_helpers():
         if isinstance(node, ast.Assign) and any(getattr(target, "id", None) == "EMAIL_SUBJECT" for target in node.targets)
     )
     exec(ast.get_source_segment(EMAIL_SOURCE, assign), email_namespace)
+    login_assign = next(
+        node for node in EMAIL_TREE.body
+        if isinstance(node, ast.Assign) and any(getattr(target, "id", None) == "LOGIN_EMAIL_SUBJECT" for target in node.targets)
+    )
+    exec(ast.get_source_segment(EMAIL_SOURCE, login_assign), email_namespace)
     for fn_name in (
         "_escape",
         "_friendly_expiration",
         "business_owner_invite_email_subject",
         "business_owner_invite_email_content",
+        "business_owner_login_email_subject",
+        "business_owner_login_email_content",
     ):
         exec(ast.get_source_segment(EMAIL_SOURCE, email_named_function(fn_name)), email_namespace)
     return (
@@ -63,6 +70,8 @@ def load_owner_helpers():
         namespace["_owner_invite_delivery_result"],
         email_namespace["business_owner_invite_email_subject"],
         email_namespace["business_owner_invite_email_content"],
+        email_namespace["business_owner_login_email_subject"],
+        email_namespace["business_owner_login_email_content"],
     )
 
 
@@ -73,6 +82,8 @@ def load_owner_helpers():
     OWNER_INVITE_DELIVERY_RESULT,
     OWNER_INVITE_EMAIL_SUBJECT,
     OWNER_INVITE_EMAIL_CONTENT,
+    OWNER_LOGIN_EMAIL_SUBJECT,
+    OWNER_LOGIN_EMAIL_CONTENT,
 ) = load_owner_helpers()
 
 
@@ -116,13 +127,7 @@ class TestBusinessOwnerContract(unittest.TestCase):
         self.assertIn('"business_claim_ip"', source)
         self.assertIn("RATE_LIMIT_BUSINESS_CLAIM_PER_IP", source)
         self.assertIn('{"token_hash": _hash_token(raw_token)}', source)
-        self.assertIn('"session_token_hash": _hash_token(session_token)', source)
-        self.assertIn('response.set_cookie(', source)
-        self.assertIn('key=BUSINESS_OWNER_SESSION_COOKIE', source)
-        self.assertIn('httponly=True', source)
-        self.assertIn('secure=True', source)
-        self.assertIn('samesite="none"', source)
-        self.assertIn('path="/"', source)
+        self.assertIn("await _create_business_owner_session(owner_doc, response, request)", source)
         self.assertIn('"status": "accepted"', source)
 
     def test_claim_endpoint_reuses_invite_exactly_once(self):
@@ -148,10 +153,35 @@ class TestBusinessOwnerContract(unittest.TestCase):
 
     def test_business_owner_claim_and_session_storage_remain_separate_from_admin(self):
         claim_source = ast.get_source_segment(SERVER_SOURCE, named_function("business_claim"))
-        self.assertIn('"session_token_hash": _hash_token(session_token)', claim_source)
-        self.assertIn('await db.business_owner_sessions.insert_one(session_doc)', claim_source)
-        self.assertIn('key=BUSINESS_OWNER_SESSION_COOKIE', claim_source)
+        session_source = ast.get_source_segment(SERVER_SOURCE, named_function("_create_business_owner_session"))
+        self.assertIn('"session_token_hash": _hash_token(session_token)', session_source)
+        self.assertIn('await db.business_owner_sessions.insert_one(session_doc)', session_source)
+        self.assertIn('key=BUSINESS_OWNER_SESSION_COOKIE', session_source)
+        self.assertIn("await _create_business_owner_session(owner_doc, response, request)", claim_source)
         self.assertNotIn('db.user_sessions.insert_one', claim_source)
+
+    def test_login_request_endpoint_is_generic_and_hashes_token(self):
+        source = ast.get_source_segment(SERVER_SOURCE, named_function("business_login_request"))
+        self.assertIn('_require_ip_rate_limit(', source)
+        self.assertIn('"business_login_request_ip"', source)
+        self.assertIn('_require_rate_limit_key(', source)
+        self.assertIn('"business_login_request_email"', source)
+        self.assertIn('"message": "If your email has access, we’ll send a secure login link."', source)
+        self.assertIn('await db.business_owners.find_one({"email": email, "status": "active"}', source)
+        self.assertIn('"token_hash": _hash_token(raw_token)', source)
+        self.assertNotIn('"token": raw_token', source)
+        self.assertIn('await db.business_owner_login_links.insert_one(doc)', source)
+
+    def test_login_claim_endpoint_rejects_reuse_and_sets_owner_cookie(self):
+        source = ast.get_source_segment(SERVER_SOURCE, named_function("business_login_claim"))
+        self.assertIn('_require_ip_rate_limit(', source)
+        self.assertIn('"business_login_claim_ip"', source)
+        self.assertIn('await db.business_owner_login_links.find_one({"token_hash": _hash_token(raw_token)}', source)
+        self.assertIn('if login_link.get("status") == "used":', source)
+        self.assertIn('raise HTTPException(status_code=400, detail="This login link has already been used.")', source)
+        self.assertIn('raise HTTPException(status_code=400, detail="This login link has expired.")', source)
+        self.assertIn('"status": "used"', source)
+        self.assertIn('await _create_business_owner_session(owner, response, request)', source)
 
     def test_owner_access_summary_only_returns_pending_invites_and_active_owner(self):
         summary_source = ast.get_source_segment(SERVER_SOURCE, named_function("_owner_access_summary"))
@@ -162,6 +192,7 @@ class TestBusinessOwnerContract(unittest.TestCase):
         source = ast.get_source_segment(SERVER_SOURCE, named_function("admin_revoke_business_owner_access"))
         self.assertIn('{"business_id": business_id, "status": "pending"}', source)
         self.assertIn('{"business_id": business_id, "status": "active"}', source)
+        self.assertIn('await db.business_owner_login_links.update_many(', source)
         self.assertIn('{"business_id": business_id, "revoked_at": None}', source)
         self.assertIn('"status": "revoked"', source)
         self.assertIn('"revoked_at": revoked_at', source)
@@ -209,6 +240,8 @@ class TestBusinessOwnerContract(unittest.TestCase):
         self.assertNotEqual(HASH_TOKEN("abc"), HASH_TOKEN("xyz"))
         url = BUSINESS_OWNER_CLAIM_URL("raw-token")
         self.assertIn("/business/claim/raw-token", url)
+        login_url = ast.get_source_segment(SERVER_SOURCE, named_function("_business_owner_login_url"))
+        self.assertIn('/business/login?token={token}', login_url)
 
     def test_owner_invite_email_template_is_branded(self):
         self.assertEqual(OWNER_INVITE_EMAIL_SUBJECT({}), "Create your YourNotDown business account")
@@ -226,11 +259,28 @@ class TestBusinessOwnerContract(unittest.TestCase):
         self.assertNotIn("MVP", html_body)
         self.assertIn("No password required.", html_body)
 
+    def test_owner_login_email_template_is_branded(self):
+        self.assertEqual(OWNER_LOGIN_EMAIL_SUBJECT({}), "Your YourNotDown business dashboard login")
+        text_body, html_body = OWNER_LOGIN_EMAIL_CONTENT({
+            "business_name": "The Patterson House",
+            "login_url": "https://www.yournotdown.com/business/login?token=test-token",
+            "expires_at": "2026-07-13T17:00:00+00:00",
+        })
+        self.assertIn("YND", html_body)
+        self.assertIn("Open Dashboard", html_body)
+        self.assertIn("The Patterson House", html_body)
+        self.assertIn("Jul", text_body)
+        self.assertIn("Built with YourNotDown", html_body)
+        self.assertIn("https://www.yournotdown.com/business/login?token=test-token", text_body)
+        self.assertNotIn("MVP", html_body)
+        self.assertIn("No password required.", html_body)
+
     def test_owner_business_facing_sources_do_not_use_internal_product_language(self):
         frontend_root = Path(__file__).resolve().parents[2] / "frontend" / "src" / "pages"
         claim_source = (frontend_root / "BusinessClaimPage.jsx").read_text()
         dashboard_source = (frontend_root / "BusinessDashboardPage.jsx").read_text()
-        for source in (EMAIL_SOURCE, claim_source, dashboard_source):
+        login_source = (frontend_root / "BusinessLoginPage.jsx").read_text()
+        for source in (EMAIL_SOURCE, claim_source, dashboard_source, login_source):
             self.assertNotIn("MVP", source)
             self.assertNotIn("prototype", source)
             self.assertNotIn("placeholder", source)

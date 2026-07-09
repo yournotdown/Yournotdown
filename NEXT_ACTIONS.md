@@ -1,5 +1,20 @@
 ## Immediate Follow-Up
 
+0. Manually QA the new business-owner magic-link login flow after the next deploy:
+   - visit `/business/login`
+   - request a magic link for an active owner email
+   - confirm the success response is always generic and does not reveal whether an email exists
+   - click the emailed `/business/login?token=...` link and confirm it lands in `/business/dashboard`
+   - confirm the link cannot be reused after a successful claim
+   - confirm an expired link fails cleanly and the page offers a fresh login request path
+   - confirm a revoked owner cannot successfully request or use a login link
+   - confirm the old `/business/claim/:token` invite flow still works for first-time invites
+
+0. Re-test the owner login flow specifically in Safari/mobile once the production API domain/cookie setup is final:
+   - confirm the `business_owner_session` cookie sticks with `Secure` / `HttpOnly` / `SameSite=None`
+   - confirm `/business/me` and `/business/dashboard` continue working after login-claim
+   - confirm the dashboard fallback link to `/business/login` appears when the owner session expires
+
 0. Use `docs/production/monitoring_and_alerting_runbook.md` as the launch-watch baseline:
    - confirm the exact Railway, Mongo, Resend, Ticketmaster, and admin dashboards Blake wants open during launch
    - keep the 30 to 60 minute watch cadence during the first real traffic push

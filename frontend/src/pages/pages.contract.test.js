@@ -6,6 +6,7 @@ const vibePageSource = fs.readFileSync(path.join(__dirname, "VibePage.jsx"), "ut
 const adminDashboardSource = fs.readFileSync(path.join(__dirname, "AdminDashboardPage.jsx"), "utf8");
 const businessClaimSource = fs.readFileSync(path.join(__dirname, "BusinessClaimPage.jsx"), "utf8");
 const businessDashboardSource = fs.readFileSync(path.join(__dirname, "BusinessDashboardPage.jsx"), "utf8");
+const businessLoginSource = fs.readFileSync(path.join(__dirname, "BusinessLoginPage.jsx"), "utf8");
 const appSource = fs.readFileSync(path.join(__dirname, "..", "App.js"), "utf8");
 const indexHtmlSource = fs.readFileSync(path.join(__dirname, "..", "..", "public", "index.html"), "utf8");
 const visitorHelperSource = fs.readFileSync(path.join(__dirname, "..", "lib", "visitor.js"), "utf8");
@@ -158,8 +159,9 @@ describe("AdminDashboardPage source contract", () => {
 });
 
 describe("Business owner routes source contract", () => {
-  test("claim and dashboard routes exist", () => {
+  test("claim, login, and dashboard routes exist", () => {
     expect(appSource).toContain('path="/business/claim/:token"');
+    expect(appSource).toContain('path="/business/login"');
     expect(appSource).toContain('path="/business/dashboard"');
   });
 
@@ -171,11 +173,25 @@ describe("Business owner routes source contract", () => {
     expect(businessClaimSource).not.toContain("MVP");
   });
 
+  test("login page requests and claims owner magic links without a password field", () => {
+    expect(businessLoginSource).toContain('.post("/business/login-request", { email })');
+    expect(businessLoginSource).toContain('.post("/business/login-claim", { token })');
+    expect(businessLoginSource).toContain('window.location.replace("/business/dashboard")');
+    expect(businessLoginSource).toContain("Access your business dashboard");
+    expect(businessLoginSource).toContain("Send Magic Link");
+    expect(businessLoginSource).toContain("type=\"email\"");
+    expect(businessLoginSource).not.toContain("type=\"password\"");
+    expect(businessLoginSource).not.toContain("Create account");
+    expect(businessLoginSource).not.toContain("MVP");
+  });
+
   test("dashboard shell contains business and sponsor language", () => {
     expect(businessDashboardSource).toContain('api.get("/business/me")');
     expect(businessDashboardSource).toContain('api.get("/business/analytics")');
     expect(businessDashboardSource).toContain("Business Portal");
     expect(businessDashboardSource).toContain("Sponsor tier:");
+    expect(businessDashboardSource).toContain("Request a fresh magic link to continue.");
+    expect(businessDashboardSource).toContain('href="/business/login"');
     expect(businessDashboardSource).not.toContain("MVP");
     expect(businessDashboardSource).not.toContain("being prepared");
   });

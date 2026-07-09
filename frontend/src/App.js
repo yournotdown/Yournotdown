@@ -10,6 +10,7 @@ import AdminDashboardPage from "./pages/AdminDashboardPage";
 import AdminBusinessAnalyticsPage from "./pages/AdminBusinessAnalyticsPage";
 import BusinessClaimPage from "./pages/BusinessClaimPage";
 import BusinessDashboardPage from "./pages/BusinessDashboardPage";
+import BusinessLoginPage from "./pages/BusinessLoginPage";
 import AuthCallback from "./pages/AuthCallback";
 import { cityPath, DEFAULT_CITY_SLUG } from "./lib/cities";
 import "@/index.css";
@@ -37,6 +38,7 @@ function AppRouter() {
       <Route path="/admin" element={<AdminDashboardPage />} />
       <Route path="/admin/business/:id" element={<AdminBusinessAnalyticsPage />} />
       <Route path="/business/claim/:token" element={<BusinessClaimPage />} />
+      <Route path="/business/login" element={<BusinessLoginPage />} />
       <Route path="/business/dashboard" element={<BusinessDashboardPage />} />
       <Route path="/" element={<NashvilleRedirect />} />
       <Route path="/vibe" element={<NashvilleRedirect path="vibe" />} />

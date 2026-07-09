@@ -3,8 +3,8 @@ import { api } from "../lib/api";
 
 const ownerSessionError = (err) => {
   const detail = err?.response?.data?.detail || "";
-  if (detail === "Not authenticated" || detail === "Invalid session" || detail === "Session revoked") {
-    return "Your secure business session is not active in this browser. Please use the latest invite link again.";
+  if (detail === "Not authenticated" || detail === "Invalid session" || detail === "Session revoked" || detail === "Session expired") {
+    return "Your secure business session is not active in this browser. Request a fresh magic link to continue.";
   }
   if (detail === "Owner access revoked") {
     return "Your business portal access is no longer active.";
@@ -47,6 +47,13 @@ export default function BusinessDashboardPage() {
           <div className="text-[10px] uppercase tracking-[0.3em] text-[#C6FF00]">YND / EST. 26</div>
           <h1 className="mt-4 font-flyer uppercase text-4xl leading-[0.92]">Business Portal</h1>
           <p className="mt-4 text-sm text-[#FF8A8A]">{error}</p>
+          <a
+            href="/business/login"
+            className="mt-5 inline-block text-[11px] font-black uppercase tracking-[0.22em] text-[#C6FF00]"
+            data-testid="business-dashboard-login-link"
+          >
+            Get a magic link
+          </a>
         </div>
       </div>
     );

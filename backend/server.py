@@ -73,6 +73,8 @@ from saved_itinerary_email import (
 from business_owner_email import (
     business_owner_invite_email_content,
     business_owner_invite_email_subject,
+    business_owner_login_email_content,
+    business_owner_login_email_subject,
 )
 
 ROOT_DIR = Path(__file__).parent
@@ -105,6 +107,7 @@ ADMIN_EMAILS = [e.strip().lower() for e in os.environ.get("ADMIN_EMAILS", "").sp
 ADMIN_SESSION_DAYS = 7
 ADMIN_SESSION_COOKIE = "session_token"
 BUSINESS_OWNER_INVITE_DAYS = 7
+BUSINESS_OWNER_LOGIN_LINK_MINUTES = 60
 BUSINESS_OWNER_SESSION_DAYS = 30
 BUSINESS_OWNER_SESSION_COOKIE = "business_owner_session"
 RATE_LIMIT_ANALYTICS_TRACK_PER_IP = 300
@@ -113,6 +116,9 @@ RATE_LIMIT_ITINERARY_SAVE_PER_IP = 10
 RATE_LIMIT_ITINERARY_SAVE_PER_EMAIL = 5
 RATE_LIMIT_OWNER_INVITE_PER_ADMIN = 10
 RATE_LIMIT_OWNER_INVITE_PER_IP = 10
+RATE_LIMIT_OWNER_LOGIN_REQUEST_PER_IP = 20
+RATE_LIMIT_OWNER_LOGIN_REQUEST_PER_EMAIL = 5
+RATE_LIMIT_OWNER_LOGIN_CLAIM_PER_IP = 20
 RATE_LIMIT_HOTEL_QR_ADMIN_WRITES_PER_ADMIN = 30
 RATE_LIMIT_HOTEL_QR_ADMIN_WRITES_PER_IP = 30
 RATE_LIMIT_BUSINESS_CLAIM_PER_IP = 20
@@ -484,6 +490,14 @@ class BusinessOwnerClaimRequest(BaseModel):
     token: str
 
 
+class BusinessOwnerLoginRequest(BaseModel):
+    email: str
+
+
+class BusinessOwnerLoginClaimRequest(BaseModel):
+    token: str
+
+
 class HotelQrCodeCreate(BaseModel):
     name: str
     city_slug: str = "nashville"
@@ -597,6 +611,12 @@ async def _apply_startup_maintenance():
     await db.business_owners.create_index([("owner_id", 1)])
     await db.business_owners.create_index([("business_id", 1), ("status", 1)])
     await db.business_owners.create_index([("business_id", 1), ("email", 1)])
+
+    await db.business_owner_login_links.create_index([("token_hash", 1)])
+    await db.business_owner_login_links.create_index([("owner_id", 1), ("status", 1), ("created_at", -1)])
+    await db.business_owner_login_links.create_index([("business_id", 1), ("status", 1), ("created_at", -1)])
+    await db.business_owner_login_links.create_index([("email", 1), ("status", 1), ("created_at", -1)])
+    await db.business_owner_login_links.create_index([("expires_at", 1)])
 
     await db.business_owner_sessions.create_index([("session_token_hash", 1)])
     await db.business_owner_sessions.create_index([("owner_id", 1), ("revoked_at", 1)])
@@ -955,6 +975,15 @@ def _business_owner_claim_url(token: str) -> str:
     return f"{base}/business/claim/{token}"
 
 
+def _business_owner_login_url(token: str) -> str:
+    base = (
+        os.environ.get("PUBLIC_SITE_URL", "").strip()
+        or os.environ.get("FRONTEND_PUBLIC_URL", "").strip()
+        or "https://www.yournotdown.com"
+    ).rstrip("/")
+    return f"{base}/business/login?token={token}"
+
+
 def _owner_invite_delivery_result() -> dict:
     resend_api_key = os.environ.get("RESEND_API_KEY", "").strip()
     resend_from_email = os.environ.get("RESEND_FROM_EMAIL", "").strip()
@@ -1014,6 +1043,10 @@ def _owner_safe(owner: Optional[dict], business: Optional[dict] = None) -> Optio
             "sponsor_tier": business.get("sponsor_tier", "none"),
         }
     return payload
+
+
+def _owner_login_delivery_result() -> dict:
+    return _owner_invite_delivery_result()
 
 
 async def _owner_access_summary(business_id: str) -> dict:
@@ -1602,6 +1635,70 @@ def _send_business_owner_invite_email(doc: dict, claim_url: str, business_name: 
         "provider_message_id": data.get("id", ""),
         "sent_at": now_iso(),
     }
+
+
+def _send_business_owner_login_email(doc: dict, login_url: str, business_name: str) -> dict:
+    api_key = os.environ.get("RESEND_API_KEY", "").strip()
+    from_email = os.environ.get("RESEND_FROM_EMAIL", "").strip()
+    reply_to = os.environ.get("RESEND_REPLY_TO", "").strip()
+    text_body, html_body = business_owner_login_email_content({
+        "business_name": business_name,
+        "login_url": login_url,
+        "expires_at": doc.get("expires_at"),
+    })
+    payload = {
+        "from": from_email,
+        "to": [doc["email"]],
+        "subject": business_owner_login_email_subject({"business_name": business_name}),
+        "text": text_body,
+        "html": html_body,
+    }
+    if reply_to:
+        payload["reply_to"] = reply_to
+    response = requests.post(
+        "https://api.resend.com/emails",
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        json=payload,
+        timeout=20,
+    )
+    response.raise_for_status()
+    data = response.json()
+    return {
+        "delivery_status": "sent",
+        "delivery_error": "",
+        "email_provider": "resend",
+        "provider_message_id": data.get("id", ""),
+        "sent_at": now_iso(),
+    }
+
+
+async def _create_business_owner_session(owner: dict, response: Response, request: Request) -> None:
+    session_token = _new_owner_token()
+    session_doc = {
+        "session_id": str(uuid.uuid4()),
+        "owner_id": owner["owner_id"],
+        "business_id": owner["business_id"],
+        "session_token_hash": _hash_token(session_token),
+        "expires_at": (datetime.now(timezone.utc) + timedelta(days=BUSINESS_OWNER_SESSION_DAYS)).isoformat(),
+        "created_at": now_iso(),
+        "last_seen_at": now_iso(),
+        "revoked_at": None,
+        "ip": request.client.host if request.client else None,
+        "user_agent": request.headers.get("user-agent"),
+    }
+    await db.business_owner_sessions.insert_one(session_doc)
+    response.set_cookie(
+        key=BUSINESS_OWNER_SESSION_COOKIE,
+        value=session_token,
+        max_age=BUSINESS_OWNER_SESSION_DAYS * 24 * 60 * 60,
+        httponly=True,
+        secure=True,
+        samesite="none",
+        path="/",
+    )
 
 
 async def _today_city_events(city: str) -> list[dict]:
@@ -2696,33 +2793,169 @@ async def business_claim(payload: BusinessOwnerClaimRequest, response: Response,
         {"id": invite["id"]},
         {"$set": {"status": "accepted", "accepted_at": now_iso()}},
     )
-
-    session_token = _new_owner_token()
-    session_doc = {
-        "session_id": str(uuid.uuid4()),
-        "owner_id": owner_id,
-        "business_id": invite["business_id"],
-        "session_token_hash": _hash_token(session_token),
-        "expires_at": (datetime.now(timezone.utc) + timedelta(days=BUSINESS_OWNER_SESSION_DAYS)).isoformat(),
-        "created_at": now_iso(),
-        "last_seen_at": now_iso(),
-        "revoked_at": None,
-        "ip": request.client.host if request.client else None,
-        "user_agent": request.headers.get("user-agent"),
-    }
-    await db.business_owner_sessions.insert_one(session_doc)
-    response.set_cookie(
-        key=BUSINESS_OWNER_SESSION_COOKIE,
-        value=session_token,
-        max_age=BUSINESS_OWNER_SESSION_DAYS * 24 * 60 * 60,
-        httponly=True,
-        secure=True,
-        samesite="none",
-        path="/",
-    )
+    await _create_business_owner_session(owner_doc, response, request)
     return {
         "ok": True,
         "owner": _owner_safe(owner_doc, business),
+    }
+
+
+@api_router.post("/business/login-request")
+async def business_login_request(payload: BusinessOwnerLoginRequest, request: Request):
+    _require_ip_rate_limit(
+        "business_login_request_ip",
+        request,
+        limit=RATE_LIMIT_OWNER_LOGIN_REQUEST_PER_IP,
+        window_seconds=RATE_LIMIT_HOUR_SECONDS,
+    )
+    email = (payload.email or "").strip().lower()
+    if email:
+        _require_rate_limit_key(
+            "business_login_request_email",
+            email,
+            limit=RATE_LIMIT_OWNER_LOGIN_REQUEST_PER_EMAIL,
+            window_seconds=RATE_LIMIT_HOUR_SECONDS,
+        )
+    generic_response = {
+        "ok": True,
+        "message": "If your email has access, we’ll send a secure login link.",
+    }
+    if not _valid_email(email):
+        return generic_response
+
+    owner = await db.business_owners.find_one({"email": email, "status": "active"}, {"_id": 0})
+    if not owner:
+        return generic_response
+
+    business = await db.businesses.find_one({"id": owner["business_id"]}, {"_id": 0})
+    if not business:
+        return generic_response
+
+    now = datetime.now(timezone.utc)
+    raw_token = _new_owner_token()
+    link_id = str(uuid.uuid4())
+    doc = {
+        "id": link_id,
+        "owner_id": owner["owner_id"],
+        "business_id": owner["business_id"],
+        "email": email,
+        "token_hash": _hash_token(raw_token),
+        "status": "pending",
+        "sent_at": None,
+        "expires_at": (now + timedelta(minutes=BUSINESS_OWNER_LOGIN_LINK_MINUTES)).isoformat(),
+        "used_at": None,
+        "created_at": now_iso(),
+        "ip": request.client.host if request.client else None,
+        "user_agent": request.headers.get("user-agent"),
+        "delivery_status": "",
+        "delivery_error": "",
+        "email_provider": "",
+        "provider_message_id": "",
+    }
+    await db.business_owner_login_links.update_many(
+        {"owner_id": owner["owner_id"], "status": "pending"},
+        {"$set": {"status": "revoked"}},
+    )
+    delivery = _owner_login_delivery_result()
+    doc.update({
+        "delivery_status": delivery["delivery_status"],
+        "delivery_error": delivery["delivery_error"],
+        "email_provider": delivery["email_provider"],
+        "provider_message_id": delivery["provider_message_id"],
+        "sent_at": delivery["sent_at"],
+    })
+    await db.business_owner_login_links.insert_one(doc)
+
+    if doc["delivery_status"] != "provider_unconfigured":
+        login_url = _business_owner_login_url(raw_token)
+        try:
+            delivery = await run_in_threadpool(_send_business_owner_login_email, doc, login_url, business.get("name", ""))
+        except requests.RequestException as exc:
+            logger.warning(
+                "business owner login email failed: business_id=%s delivery_status=%s email_hash=%s error_type=%s",
+                owner["business_id"],
+                "failed",
+                _hash_token(email)[:12],
+                type(exc).__name__,
+            )
+            delivery = {
+                "delivery_status": "failed",
+                "delivery_error": str(exc),
+                "email_provider": "resend",
+                "provider_message_id": "",
+                "sent_at": None,
+            }
+        await db.business_owner_login_links.update_one(
+            {"id": link_id},
+            {"$set": {
+                "delivery_status": delivery["delivery_status"],
+                "delivery_error": delivery["delivery_error"],
+                "email_provider": delivery["email_provider"],
+                "provider_message_id": delivery["provider_message_id"],
+                "sent_at": delivery["sent_at"],
+            }},
+        )
+
+    return generic_response
+
+
+@api_router.post("/business/login-claim")
+async def business_login_claim(payload: BusinessOwnerLoginClaimRequest, response: Response, request: Request):
+    _require_ip_rate_limit(
+        "business_login_claim_ip",
+        request,
+        limit=RATE_LIMIT_OWNER_LOGIN_CLAIM_PER_IP,
+        window_seconds=RATE_LIMIT_HOUR_SECONDS,
+    )
+    raw_token = (payload.token or "").strip()
+    if not raw_token:
+        raise HTTPException(status_code=400, detail="Invalid or expired login link.")
+    login_link = await db.business_owner_login_links.find_one({"token_hash": _hash_token(raw_token)}, {"_id": 0})
+    if not login_link:
+        raise HTTPException(status_code=400, detail="Invalid or expired login link.")
+    if login_link.get("status") == "revoked":
+        raise HTTPException(status_code=400, detail="This login link is no longer active.")
+    if login_link.get("status") == "used":
+        raise HTTPException(status_code=400, detail="This login link has already been used.")
+
+    expires_at_raw = login_link.get("expires_at")
+    expires_at = datetime.fromisoformat(expires_at_raw) if expires_at_raw else None
+    if expires_at and expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if expires_at and expires_at < datetime.now(timezone.utc):
+        await db.business_owner_login_links.update_one(
+            {"id": login_link["id"]},
+            {"$set": {"status": "expired"}},
+        )
+        raise HTTPException(status_code=400, detail="This login link has expired.")
+    if login_link.get("status") != "pending":
+        raise HTTPException(status_code=400, detail="Invalid or expired login link.")
+
+    owner = await db.business_owners.find_one({"owner_id": login_link["owner_id"]}, {"_id": 0})
+    if not owner or owner.get("status") != "active":
+        await db.business_owner_login_links.update_one(
+            {"id": login_link["id"]},
+            {"$set": {"status": "revoked"}},
+        )
+        raise HTTPException(status_code=400, detail="This login link is no longer active.")
+
+    business = await db.businesses.find_one({"id": owner["business_id"]}, {"_id": 0})
+    if not business:
+        raise HTTPException(status_code=404, detail="Business not found")
+
+    await db.business_owner_login_links.update_one(
+        {"id": login_link["id"]},
+        {"$set": {"status": "used", "used_at": now_iso()}},
+    )
+    await db.business_owners.update_one(
+        {"owner_id": owner["owner_id"]},
+        {"$set": {"last_login_at": now_iso()}},
+    )
+    owner["last_login_at"] = now_iso()
+    await _create_business_owner_session(owner, response, request)
+    return {
+        "ok": True,
+        "owner": _owner_safe(owner, business),
     }
 
 
@@ -2873,6 +3106,10 @@ async def admin_revoke_business_owner_access(business_id: str, user=Depends(requ
     await db.business_owners.update_many(
         {"business_id": business_id, "status": "active"},
         {"$set": {"status": "revoked", "revoked_at": revoked_at}},
+    )
+    await db.business_owner_login_links.update_many(
+        {"business_id": business_id, "status": "pending"},
+        {"$set": {"status": "revoked"}},
     )
     await db.business_owner_sessions.update_many(
         {"business_id": business_id, "revoked_at": None},

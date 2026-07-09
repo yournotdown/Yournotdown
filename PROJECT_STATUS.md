@@ -6,6 +6,47 @@ The repo is currently on branch `main`. The only known worktree changes outside 
 
 ## Latest Work Session
 
+Latest local business-owner magic-link login pass:
+- added self-serve owner re-entry without changing the original admin invite claim flow
+- backend changes in `backend/server.py`:
+  - added `POST /api/business/login-request`
+  - added `POST /api/business/login-claim`
+  - added `business_owner_login_links` collection/index setup
+  - added a shared `_create_business_owner_session(...)` helper so invite claim and login claim create the same secure owner session shape
+  - login request behavior now:
+    - normalizes email
+    - returns the same generic success response for active, revoked, and unknown emails
+    - only creates/sends a login link for active `business_owners`
+    - stores only `token_hash`, never a raw login token
+    - rate-limits login request and login claim endpoints
+  - login claim behavior now:
+    - hashes the presented token before lookup
+    - rejects used, expired, revoked, and invalid login links
+    - marks a successful login link as `used`
+    - creates a fresh `business_owner_session` cookie
+  - admin revoke now also revokes pending owner login links
+- email/template changes in `backend/business_owner_email.py`:
+  - added a dedicated owner login email subject/body
+  - login email uses `YND / EST. 26` branding and `Open Dashboard` CTA
+  - no password/account-creation-only copy and no internal `MVP` language
+- frontend changes:
+  - added `/business/login` route in `frontend/src/App.js`
+  - added `frontend/src/pages/BusinessLoginPage.jsx`
+  - the login page handles both:
+    - requesting a magic link by email
+    - consuming a `?token=...` login link and redirecting into `/business/dashboard`
+  - updated `frontend/src/pages/BusinessDashboardPage.jsx` so missing/expired owner sessions point to `/business/login` instead of telling the owner to reuse an old invite
+- tests updated:
+  - `backend/tests/test_business_owner_contract.py`
+  - `frontend/src/pages/pages.contract.test.js`
+- local verification for this pass:
+  - `python3 -B -m unittest backend.tests.test_business_owner_contract backend.tests.test_analytics_contract backend.tests.test_saved_itinerary_contract backend.tests.test_locked_steps_contract backend.tests.test_tonight_page_contract backend.tests.test_city_events_filtering_contract backend.tests.test_ticketmaster_events_unit` passed
+  - `cd frontend && npm run build` passed
+  - `cd frontend && CI=true npm test -- --watchAll=false` passed
+- still unverified:
+  - no manual browser QA has yet confirmed the full owner login-link email delivery and claim flow against a real Resend-configured environment
+  - no post-deploy Safari/mobile cookie QA has yet confirmed the owner login-link flow across the production domain setup
+
 Latest local production monitoring + failure-visibility runbook pass:
 - added `docs/production/monitoring_and_alerting_runbook.md`
 - documented a launch-focused monitoring plan covering:
