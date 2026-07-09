@@ -1,5 +1,16 @@
 ## Immediate Follow-Up
 
+0. Use `docs/production/monitoring_and_alerting_runbook.md` as the launch-watch baseline:
+   - confirm the exact Railway, Mongo, Resend, Ticketmaster, and admin dashboards Blake wants open during launch
+   - keep the 30 to 60 minute watch cadence during the first real traffic push
+
+0. Decide whether to implement a very small logging-only follow-up before launch for the gaps documented in the runbook:
+   - itinerary generation failure logging
+   - saved-itinerary Resend failure logging
+   - owner-invite email failure logging
+   - Hotel QR admin write failure logging
+   - if done, keep it narrow and operational only with no behavior changes
+
 0. Manually QA the new write-rate limits after the next deploy:
    - confirm normal app usage does not trip limits for `analytics/track` or `itinerary/generate`
    - confirm repeated `itinerary/save` abuse attempts return a clean `429` with no save-email crash path

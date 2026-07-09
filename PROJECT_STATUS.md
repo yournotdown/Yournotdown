@@ -6,6 +6,44 @@ The repo is currently on branch `main`. The only known worktree changes outside 
 
 ## Latest Work Session
 
+Latest local production monitoring + failure-visibility runbook pass:
+- added `docs/production/monitoring_and_alerting_runbook.md`
+- documented a launch-focused monitoring plan covering:
+  - backend health
+  - frontend health
+  - 5xx errors
+  - backend restarts
+  - latency spikes
+  - Mongo slow queries / connection pressure / collection growth
+  - Resend delivery failures
+  - saved-itinerary failures
+  - business-owner invite failures
+  - Ticketmaster cron failures / 429s / stale-event risk
+  - Hotel QR tracking failures
+  - admin analytics/audience/hotel-qr failures
+- documented the key URLs and admin surfaces to check during launch
+- documented Railway, Mongo, Resend, and Ticketmaster watch points
+- documented urgent thresholds and a simple 30 to 60 minute launch-day watch routine
+- documented emergency actions for:
+  - frontend rollback
+  - backend rollback
+  - disabling a bad sponsor
+  - deactivating a bad Hotel QR
+  - pausing owner invites operationally
+  - avoiding manual Ticketmaster sync during incidents
+- reviewed backend logging coverage and found notable visibility gaps:
+  - no explicit itinerary-generation failure log wrapper
+  - no explicit save-email Resend failure log
+  - no explicit owner-invite email failure log
+  - no explicit Hotel QR admin write failure logs
+  - Ticketmaster sync logging is better than those areas, but still requires active operational watching
+- intentionally did **not** change application code in this pass; this was a docs-first runbook pass only
+- local verification:
+  - no tests run because this pass is docs-only
+- still unverified:
+  - the new runbook itself has not yet been exercised during a real launch or staging watch window
+  - the identified logging gaps remain recommendations, not code changes, in this pass
+
 Latest local production-readiness P0F write-abuse and rate-limit protection pass:
 - added lightweight in-process write-rate limiting in `backend/server.py`
 - kept the implementation dependency-free and local-memory only for now
