@@ -18,28 +18,42 @@ from featured_live_music import (  # noqa: E402
 
 
 class TestFeaturedLiveMusic(unittest.TestCase):
-    def test_active_featured_event_overrides_by_priority_then_updated_at(self):
+    def test_active_featured_event_overrides_by_priority_then_time_then_created_at(self):
         rows = [
             {
-                "id": "low",
+                "id": "priority-two",
+                "city_slug": "nashville",
+                "slot": "live_music",
+                "active": True,
+                "priority": 2,
+                "title": "Priority Two",
+                "local_date": "2026-07-05",
+                "local_time": "20:00:00",
+                "created_at": "2026-07-05T08:00:00+00:00",
+                "updated_at": "2026-07-05T10:00:00+00:00",
+            },
+            {
+                "id": "priority-one-early",
                 "city_slug": "nashville",
                 "slot": "live_music",
                 "active": True,
                 "priority": 1,
-                "title": "Low Priority",
+                "title": "Priority One Early",
                 "local_date": "2026-07-05",
-                "local_time": "20:00:00",
-                "updated_at": "2026-07-05T10:00:00+00:00",
+                "local_time": "19:00:00",
+                "created_at": "2026-07-05T07:00:00+00:00",
+                "updated_at": "2026-07-05T09:00:00+00:00",
             },
             {
-                "id": "high",
+                "id": "priority-one-later",
                 "city_slug": "nashville",
                 "slot": "live_music",
                 "active": True,
-                "priority": 5,
-                "title": "High Priority",
+                "priority": 1,
+                "title": "Priority One Later",
                 "local_date": "2026-07-05",
                 "local_time": "21:00:00",
+                "created_at": "2026-07-05T11:00:00+00:00",
                 "updated_at": "2026-07-05T09:00:00+00:00",
             },
         ]
@@ -48,7 +62,39 @@ class TestFeaturedLiveMusic(unittest.TestCase):
             "nashville",
             now=datetime(2026, 7, 5, 18, tzinfo=timezone.utc),
         )
-        self.assertEqual(selected["id"], "high")
+        self.assertEqual(selected["id"], "priority-one-early")
+
+    def test_same_priority_prefers_more_recent_created_at(self):
+        rows = [
+            {
+                "id": "older",
+                "city_slug": "nashville",
+                "slot": "live_music",
+                "active": True,
+                "priority": 1,
+                "title": "Older Created",
+                "local_date": "2026-07-05",
+                "local_time": "20:00:00",
+                "created_at": "2026-07-05T08:00:00+00:00",
+            },
+            {
+                "id": "newer",
+                "city_slug": "nashville",
+                "slot": "live_music",
+                "active": True,
+                "priority": 1,
+                "title": "Newer Created",
+                "local_date": "2026-07-05",
+                "local_time": "20:00:00",
+                "created_at": "2026-07-05T09:00:00+00:00",
+            },
+        ]
+        selected = active_featured_live_music_event(
+            rows,
+            "nashville",
+            now=datetime(2026, 7, 5, 18, tzinfo=timezone.utc),
+        )
+        self.assertEqual(selected["id"], "newer")
 
     def test_inactive_or_expired_featured_event_does_not_apply(self):
         now = datetime(2026, 7, 5, 18, tzinfo=timezone.utc)

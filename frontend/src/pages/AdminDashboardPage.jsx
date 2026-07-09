@@ -1425,13 +1425,16 @@ function FeaturedLiveMusicPanel({
           />
         </Field>
         <Field label="Priority">
-          <Input
-            type="number"
-            value={String(value.priority ?? 0)}
-            onChange={(e) => onChange({ ...value, priority: Number(e.target.value || 0) })}
-            className="bg-[#1A1A22] border-white/10 text-white"
-            data-testid="featured-live-music-priority"
-          />
+          <div className="space-y-2">
+            <Input
+              type="number"
+              value={String(value.priority ?? 0)}
+              onChange={(e) => onChange({ ...value, priority: Number(e.target.value || 0) })}
+              className="bg-[#1A1A22] border-white/10 text-white"
+              data-testid="featured-live-music-priority"
+            />
+            <p className="text-xs text-[#A1A1AA]">1 appears first.</p>
+          </div>
         </Field>
       </div>
 

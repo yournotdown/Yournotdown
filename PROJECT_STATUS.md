@@ -6,6 +6,32 @@ The repo is currently on branch `main`. The only known worktree changes outside 
 
 ## Latest Work Session
 
+Latest local featured-event priority launch-blocker pass:
+- fixed Featured Live Music priority semantics so lower positive numbers win instead of higher numbers
+- backend changes:
+  - `backend/featured_live_music.py`
+    - centralized active featured-event ranking through `_featured_live_music_sort_key(...)`
+    - `priority` now sorts ascending, where `1` appears first
+    - tie-breaks now use `local_time` ascending, then `created_at` descending, then `updated_at` descending
+  - `backend/server.py`
+    - kept the same active-featured-event helper for both public live-music injection and Tonight's Move forcing
+    - tightened public live-music de-duping so the pinned featured event is not duplicated by matching event identity in the same list
+- frontend changes:
+  - `frontend/src/pages/AdminDashboardPage.jsx`
+    - added helper copy under the Featured Live Music priority field: `1 appears first.`
+- test coverage added/updated:
+  - `backend/tests/test_featured_live_music_unit.py`
+  - `backend/tests/test_city_events_filtering_contract.py`
+  - `frontend/src/pages/pages.contract.test.js`
+- local verification for this pass:
+  - `python3 -B -m unittest backend.tests.test_city_events_filtering_contract backend.tests.test_featured_live_music_unit backend.tests.test_tonight_page_contract backend.tests.test_ticketmaster_events_unit` passed
+  - `python3 -B -m unittest backend.tests.test_business_owner_contract backend.tests.test_analytics_contract backend.tests.test_saved_itinerary_contract backend.tests.test_locked_steps_contract backend.tests.test_tonight_page_contract backend.tests.test_city_events_filtering_contract backend.tests.test_ticketmaster_events_unit backend.tests.test_contact_inquiries_contract backend.tests.test_featured_live_music_unit` passed
+  - `cd frontend && npm run build` passed
+  - `cd frontend && CI=true npm test -- --watchAll=false` passed
+- still unverified:
+  - no manual browser QA has yet confirmed that an active priority-1 featured event renders first on the public live music surface in production
+  - no manual browser QA has yet confirmed that multiple simultaneous active featured events respect the new `1 appears first` ordering end-to-end in admin and public views
+
 Latest local featured-event launch-blocker pass:
 - fixed the Featured Live Music admin path so active manual featured events can appear on the public `live-music` category/detail surface instead of only affecting Tonight's Move generation
 - backend changes:

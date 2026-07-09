@@ -1,5 +1,13 @@
 ## Immediate Follow-Up
 
+0. Manually QA the featured live music priority fix after the next deploy:
+   - create two active same-day Featured Live Music events with priorities `1` and `2`
+   - confirm the priority-`1` event appears first on the public live music page
+   - confirm the priority-`1` event is the Tonight's Move live music recommendation when the entertainment slot is present
+   - confirm the admin helper copy under Priority reads `1 appears first.`
+   - confirm no duplicate featured live music card appears in the same public list
+   - confirm Ticketmaster live music still appears as fallback when no featured event is active
+
 0. Manually QA the featured live music launch-blocker fix after the next deploy:
    - create or edit one active Featured Live Music event in admin with a same-day date and time
    - confirm it appears on the public `/nashville/live-music` category detail page

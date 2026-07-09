@@ -180,6 +180,7 @@ describe("AdminDashboardPage source contract", () => {
     expect(adminDashboardSource).toContain("Uploaded image is currently being used.");
     expect(adminDashboardSource).toContain("If you upload an image, it will be used before the image URL.");
     expect(adminDashboardSource).toContain("Featured event image uploaded");
+    expect(adminDashboardSource).toContain("1 appears first.");
   });
 });
 

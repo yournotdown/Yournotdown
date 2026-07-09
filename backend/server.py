@@ -1881,15 +1881,21 @@ async def _public_businesses(
         featured_live_music = await _active_featured_live_music_event(city)
         if featured_live_music:
             featured_business = featured_live_music_business(featured_live_music)
+            featured_event = featured_live_music_step_event(featured_live_music)
+            featured_event_id = featured_event.get("external_event_id") or featured_event.get("id")
             public_businesses = [
                 {
                     **featured_business,
-                    "event": featured_live_music_step_event(featured_live_music),
+                    "event": featured_event,
                 },
                 *[
                     business
                     for business in public_businesses
                     if business.get("id") != featured_business.get("id")
+                    and (
+                        ((business.get("event") or {}).get("external_event_id") or (business.get("event") or {}).get("id"))
+                        != featured_event_id
+                    )
                 ],
             ]
     return public_businesses[:limit]

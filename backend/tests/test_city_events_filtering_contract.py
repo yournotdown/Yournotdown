@@ -38,8 +38,11 @@ class TestCityEventsFilteringContract(unittest.TestCase):
         self.assertIn('if category == "live-music" and featured is not False:', source)
         self.assertIn("featured_live_music = await _active_featured_live_music_event(city)", source)
         self.assertIn("featured_business = featured_live_music_business(featured_live_music)", source)
-        self.assertIn('"event": featured_live_music_step_event(featured_live_music)', source)
+        self.assertIn("featured_event = featured_live_music_step_event(featured_live_music)", source)
+        self.assertIn("featured_event_id = featured_event.get(", source)
+        self.assertIn('"event": featured_event', source)
         self.assertIn('if business.get("id") != featured_business.get("id")', source)
+        self.assertIn('!= featured_event_id', source)
         self.assertIn("return public_businesses[:limit]", source)
 
     def test_itinerary_generation_uses_filtered_today_events(self):

@@ -69,15 +69,31 @@ def active_featured_live_music_event(records: Iterable[dict], city_slug: str,
     ]
     if not active:
         return None
-    return sorted(
-        active,
-        key=lambda record: (
-            record.get("priority") or 0,
-            record.get("updated_at") or "",
-            record.get("created_at") or "",
-        ),
-        reverse=True,
-    )[0]
+    return sorted(active, key=_featured_live_music_sort_key)[0]
+
+
+def _featured_live_music_sort_key(record: dict) -> tuple:
+    priority = record.get("priority")
+    try:
+        priority_value = int(priority)
+    except (TypeError, ValueError):
+        priority_value = 0
+    if priority_value < 1:
+        priority_value = 999999
+
+    local_time = (record.get("local_time") or "99:99:99").strip()
+    created_at = record.get("created_at") or ""
+    updated_at = record.get("updated_at") or ""
+    return (
+        priority_value,
+        local_time,
+        _descending_text_sort_value(created_at),
+        _descending_text_sort_value(updated_at),
+    )
+
+
+def _descending_text_sort_value(value: str) -> tuple[int, ...]:
+    return tuple(-ord(ch) for ch in value)
 
 
 def featured_live_music_business(record: dict) -> dict:
