@@ -42,7 +42,7 @@ export default function TermsPage() {
         <div className="text-[10px] uppercase tracking-[0.3em] text-[#C6FF00]">YND / EST. 26</div>
         <h1 className="mt-4 font-flyer text-5xl uppercase leading-[0.92]">Terms</h1>
         <p className="mt-4 text-sm leading-7 text-white/68">
-          These launch-ready terms are plain-language product terms for YourNotDown. They are not a promise of complete legal protection and may be updated after attorney review.
+          These Terms explain how YourNotDown works and the conditions that apply when you use the service.
         </p>
 
         <div className="mt-10 space-y-8">

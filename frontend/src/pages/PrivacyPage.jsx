@@ -42,7 +42,7 @@ export default function PrivacyPage() {
         <div className="text-[10px] uppercase tracking-[0.3em] text-[#C6FF00]">YND / EST. 26</div>
         <h1 className="mt-4 font-flyer text-5xl uppercase leading-[0.92]">Privacy</h1>
         <p className="mt-4 text-sm leading-7 text-white/68">
-          This page explains the current launch-era data practices for YourNotDown in plain language.
+          This Privacy Policy explains how YourNotDown collects, uses, and protects information submitted through the service.
         </p>
 
         <div className="mt-10 space-y-8">
