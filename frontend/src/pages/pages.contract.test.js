@@ -19,6 +19,12 @@ const visitorHelperSource = fs.readFileSync(path.join(__dirname, "..", "lib", "v
 const qrHelperSource = fs.readFileSync(path.join(__dirname, "..", "lib", "qr.js"), "utf8");
 
 describe("TonightPage source contract", () => {
+  test("public shell does not render the old scanline bar", () => {
+    expect(homePageSource).not.toContain("scanline-anim");
+    expect(vibePageSource).not.toContain("scanline-anim");
+    expect(tonightPageSource).not.toContain("scanline-anim");
+  });
+
   test("Run It Back scrolls to the top after a successful reroll", () => {
     expect(tonightPageSource).toContain("scrollToTopOnSuccess = false");
     expect(tonightPageSource).toContain("scrollToTopOnSuccess: true");
@@ -86,6 +92,13 @@ describe("VibePage source contract", () => {
     expect(vibePageSource).toContain("lg:max-h-[210px]");
     expect(vibePageSource).toContain("lg:gap-x-4 lg:gap-y-4");
     expect(vibePageSource).toContain("lg:pt-16 lg:pb-20");
+  });
+});
+
+describe("HomePage source contract", () => {
+  test("public homepage does not expose the admin shortcut link", () => {
+    expect(homePageSource).not.toContain("homepage-admin-link");
+    expect(homePageSource).not.toContain('navigate("/admin/login")');
   });
 });
 

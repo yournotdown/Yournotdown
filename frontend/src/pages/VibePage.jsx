@@ -36,7 +36,6 @@ export default function VibePage() {
       <div className="pointer-events-none absolute inset-0 film-grain opacity-70" />
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,_transparent_55%,_#000_100%)]" />
       <div className="pointer-events-none absolute inset-0 strobe-dim bg-black" />
-      <div className="pointer-events-none absolute inset-x-0 h-px bg-white/40 scanline-anim" />
 
       {/* Corner marks */}
       <div className="absolute top-5 left-6 z-10 text-[10px] uppercase tracking-[0.3em] text-white/40 select-none">

@@ -6,6 +6,22 @@ The repo is currently on branch `main`. The only known worktree changes outside 
 
 ## Latest Work Session
 
+Latest local final public UI cleanup pass:
+- removed the small public Admin shortcut from the bottom-right of the homepage
+- removed the thin animated scanline bar from the public page shells:
+  - `HomePage`
+  - `VibePage`
+  - `TonightPage`
+- kept the legal/footer links intact through `PublicFooter`
+- did not change any admin routes, auth behavior, analytics, or backend logic
+- added a frontend source-contract guard so the old public Admin shortcut and scanline effect do not quietly return
+- local verification for this pass:
+  - `cd frontend && npm run build` passed
+  - `cd frontend && CI=true npm test -- --watchAll=false` passed
+  - `git diff --check` passed
+- still unverified:
+  - no manual browser QA has yet confirmed the public pages feel correct after removing the scanline effect and homepage Admin shortcut in production
+
 Latest local featured-live-music slot-order correction pass:
 - corrected the earlier launch-blocker assumption that Featured Live Music should become card `1` of the entire itinerary
 - removed the backend post-processing step that promoted featured live music to the front of Tonight's Move

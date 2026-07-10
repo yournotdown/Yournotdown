@@ -39,8 +39,6 @@ export default function HomePage() {
       <div className="pointer-events-none absolute inset-0 film-grain opacity-70" />
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,_transparent_55%,_#000_100%)]" />
       <div className="pointer-events-none absolute inset-0 strobe-dim bg-black" />
-      {/* Scanline */}
-      <div className="pointer-events-none absolute inset-x-0 h-px bg-white/40 scanline-anim" />
 
       {/* HERO TYPE */}
       <motion.div
@@ -118,13 +116,6 @@ export default function HomePage() {
         Vol. 001
       </div>
 
-      <button
-        onClick={() => navigate("/admin/login")}
-        className="absolute bottom-16 right-6 z-20 text-[10px] uppercase tracking-[0.3em] text-white/20 hover:text-[#C6FF00] transition-colors"
-        data-testid="homepage-admin-link"
-      >
-        admin
-      </button>
       <PublicFooter className="absolute bottom-16 left-6 z-20" compact />
     </div>
   );

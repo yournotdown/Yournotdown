@@ -1,5 +1,10 @@
 ## Immediate Follow-Up
 
+0. Manually QA the final public UI cleanup after the next deploy:
+   - confirm the homepage no longer shows the small public Admin link in the bottom-right
+   - confirm the homepage, vibe page, and Tonight's Move page no longer show the thin animated scanline bar during screen changes
+   - confirm legal/footer links still render correctly in the lower-left footer area
+
 0. Manually QA the corrected featured-live-music slot behavior after the next deploy:
    - create an active same-day Nashville featured live-music event with priority `1`
    - leave Tonight's Move sponsorship inactive
