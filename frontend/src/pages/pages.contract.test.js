@@ -174,8 +174,8 @@ describe("AdminDashboardPage source contract", () => {
   });
 
   test("featured live music copy explains active priority behavior without override wording", () => {
-    expect(adminDashboardSource).toContain("The top active same-day featured event is used as the Live Music pick while active.");
-    expect(adminDashboardSource).toContain("1 appears first and is used as the featured Live Music pick while active.");
+    expect(adminDashboardSource).toContain("The top active same-day featured event is used as the Live Music step while active.");
+    expect(adminDashboardSource).toContain("1 appears first in Live Music and is used as the Live Music step while active.");
     expect(adminDashboardSource).toContain("Active featured event");
   });
 
@@ -186,9 +186,11 @@ describe("AdminDashboardPage source contract", () => {
     expect(adminDashboardSource).toContain("Uploaded image is currently being used.");
     expect(adminDashboardSource).toContain("If you upload an image, it will be used before the image URL.");
     expect(adminDashboardSource).toContain("Featured event image uploaded");
-    expect(adminDashboardSource).toContain("The top active same-day featured event is used as the Live Music pick while active.");
-    expect(adminDashboardSource).toContain("1 appears first and is used as the featured Live Music pick while active.");
+    expect(adminDashboardSource).toContain("The top active same-day featured event is used as the Live Music step while active.");
+    expect(adminDashboardSource).toContain("1 appears first in Live Music and is used as the Live Music step while active.");
     expect(adminDashboardSource).toContain("Active featured event");
+    expect(adminDashboardSource).toContain("This does not require an active sponsorship.");
+    expect(adminDashboardSource).toContain("Sponsorship does not control Featured Live Music visibility.");
   });
 });
 

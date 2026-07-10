@@ -1,5 +1,27 @@
 ## Immediate Follow-Up
 
+0. Manually QA the corrected featured-live-music slot behavior after the next deploy:
+   - create an active same-day Nashville featured live-music event with priority `1`
+   - leave Tonight's Move sponsorship inactive
+   - confirm the public live-music category/detail list still shows the featured event first without duplication
+   - confirm Tonight's Move keeps the featured event in the normal `entertainment` slot rather than card `1`
+   - confirm dinner and drinks still remain ahead of the live-music step in the default itinerary order
+   - click `Run It Back` repeatedly and confirm the unlocked featured live-music event can rotate away after it has been shown
+   - lock the live-music card and confirm the locked featured selection stays fixed
+   - confirm the admin helper copy now reads:
+     - `This does not require an active sponsorship.`
+     - `1 appears first in Live Music and is used as the Live Music step while active.`
+
+0. Manually QA the featured-live-music sponsorship separation after the next deploy:
+   - create an active same-day Nashville featured live-music event with priority `1`
+   - leave Tonight's Move sponsorship inactive
+   - confirm the featured event still appears first on the public live-music page
+   - confirm the featured event still appears as card `1` on Tonight's Move
+   - confirm `Run It Back` keeps card `1` pinned while other unlocked cards can still change
+   - confirm the admin copy now clearly separates:
+     - `This does not require an active sponsorship.`
+     - `Sponsorship does not control Featured Live Music visibility.`
+
 0. Manually QA the featured-live-music first-card behavior after the next deploy:
    - select each launch vibe and confirm the active same-day priority-`1` featured live-music event is card 1 on first load
    - click `Run It Back` repeatedly and confirm the featured live-music card stays first while it remains active and unlocked

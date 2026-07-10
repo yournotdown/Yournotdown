@@ -29,8 +29,8 @@ from google_places_photos import (
 from featured_live_music import (
     FEATURED_LIVE_MUSIC_SLOT,
     active_featured_live_music_event,
+    featured_live_music_is_excluded,
     featured_live_music_pick,
-    promote_featured_live_music_step_first,
     normalize_live_music_event_mode,
 )
 from ticketmaster_events import (
@@ -1987,7 +1987,11 @@ async def generate_itinerary(req: ItineraryRequest, request: Request):
             forced_event = None
             if label["slot"] == "entertainment":
                 event_candidates = [business for business in candidates if business_supports_live_music_event(business)]
-                if featured_live_music:
+                if featured_live_music and not featured_live_music_is_excluded(
+                    featured_live_music,
+                    exclude | chosen_ids | slot_history_excludes,
+                    exclude_event_ids,
+                ):
                     pick, forced_event = featured_live_music_pick(featured_live_music)
                 elif live_music_event_mode in {"ticketmaster", "ticketmaster_preferred"}:
                     pick, forced_event = itinerary_event_pick(
@@ -2026,10 +2030,6 @@ async def generate_itinerary(req: ItineraryRequest, request: Request):
                     steps.append(step)
                 else:
                     steps.append(attach_event_to_step(step, today_events_by_business))
-
-        if featured_live_music and "entertainment" not in locked_steps_by_slot:
-            featured_event_id = featured_live_music.get("id", "")
-            steps = promote_featured_live_music_step_first(steps, featured_event_id)
 
         itin_id = str(uuid.uuid4())
         itinerary = {

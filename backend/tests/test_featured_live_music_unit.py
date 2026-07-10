@@ -11,9 +11,9 @@ from featured_live_music import (  # noqa: E402
     LIVE_MUSIC_EVENT_MODE_TICKETMASTER_PREFERRED,
     active_featured_live_music_event,
     featured_event_is_active,
+    featured_live_music_is_excluded,
     featured_live_music_business,
     featured_live_music_pick,
-    promote_featured_live_music_step_first,
     featured_live_music_step_event,
     normalize_live_music_event_mode,
 )
@@ -226,32 +226,59 @@ class TestFeaturedLiveMusic(unittest.TestCase):
         self.assertEqual(event["source"], "admin_featured_event")
         self.assertEqual(event["title"], "Priority One Show")
 
-    def test_promotes_featured_live_music_step_to_first_card(self):
-        steps = [
-            {"slot": "dinner", "number": 1, "business": {"id": "dinner-1"}},
-            {"slot": "drinks", "number": 2, "business": {"id": "drinks-1"}},
+    def test_sponsorship_fields_do_not_control_featured_visibility(self):
+        rows = [
             {
-                "slot": "entertainment",
-                "number": 3,
-                "business": {"id": "featured-live-music-feature-3"},
-                "event": {"id": "feature-3", "external_event_id": "feature-3"},
+                "id": "feature-4",
+                "city_slug": "nashville",
+                "slot": "live_music",
+                "active": True,
+                "priority": 1,
+                "title": "Visible Without Sponsorship",
+                "venue_name": "Mercy Lounge",
+                "local_date": "2026-07-05",
+                "local_time": "20:00:00",
+                "sponsorship_active": False,
+                "sponsor_tier": "none",
+                "sponsored": False,
             },
-            {"slot": "late-night", "number": 4, "business": {"id": "late-1"}},
         ]
-        reordered = promote_featured_live_music_step_first(steps, "feature-3")
-        self.assertEqual(reordered[0]["slot"], "entertainment")
-        self.assertEqual(reordered[0]["event"]["external_event_id"], "feature-3")
-        self.assertEqual([step["number"] for step in reordered], [1, 2, 3, 4])
-        self.assertEqual(len([step for step in reordered if step["slot"] == "entertainment"]), 1)
+        selected = active_featured_live_music_event(
+            rows,
+            "nashville",
+            now=datetime(2026, 7, 5, 18, tzinfo=timezone.utc),
+        )
+        self.assertEqual(selected["id"], "feature-4")
 
-    def test_promote_helper_leaves_steps_unchanged_when_featured_missing(self):
-        steps = [
-            {"slot": "dinner", "number": 1, "business": {"id": "dinner-1"}},
-            {"slot": "drinks", "number": 2, "business": {"id": "drinks-1"}},
-        ]
-        reordered = promote_featured_live_music_step_first(steps, "missing-feature")
-        self.assertEqual([step["slot"] for step in reordered], ["dinner", "drinks"])
-        self.assertEqual([step["number"] for step in reordered], [1, 2])
+    def test_featured_event_is_excluded_by_synthetic_business_id(self):
+        record = {"id": "feature-3", "venue_business_id": "", "slot": "live_music"}
+        self.assertTrue(
+            featured_live_music_is_excluded(
+                record,
+                {"featured-live-music-feature-3"},
+                set(),
+            )
+        )
+
+    def test_featured_event_is_excluded_by_event_id(self):
+        record = {"id": "feature-3", "venue_business_id": "venue-123", "slot": "live_music"}
+        self.assertTrue(
+            featured_live_music_is_excluded(
+                record,
+                set(),
+                {"feature-3"},
+            )
+        )
+
+    def test_featured_event_remains_available_when_not_excluded(self):
+        record = {"id": "feature-3", "venue_business_id": "venue-123", "slot": "live_music"}
+        self.assertFalse(
+            featured_live_music_is_excluded(
+                record,
+                {"other-venue"},
+                {"other-feature"},
+            )
+        )
 
     def test_normalizes_first_load_mode(self):
         self.assertEqual(

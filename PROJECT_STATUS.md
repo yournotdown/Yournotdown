@@ -6,6 +6,60 @@ The repo is currently on branch `main`. The only known worktree changes outside 
 
 ## Latest Work Session
 
+Latest local featured-live-music slot-order correction pass:
+- corrected the earlier launch-blocker assumption that Featured Live Music should become card `1` of the entire itinerary
+- removed the backend post-processing step that promoted featured live music to the front of Tonight's Move
+- confirmed the intended behavior is now:
+  - featured live music remains in the normal `entertainment` slot position
+  - dinner and drinks remain ahead of it in the standard itinerary order
+  - priority `1` still means top featured live-music candidate for:
+    - public Live Music category/detail ordering
+    - initial Tonight's Move entertainment-slot selection while active
+- updated reroll behavior so unlocked featured live music can rotate away:
+  - the backend now checks featured-event business/event identity against:
+    - `exclude_ids`
+    - `exclude_ids_by_slot`
+    - `exclude_event_ids`
+  - if the featured event has already been shown and is not locked, `Run It Back` can fall through to Ticketmaster or weighted live-music fallback instead of forcing the same featured event forever
+- preserved the rest of the intended launch behavior:
+  - public Live Music category/detail still injects the active featured event first with no duplicate
+  - sponsorship remains separate from featured-event visibility
+  - locked featured live-music selections still remain locked through `locked_steps`
+  - uploaded `image_path` still remains available alongside `image_url`
+- frontend/admin copy updated:
+  - featured helper copy now says the event is used as the `Live Music step while active`
+  - priority helper copy now says `1 appears first in Live Music and is used as the Live Music step while active.`
+- local verification for this pass:
+  - `python3 -B -m unittest backend.tests.test_city_events_filtering_contract backend.tests.test_featured_live_music_unit backend.tests.test_tonight_page_contract backend.tests.test_ticketmaster_events_unit` passed
+  - `python3 -B -m unittest backend.tests.test_business_owner_contract backend.tests.test_analytics_contract backend.tests.test_saved_itinerary_contract backend.tests.test_locked_steps_contract backend.tests.test_tonight_page_contract backend.tests.test_city_events_filtering_contract backend.tests.test_ticketmaster_events_unit backend.tests.test_contact_inquiries_contract backend.tests.test_featured_live_music_unit` passed
+  - `cd frontend && npm run build` passed
+  - `cd frontend && CI=true npm test -- --watchAll=false` passed
+  - `git diff --check` passed
+- still unverified:
+  - no manual production/admin QA has yet confirmed that `Run It Back` rotates away from an unlocked featured live-music event exactly as expected after deploy
+  - no manual browser QA has yet confirmed that the featured event still appears first on the public Live Music surface while staying in the normal entertainment slot within Tonight's Move
+
+Latest local featured-live-music sponsorship-separation clarification pass:
+- audited the current code path and confirmed featured-event visibility is not filtered by sponsorship state in backend selection logic
+- confirmed the confusion point is admin UX, not sponsor-field gating:
+  - featured live music uses `AdminFeaturedLiveMusicEvent.active`
+  - tonight sponsorship uses a separate `AdminTonightMoveSponsorship.active`
+  - both panels live on the same admin tab, which can make it look like sponsorship is required
+- updated admin copy in `frontend/src/pages/AdminDashboardPage.jsx` to make the separation explicit:
+  - featured panel now says `This does not require an active sponsorship.`
+  - sponsorship panel now says `Sponsorship does not control Featured Live Music visibility.`
+- added tests proving sponsor-style fields do not control featured-event visibility:
+  - `backend/tests/test_featured_live_music_unit.py`
+  - `backend/tests/test_city_events_filtering_contract.py`
+  - `frontend/src/pages/pages.contract.test.js`
+- local verification for this pass:
+  - focused featured/ticketmaster suite passed
+  - broader safe backend suite passed
+  - frontend build passed
+  - frontend tests passed
+- still unverified:
+  - no live browser QA has yet confirmed that Blake's observed `active sponsorship` dependency was purely UI confusion rather than a deployment-state mismatch
+
 Latest local featured-live-music first-card launch-blocker pass:
 - confirmed the tracked dirty files matched the expected featured-live-music workset before editing; there were no unrelated tracked dirty files
 - clarified the real remaining blocker:

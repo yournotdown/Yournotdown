@@ -1284,7 +1284,10 @@ function FeaturedLiveMusicPanel({
         <div>
           <h2 className="font-display text-3xl font-bold">Featured Live Music Event</h2>
           <p className="mt-1 text-sm text-[#A1A1AA]">
-            The top active same-day featured event is used as the Live Music pick while active. If none is active, the normal Ticketmaster fallback applies.
+            The top active same-day featured event is used as the Live Music step while active. If none is active, the normal Ticketmaster fallback applies.
+          </p>
+          <p className="mt-2 text-xs uppercase tracking-[0.18em] text-white/45">
+            This does not require an active sponsorship.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -1433,7 +1436,7 @@ function FeaturedLiveMusicPanel({
               className="bg-[#1A1A22] border-white/10 text-white"
               data-testid="featured-live-music-priority"
             />
-            <p className="text-xs text-[#A1A1AA]">1 appears first and is used as the featured Live Music pick while active.</p>
+            <p className="text-xs text-[#A1A1AA]">1 appears first in Live Music and is used as the Live Music step while active.</p>
           </div>
         </Field>
       </div>
@@ -1515,6 +1518,9 @@ function TonightMoveSponsorshipPanel({ value, onChange, onSave, onDelete, saving
           <h2 className="font-display text-3xl font-bold">Tonight&apos;s Move Sponsorship</h2>
           <p className="mt-1 text-sm text-[#A1A1AA]">
             Shows a subtle sponsor treatment near the Tonight page hero without affecting itinerary selection.
+          </p>
+          <p className="mt-2 text-xs uppercase tracking-[0.18em] text-white/45">
+            Sponsorship does not control Featured Live Music visibility.
           </p>
         </div>
         <div className="flex items-center gap-2">
