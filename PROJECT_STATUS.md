@@ -6,6 +6,37 @@ The repo is currently on branch `main`. The only known worktree changes outside 
 
 ## Latest Work Session
 
+Latest local live Google ratings pass for Tonight's Move only:
+- added a narrow backend endpoint: `POST /api/places/live-ratings`
+- endpoint behavior:
+  - accepts up to `4` unique Google `place_id` values
+  - deduplicates incoming IDs
+  - rejects malformed IDs with a safe `400`
+  - rate-limits by IP using the existing in-process limiter
+  - requests only:
+    - `rating`
+    - `userRatingCount`
+    - `googleMapsUri`
+    - `attributions`
+  - uses the existing server-side Google Places API key
+  - does not write ratings or review counts to MongoDB
+  - returns safe per-place results and tolerates partial upstream failures
+- frontend changes are intentionally narrow:
+  - `TonightPage` now requests live ratings once per itinerary after load
+  - ratings stay in React state only and are not written to localStorage, sessionStorage, IndexedDB, or MongoDB
+  - eligible Tonight cards render:
+    - `4.7 ★ (1,240 reviews) · Google Maps`
+  - the row stays hidden when rating data is missing, failed, or zero
+  - card order, `Run It Back`, locked-card behavior, sponsorship appearance, and Featured Live Music behavior remain unchanged
+- local verification for this pass:
+  - `python3 -B -m unittest backend.tests.test_business_owner_contract backend.tests.test_analytics_contract backend.tests.test_saved_itinerary_contract backend.tests.test_locked_steps_contract backend.tests.test_tonight_page_contract backend.tests.test_city_events_filtering_contract backend.tests.test_ticketmaster_events_unit backend.tests.test_contact_inquiries_contract backend.tests.test_featured_live_music_unit backend.tests.test_live_ratings_contract` passed
+  - `cd frontend && npm run build` passed
+  - `cd frontend && CI=true npm test -- --watchAll=false` passed
+  - `git diff --check` passed
+- still unverified:
+  - no manual production/browser QA has yet confirmed that the live Google Maps rating row appears only on eligible Tonight cards and opens the correct Google Maps venue link
+  - no live QA has yet confirmed real-world rate-limit behavior for the new endpoint under repeated client refreshes
+
 Latest local final public UI cleanup pass:
 - removed the small public Admin shortcut from the bottom-right of the homepage
 - removed the thin animated scanline bar from the public page shells:

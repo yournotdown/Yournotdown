@@ -60,6 +60,7 @@ export default function TonightPage() {
   const [saveLoading, setSaveLoading] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState("");
   const [saveError, setSaveError] = useState("");
+  const [liveRatingsByPlaceId, setLiveRatingsByPlaceId] = useState({});
   const sponsorship = itinerary?.tonight_move_sponsorship;
   const allStepsLocked = Boolean(
     itinerary?.steps?.length === 4 && itinerary.steps.every((step) => Boolean(lockedSteps[step.slot]))
@@ -133,9 +134,41 @@ export default function TonightPage() {
     setSaveLoading(false);
     setSaveSuccess("");
     setSaveError("");
+    setLiveRatingsByPlaceId({});
     generate({ liveMusicEventMode: "ticketmaster_preferred" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [citySlug, vibe]);
+
+  useEffect(() => {
+    const placeIds = Array.from(
+      new Set(
+        (itinerary?.steps || [])
+          .map((step) => step?.business?.google_place_id)
+          .filter(Boolean)
+      )
+    ).slice(0, 4);
+    if (!placeIds.length) {
+      setLiveRatingsByPlaceId({});
+      return undefined;
+    }
+    let cancelled = false;
+    const loadLiveRatings = async () => {
+      try {
+        const response = await api.post("/places/live-ratings", { place_ids: placeIds });
+        if (!cancelled) {
+          setLiveRatingsByPlaceId(response?.data?.results || {});
+        }
+      } catch (_error) {
+        if (!cancelled) {
+          setLiveRatingsByPlaceId({});
+        }
+      }
+    };
+    loadLiveRatings();
+    return () => {
+      cancelled = true;
+    };
+  }, [itinerary?.steps]);
 
   useEffect(() => {
     if (allStepsLocked) {
@@ -393,6 +426,7 @@ export default function TonightPage() {
                     step={step}
                     idx={idx}
                     total={itinerary.steps.length}
+                    liveRating={liveRatingsByPlaceId[step?.business?.google_place_id] || null}
                     locked={Boolean(lockedSteps[step.slot])}
                     onLock={handleLockStep}
                     onUnlock={handleUnlockStep}
@@ -548,7 +582,29 @@ export default function TonightPage() {
   );
 }
 
-function StepCard({ step, idx, total, locked, onLock, onUnlock, onAction, directionsUrl }) {
+function formatLiveRatingValue(value) {
+  const rating = Number(value);
+  if (!Number.isFinite(rating) || rating <= 0) return "";
+  return rating.toFixed(1);
+}
+
+function formatLiveRatingReviewCount(value) {
+  const count = Number(value);
+  if (!Number.isFinite(count) || count <= 0) return "";
+  return count.toLocaleString();
+}
+
+function sanitizeLiveRatingAttributions(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => ({
+      provider: String(item?.provider || "").trim(),
+      providerUri: String(item?.providerUri || "").trim(),
+    }))
+    .filter((item) => item.provider);
+}
+
+function StepCard({ step, idx, total, liveRating, locked, onLock, onUnlock, onAction, directionsUrl }) {
   const b = step.business || {};
   const event = step.event;
   const imageUrl = resolveImageUrl(b, { maxWidth: 960 }) || event?.image_url;
@@ -556,6 +612,11 @@ function StepCard({ step, idx, total, locked, onLock, onUnlock, onAction, direct
   const title = SLOT_TITLES[step.slot] || step.label.toUpperCase();
   const number = String(idx + 1).padStart(2, "0");
   const eventTime = formatEventTime(event?.local_time);
+  const formattedRating = formatLiveRatingValue(liveRating?.rating);
+  const formattedReviewCount = formatLiveRatingReviewCount(liveRating?.user_rating_count);
+  const googleMapsUri = liveRating?.google_maps_uri || "";
+  const attributionProviders = sanitizeLiveRatingAttributions(liveRating?.attributions);
+  const showLiveRating = Boolean(formattedRating && formattedReviewCount);
 
   return (
     <motion.section
@@ -632,6 +693,52 @@ function StepCard({ step, idx, total, locked, onLock, onUnlock, onAction, direct
       >
         {b.name}
       </h2>
+
+      {showLiveRating ? (
+        <div
+          className="mt-2 inline-flex max-w-full flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-1.5 text-[12px] font-normal not-italic leading-5 text-white/64"
+          data-testid={`tonight-live-rating-${b.id}`}
+          aria-label={`Google Maps rating ${formattedRating} out of 5 from ${formattedReviewCount} reviews`}
+        >
+          <span className="whitespace-nowrap">
+            {formattedRating} <span aria-hidden="true">★</span>
+          </span>
+          <span className="whitespace-nowrap">({formattedReviewCount} reviews)</span>
+          {attributionProviders.map((provider) => (
+            <span key={`${b.id}-${provider.provider}-${provider.providerUri || "provider"}`} className="inline-flex items-center gap-2">
+              <span className="text-white/25" aria-hidden="true">·</span>
+              {provider.providerUri ? (
+                <a
+                  href={provider.providerUri}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="whitespace-nowrap text-white/54 underline decoration-white/20 underline-offset-2 transition-colors hover:text-[#C6FF00]"
+                >
+                  {provider.provider}
+                </a>
+              ) : (
+                <span className="whitespace-nowrap text-white/54">{provider.provider}</span>
+              )}
+            </span>
+          ))}
+          <span className="text-white/25" aria-hidden="true">·</span>
+          {googleMapsUri ? (
+            <a
+              href={googleMapsUri}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="whitespace-nowrap text-white/58 underline decoration-white/20 underline-offset-2 transition-colors hover:text-[#C6FF00]"
+              translate="no"
+            >
+              Google Maps
+            </a>
+          ) : (
+            <span className="whitespace-nowrap text-white/58" translate="no">
+              Google Maps
+            </span>
+          )}
+        </div>
+      ) : null}
 
       {event && (
         <div className="mt-4 border-l-2 border-[#C6FF00] pl-3" data-testid={`tonight-event-${b.id}`}>

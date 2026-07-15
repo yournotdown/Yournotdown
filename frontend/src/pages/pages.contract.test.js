@@ -66,6 +66,36 @@ describe("TonightPage source contract", () => {
     expect(tonightPageSource).toContain('decoding="async"');
     expect(tonightPageSource).toContain('sizes="(min-width: 1024px) 960px, 100vw"');
   });
+
+  test("Tonight page requests live Google ratings without changing card order or browser storage", () => {
+    expect(tonightPageSource).toContain('const [liveRatingsByPlaceId, setLiveRatingsByPlaceId] = useState({});');
+    expect(tonightPageSource).toContain('api.post("/places/live-ratings", { place_ids: placeIds })');
+    expect(tonightPageSource).toContain('.map((step) => step?.business?.google_place_id)');
+    expect(tonightPageSource).toContain(".slice(0, 4);");
+    expect(tonightPageSource).toContain("setLiveRatingsByPlaceId(response?.data?.results || {});");
+    expect(tonightPageSource).toContain("setLiveRatingsByPlaceId({});");
+    expect(tonightPageSource).toContain("formatLiveRatingValue(liveRating?.rating)");
+    expect(tonightPageSource).toContain("formatLiveRatingReviewCount(liveRating?.user_rating_count)");
+    expect(tonightPageSource).toContain("Google Maps");
+    expect(tonightPageSource).toContain('translate="no"');
+    expect(tonightPageSource).toContain('href={googleMapsUri}');
+    expect(tonightPageSource).not.toContain("liveRatingsByPlaceId.sort(");
+    expect(tonightPageSource).not.toContain("localStorage.setItem");
+    expect(tonightPageSource).not.toContain("sessionStorage.setItem");
+    expect(tonightPageSource).not.toContain("indexedDB");
+  });
+
+  test("Tonight page renders safe attribution styling for Google Maps and provider attributions", () => {
+    expect(tonightPageSource).toContain("sanitizeLiveRatingAttributions(liveRating?.attributions)");
+    expect(tonightPageSource).toContain('text-[12px]');
+    expect(tonightPageSource).toContain("font-normal");
+    expect(tonightPageSource).toContain("rounded-md border border-white/10 bg-white/[0.03]");
+    expect(tonightPageSource).toContain("whitespace-nowrap");
+    expect(tonightPageSource).toContain("provider.providerUri ? (");
+    expect(tonightPageSource).toContain("provider.provider");
+    expect(tonightPageSource).toContain('translate="no"');
+    expect(tonightPageSource).toContain("Google Maps");
+  });
 });
 
 describe("VibePage source contract", () => {

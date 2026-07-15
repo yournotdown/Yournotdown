@@ -1,5 +1,15 @@
 ## Immediate Follow-Up
 
+0. Manually QA the narrow live Google ratings pass after the next deploy:
+   - generate a real Tonight's Move itinerary with up to four canonical businesses that have `google_place_id`
+   - confirm eligible cards show:
+     - `4.7 ★ (1,240 reviews) · Google Maps`
+   - confirm the row is hidden when the live request fails, returns zero, or a business has no place ID
+   - confirm the Google Maps attribution text sits beside the rating and opens the correct venue in a new tab
+   - confirm event-only/unmapped cards do not show a rating row
+   - confirm card order, sponsorship styling, `Run It Back`, and locked-card behavior remain unchanged
+   - if Google Places quota or latency becomes a concern, decide later whether to add a very short-lived non-persistent server cache; this pass intentionally does not cache or persist results
+
 0. Manually QA the final public UI cleanup after the next deploy:
    - confirm the homepage no longer shows the small public Admin link in the bottom-right
    - confirm the homepage, vibe page, and Tonight's Move page no longer show the thin animated scanline bar during screen changes

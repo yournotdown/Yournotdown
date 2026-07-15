@@ -92,6 +92,32 @@ class TestTonightPageContract(unittest.TestCase):
         self.assertNotIn("TONIGHT'S SHOWS", TONIGHT_PAGE_SOURCE)
         self.assertNotIn("No eligible Ticketmaster shows listed for tonight", TONIGHT_PAGE_SOURCE)
 
+    def test_tonight_page_fetches_live_ratings_in_memory_only(self):
+        self.assertIn('const [liveRatingsByPlaceId, setLiveRatingsByPlaceId] = useState({});', TONIGHT_PAGE_SOURCE)
+        self.assertIn('api.post("/places/live-ratings", { place_ids: placeIds })', TONIGHT_PAGE_SOURCE)
+        self.assertIn(".map((step) => step?.business?.google_place_id)", TONIGHT_PAGE_SOURCE)
+        self.assertIn(".slice(0, 4);", TONIGHT_PAGE_SOURCE)
+        self.assertIn("liveRating={liveRatingsByPlaceId[step?.business?.google_place_id] || null}", TONIGHT_PAGE_SOURCE)
+        self.assertNotIn("localStorage", TONIGHT_PAGE_SOURCE)
+        self.assertNotIn("sessionStorage", TONIGHT_PAGE_SOURCE)
+
+    def test_tonight_page_renders_google_maps_attribution_beside_live_rating(self):
+        self.assertIn('data-testid={`tonight-live-rating-${b.id}`}', TONIGHT_PAGE_SOURCE)
+        self.assertIn("formatLiveRatingValue(liveRating?.rating)", TONIGHT_PAGE_SOURCE)
+        self.assertIn("formatLiveRatingReviewCount(liveRating?.user_rating_count)", TONIGHT_PAGE_SOURCE)
+        self.assertIn("sanitizeLiveRatingAttributions(liveRating?.attributions)", TONIGHT_PAGE_SOURCE)
+        self.assertIn("const showLiveRating = Boolean(formattedRating && formattedReviewCount);", TONIGHT_PAGE_SOURCE)
+        self.assertIn("({formattedReviewCount} reviews)", TONIGHT_PAGE_SOURCE)
+        self.assertIn('translate="no"', TONIGHT_PAGE_SOURCE)
+        self.assertIn("Google Maps", TONIGHT_PAGE_SOURCE)
+        self.assertIn('href={googleMapsUri}', TONIGHT_PAGE_SOURCE)
+        self.assertIn('provider.providerUri ? (', TONIGHT_PAGE_SOURCE)
+        self.assertIn("provider.provider", TONIGHT_PAGE_SOURCE)
+        self.assertIn("whitespace-nowrap", TONIGHT_PAGE_SOURCE)
+        self.assertIn("text-[12px]", TONIGHT_PAGE_SOURCE)
+        self.assertIn("font-normal", TONIGHT_PAGE_SOURCE)
+        self.assertIn("rounded-md border border-white/10 bg-white/[0.03]", TONIGHT_PAGE_SOURCE)
+
 
 if __name__ == "__main__":
     unittest.main()

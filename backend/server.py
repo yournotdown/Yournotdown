@@ -124,10 +124,14 @@ RATE_LIMIT_CONTACT_INQUIRIES_PER_EMAIL = 5
 RATE_LIMIT_HOTEL_QR_ADMIN_WRITES_PER_ADMIN = 30
 RATE_LIMIT_HOTEL_QR_ADMIN_WRITES_PER_IP = 30
 RATE_LIMIT_BUSINESS_CLAIM_PER_IP = 20
+RATE_LIMIT_PLACES_LIVE_RATINGS_PER_IP = 30
 RATE_LIMIT_MINUTE_SECONDS = 60
 RATE_LIMIT_HOUR_SECONDS = 60 * 60
 # In-process only. Multi-instance deployments need a shared store such as Redis.
 RATE_LIMIT_STATE: Dict[str, List[float]] = {}
+GOOGLE_PLACES_DETAILS_API_URL = "https://places.googleapis.com/v1/places"
+GOOGLE_PLACES_LIVE_RATINGS_FIELD_MASK = "rating,userRatingCount,googleMapsUri,attributions"
+GOOGLE_PLACE_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{10,200}$")
 
 
 # ------------- Models -------------
@@ -522,6 +526,10 @@ class ContactInquiryCreate(BaseModel):
 
 class ContactInquiryUpdate(BaseModel):
     status: str
+
+
+class LiveRatingsRequest(BaseModel):
+    place_ids: List[str] = Field(default_factory=list)
 
 
 class HotelQrCodeCreate(BaseModel):
@@ -1318,6 +1326,68 @@ def _valid_email(value: str) -> bool:
 
 def _normalize_email(value: str) -> str:
     return (value or "").strip().lower()
+
+
+def _normalize_google_place_id(value: str) -> str:
+    normalized = (value or "").strip()
+    if not normalized:
+        return ""
+    if not GOOGLE_PLACE_ID_PATTERN.fullmatch(normalized):
+        return ""
+    return normalized
+
+
+def _live_rating_response_item(place_id: str, payload: Optional[dict]) -> Optional[dict]:
+    if not isinstance(payload, dict):
+        return None
+    try:
+        rating_value = float(payload.get("rating"))
+        review_count_value = int(payload.get("userRatingCount"))
+    except (TypeError, ValueError):
+        return None
+    if rating_value <= 0 or review_count_value <= 0:
+        return None
+    item = {
+        "place_id": place_id,
+        "rating": rating_value,
+        "user_rating_count": review_count_value,
+    }
+    google_maps_uri = (payload.get("googleMapsUri") or "").strip()
+    if google_maps_uri:
+        item["google_maps_uri"] = google_maps_uri
+    attributions = payload.get("attributions")
+    if isinstance(attributions, list) and attributions:
+        safe_attributions = []
+        for attribution in attributions:
+            if not isinstance(attribution, dict):
+                continue
+            provider = (attribution.get("provider") or "").strip()
+            provider_uri = (attribution.get("providerUri") or "").strip()
+            if not provider:
+                continue
+            safe_attributions.append({
+                "provider": provider,
+                "providerUri": provider_uri,
+            })
+        if safe_attributions:
+            item["attributions"] = safe_attributions
+    return item
+
+
+def _fetch_google_place_live_rating(place_id: str) -> Optional[dict]:
+    api_key = os.environ.get("GOOGLE_PLACES_API_KEY", "").strip()
+    if not api_key:
+        raise RuntimeError("GOOGLE_PLACES_API_KEY is not configured")
+    response = requests.get(
+        f"{GOOGLE_PLACES_DETAILS_API_URL}/{place_id}",
+        headers={
+            "X-Goog-Api-Key": api_key,
+            "X-Goog-FieldMask": GOOGLE_PLACES_LIVE_RATINGS_FIELD_MASK,
+        },
+        timeout=5,
+    )
+    response.raise_for_status()
+    return _live_rating_response_item(place_id, response.json())
 
 
 def _normalize_visitor_id(value: Optional[str]) -> str:
@@ -2158,6 +2228,62 @@ async def get_business(business_id: str):
 @api_router.get("/events/today")
 async def list_today_events(city: str = "nashville"):
     return await _today_city_events(city)
+
+
+@api_router.post("/places/live-ratings")
+async def live_place_ratings(payload: LiveRatingsRequest, request: Request):
+    _require_ip_rate_limit(
+        "places_live_ratings_ip",
+        request,
+        limit=RATE_LIMIT_PLACES_LIVE_RATINGS_PER_IP,
+        window_seconds=RATE_LIMIT_MINUTE_SECONDS,
+    )
+    normalized_place_ids = []
+    seen_place_ids = set()
+    for raw_place_id in payload.place_ids:
+        place_id = _normalize_google_place_id(raw_place_id)
+        if not place_id:
+            raise HTTPException(status_code=400, detail="Invalid place ID.")
+        if place_id in seen_place_ids:
+            continue
+        seen_place_ids.add(place_id)
+        normalized_place_ids.append(place_id)
+    if len(normalized_place_ids) > 4:
+        raise HTTPException(status_code=400, detail="A maximum of 4 place IDs is allowed.")
+
+    if not normalized_place_ids:
+        return {"results": {}}
+
+    results = {}
+    try:
+        for place_id in normalized_place_ids:
+            try:
+                item = await run_in_threadpool(_fetch_google_place_live_rating, place_id)
+            except RuntimeError as exc:
+                logger.warning("live place ratings unavailable: error_type=%s", type(exc).__name__)
+                return {"results": {}}
+            except requests.RequestException as exc:
+                logger.warning(
+                    "live place rating request failed: place_id_hash=%s error_type=%s detail=%s",
+                    _hash_token(place_id)[:12],
+                    type(exc).__name__,
+                    describe_google_places_request_error(exc),
+                )
+                continue
+            except Exception as exc:
+                logger.warning(
+                    "live place rating parse failed: place_id_hash=%s error_type=%s",
+                    _hash_token(place_id)[:12],
+                    type(exc).__name__,
+                )
+                continue
+            if item:
+                results[place_id] = item
+    except Exception:
+        logger.exception("live place ratings failed unexpectedly")
+        return {"results": {}}
+
+    return {"results": results}
 
 
 # ------------- Google Places photos (public proxy) -------------
